@@ -103,6 +103,14 @@ vocably-ai-worker/   # Cloudflare Worker (TypeScript) — proxy AI, lihat DATA_M
 Jangan buat struktur folder baru di luar ini tanpa alasan jelas — tanyakan
 dulu kalau perlu penyesuaian.
 
+> **Pengecualian sementara (Milestone 2):** ada folder tambahan
+> `lib/screens/placeholders/` yang sengaja tidak masuk struktur di atas —
+> isinya cuma layar bukti routing berbasis role (siswa/guru), dipakai
+> sebelum shell navigasi (Milestone 3) dan dashboard asli (Milestone 6/8)
+> ada. Folder ini dihapus begitu destinasi asli menggantikannya — jangan
+> diperlakukan sebagai lapisan arsitektur permanen atau ditambahkan ke
+> struktur final di atas.
+
 ## 4. Coding Conventions
 
 - Naming: `camelCase` untuk variabel/fungsi, `PascalCase` untuk class/widget,
@@ -352,6 +360,16 @@ di `DATA_MODEL.md` §5.
   `teacherAccessCodes` — kalau valid & `active == true`, write diizinkan;
   kalau tidak, ditolak (permission-denied). Client harus menangkap error itu
   dan menampilkan "Kode akses tidak valid", bukan pesan mentah Firestore.
+  **Kalau ditolak, akun Auth yang baru saja dibuat langsung dihapus
+  (rollback)** — supaya kode salah tidak meninggalkan akun Auth tanpa
+  profil. Kegagalan lain yang tidak bisa dipastikan sebagai "kode salah"
+  (network drop, dll.) tidak memicu rollback ini — lihat poin orphaned
+  account di bawah.
+- **Akun Auth tanpa dokumen `users` ("orphaned account")** ditangani lewat
+  layar "Lengkapi Pendaftaran" (`complete_registration_screen.dart` +
+  `complete_registration_controller.dart`), yang **hanya pernah membuat
+  profil `siswa` default** — tidak pernah, dan tidak bisa, memulihkan akun
+  sebagai `guru`. Detail lengkap di `DATA_MODEL.md` §1 poin 7.
 - **`teacherCodeInput` disimpan permanen** sebagai audit trail (Firestore
   tidak punya konsep "field yang divalidasi tapi tidak tersimpan"). Karena
   itu dokumen `users` hanya boleh dibaca pemiliknya sendiri.
@@ -361,8 +379,11 @@ di `DATA_MODEL.md` §5.
 - **Setelah dokumen `users` dibuat, `role` dan `teacherCodeInput` tidak
   boleh diubah lagi** lewat `update` apa pun dari client — tegakkan eksplisit
   di security rules.
-- Field yang **boleh** di-update siswa atas dirinya sendiri: `name`,
-  `cefrLevel`, `placementTestCompleted`, `placementTestPrompted`.
+- Field yang **boleh** di-update pemilik akun atas dirinya sendiri, per
+  role: **siswa** — `name`, `cefrLevel`, `placementTestCompleted`,
+  `placementTestPrompted`; **guru** — `name` saja. Field lain (`uid`,
+  `email`, `role`, `createdAt`, `teacherCodeInput`) immutable untuk kedua
+  role. Detail matriks lengkap di `DATA_MODEL.md` §1 poin 5.
 - **Satu akun = satu role, permanen** — terjaga otomatis oleh struktur ini +
   aturan immutability di atas.
 

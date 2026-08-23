@@ -91,6 +91,15 @@ lewat field `role`), `docId` = Firebase Auth `uid`.
 >    sekali** dengan role guru (tidak ada fallback diam-diam jadi siswa;
 >    kalau write-nya ditolak, client harus tampilkan error "Kode akses tidak
 >    valid" dan minta user coba lagi atau mendaftar sebagai siswa).
+>    - **Rollback akun Auth (diimplementasikan di Milestone 2):** karena
+>      akun Firebase Auth sudah terlanjur dibuat *sebelum* penulisan profil
+>      guru ditolak, client menghapus (rollback) akun Auth tersebut begitu
+>      `permission-denied` ini **spesifik dikonfirmasi** berasal dari
+>      percobaan `role: "guru"` — supaya kode akses yang salah ketik tidak
+>      meninggalkan akun Auth menggantung tanpa profil. Kegagalan lain yang
+>      tidak bisa dipastikan sebagai "kode salah" (mis. jaringan terputus,
+>      Firestore sementara tidak bisa diakses) **tidak** memicu rollback ini
+>      — lihat poin 7 di bawah untuk penanganan kasus tersebut.
 >    - Karena `teacherCodeInput` sekarang bagian resmi dari skema, rule
 >      validasi skema pada `create` harus **mengizinkan** field ini untuk
 >      `role == "guru"` dan **menolaknya** untuk `role == "siswa"`.
@@ -106,14 +115,38 @@ lewat field `role`), `docId` = Firebase Auth `uid`.
 >    `request.resource.data.role == resource.data.role`. Terapkan hal yang
 >    sama untuk `teacherCodeInput` (audit trail tidak boleh diubah setelah
 >    dicatat).
-> 5. **Field yang BOLEH di-update siswa atas dirinya sendiri:**
->    `cefrLevel`, `placementTestCompleted`, `placementTestPrompted`, dan
->    `name`. Selain itu ditolak. Ini penting karena skoring placement test
->    dihitung di client (§6).
+> 5. **Field yang BOLEH di-update oleh pemilik akun, per role (final,
+>    diimplementasikan & diverifikasi di Milestone 2):**
+>    - **Siswa:** `name`, `cefrLevel`, `placementTestCompleted`,
+>      `placementTestPrompted`.
+>    - **Guru:** `name` saja — tidak ada field lain yang relevan untuk
+>      diedit guru atas profilnya sendiri di milestone ini.
+>    Field di luar daftar sesuai role masing-masing ditolak — termasuk
+>    `uid`, `email`, `role`, `createdAt` (immutable untuk kedua role) dan
+>    `teacherCodeInput` (immutable untuk guru, dan tidak pernah boleh ada
+>    sama sekali di dokumen siswa). Field self-update siswa penting karena
+>    skoring placement test dihitung di client (§6).
 > 6. Karena tiap akun (`uid`) cuma punya satu dokumen `users` dengan satu
 >    field `role`, dan email di Firebase Auth memang unik per akun, aturan
 >    **"satu email = satu role"** otomatis terjaga oleh struktur ini +
 >    aturan immutability di atas.
+> 7. **Akun Auth tanpa dokumen `users` ("orphaned account") —
+>    diimplementasikan di Milestone 2.** Bisa terjadi kalau sign up berhasil
+>    membuat akun Firebase Auth tapi penulisan dokumen `users/{uid}`
+>    gagal/terputus dengan cara yang **tidak** bisa dipastikan sebagai kode
+>    akses guru yang salah (mis. koneksi putus tepat setelah Auth berhasil,
+>    Firestore sementara tidak bisa diakses) — berbeda dari kasus poin 3,
+>    yang justru menghapus akun Auth-nya. Klien menangani skenario ini
+>    dengan layar "Lengkapi Pendaftaran"
+>    (`screens/auth/complete_registration_screen.dart` +
+>    `providers/complete_registration_controller.dart`): begitu Firebase
+>    Auth punya user tapi `users/{uid}` tidak ditemukan, layar ini
+>    ditampilkan dan **hanya pernah membuat profil `siswa` default** lewat
+>    jalur `create` yang sama persis (dan divalidasi rule yang sama persis)
+>    dengan sign up siswa biasa. Jalur ini **tidak pernah, dan secara
+>    struktural tidak bisa**, membuat atau memulihkan akun sebagai `guru` —
+>    ini murni defensive engineering untuk pendaftaran yang terinterupsi,
+>    bukan cara baru untuk assignment role.
 
 ## 2. `vocabWords`
 

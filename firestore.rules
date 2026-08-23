@@ -1,18 +1,77 @@
 rules_version = '2';
 
-// Milestone 1 baseline: deny all client reads/writes by default.
-//
-// This intentionally does NOT model any application schema yet — no
-// `users`/`vocabWords`/etc. rules exist because those collections don't
-// exist yet either (see DATA_MODEL.md). Real, schema-aware rules are
-// introduced starting Milestone 2 (users/role assignment) and expanded in
-// Milestone 4/5 (vocabWords) per CLAUDE.md's build order.
-//
-// This baseline replaces the project's previous test-mode rules, which had
-// already expired (2026-05-15) and were functioning as an accidental
-// deny-all. This makes that state explicit and intentional instead.
+// Milestone 2: real users/teacherAccessCodes rules. Field matrix and
+// exact rationale for every clause below were reviewed and approved
+// against DATA_MODEL.md §1 before this was written — see project chat
+// history for the field-by-field justification. Every other collection
+// still defaults to deny-all (untouched Milestone 1 baseline) since no
+// other schema exists yet.
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isValidStudentCreate() {
+      let data = request.resource.data;
+      return data.role == 'siswa'
+        && data.cefrLevel == null
+        && data.placementTestCompleted == false
+        && data.placementTestPrompted == false
+        && data.keys().hasOnly([
+             'uid', 'email', 'name', 'role', 'createdAt',
+             'cefrLevel', 'placementTestCompleted', 'placementTestPrompted'
+           ]);
+    }
+
+    function isValidTeacherCreate() {
+      let data = request.resource.data;
+      return data.role == 'guru'
+        && data.teacherCodeInput is string
+        && data.teacherCodeInput.size() > 0
+        && exists(/databases/$(database)/documents/teacherAccessCodes/$(data.teacherCodeInput))
+        && get(/databases/$(database)/documents/teacherAccessCodes/$(data.teacherCodeInput)).data.active == true
+        && data.keys().hasOnly([
+             'uid', 'email', 'name', 'role', 'createdAt', 'teacherCodeInput'
+           ]);
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.email is string
+        && request.resource.data.name is string
+        && request.resource.data.createdAt == request.time
+        && (isValidStudentCreate() || isValidTeacherCreate());
+
+      // Role-specific self-update whitelists — siswa may update its four
+      // documented fields; guru may only update `name`. uid/email/role/
+      // createdAt/teacherCodeInput are immutable for both roles: they
+      // simply never appear in either whitelist below, so any attempt to
+      // touch them fails hasOnly() and the whole update is denied.
+      allow update: if isOwner(uid)
+        && request.resource.data.role == resource.data.role
+        && (
+          (resource.data.role == 'siswa'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['name', 'cefrLevel', 'placementTestCompleted', 'placementTestPrompted']))
+          ||
+          (resource.data.role == 'guru'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['name']))
+        );
+
+      allow delete: if false;
+    }
+
+    match /teacherAccessCodes/{code} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
