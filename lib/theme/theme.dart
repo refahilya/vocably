@@ -13,8 +13,11 @@ import 'package:flutter/material.dart';
 /// the old app's code — treat the values below the same way; adjust with a
 /// color picker later if a more precise reference turns up.
 ///
-/// **Milestone 3, Stage 1 scope: tokens only.** Nothing here is wired into
-/// a `ThemeData`/`MaterialApp` yet — that is Stage 2.
+/// Stage 1 (tokens: [AppColors]/[AppSpacing]/[AppRadius]/[AppTextStyles])
+/// and Stage 2 ([AppTheme], which turns those tokens into the actual
+/// [ThemeData] wired into `MaterialApp` in `app.dart`) both live here —
+/// `theme.dart` stays the single file for design-system code per
+/// `CLAUDE.md` §5/§6, not split prematurely.
 
 /// Color tokens. Where `DESIGN_REFERENCE.md` §1 pairs a role with a "muda"
 /// (light) background variant, both are kept here — e.g. [success] +
@@ -127,4 +130,83 @@ abstract final class AppTextStyles {
     fontWeight: FontWeight.w600,
     color: Colors.black87,
   );
+}
+
+/// Builds the application [ThemeData] from the tokens above — the only
+/// place raw Flutter theming APIs meet the Vocably tokens. Nothing outside
+/// this file should reference [AppColors]/[AppTextStyles]/[AppRadius] to
+/// build theme-level styling, and nothing outside this file should
+/// hardcode a raw color/style meant to represent one of the roles above
+/// (`CLAUDE.md` §5: "jangan hardcode nilai style di widget individual").
+abstract final class AppTheme {
+  static ThemeData get themeData {
+    // Seeded from AppColors.primary so every M3-generated tonal role
+    // (containers, tertiary, etc.) that DESIGN_REFERENCE.md doesn't
+    // explicitly specify still stays harmonious with the brand color,
+    // rather than falling back to Flutter's unrelated default purple.
+    // The roles the doc *does* specify (§1) are then pinned explicitly via
+    // copyWith so they match the documented tokens exactly, not whatever
+    // the seed algorithm would have derived for them.
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      brightness: Brightness.light,
+    ).copyWith(
+      primary: AppColors.primary,
+      onPrimary: Colors.white,
+      secondary: AppColors.accent,
+      error: AppColors.error,
+      onError: Colors.white,
+      surface: AppColors.background,
+      onSurface: Colors.black87,
+    );
+
+    return ThemeData(
+      colorScheme: colorScheme,
+      // §1: "Background utama — Putih / abu sangat muda".
+      scaffoldBackgroundColor: AppColors.background,
+      // §2: "Header/app bar: bold, putih, di atas background navy".
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        titleTextStyle: AppTextStyles.appBarTitle,
+      ),
+      // Maps the tokens that have an obvious TextTheme slot; the rest of
+      // the slots keep Flutter's Material defaults — DESIGN_REFERENCE.md
+      // §2 only documents these three treatments plus the app bar above.
+      textTheme: const TextTheme(
+        headlineSmall: AppTextStyles.wordTitle,
+        bodyMedium: AppTextStyles.body,
+        labelSmall: AppTextStyles.badgeLabel,
+      ),
+      // Existing auth screens (login/sign-up/complete-registration) already
+      // use FilledButton/OutlinedButton and TextFormField with no local
+      // style overrides, so this directly restyles those already-built
+      // screens to the documented rounded shape language (§1 intro:
+      // "rounded corner, pill chip") without touching those files.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.medium),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.medium),
+          ),
+        ),
+      ),
+      // §5.6: form fields "rounded, border tipis, focus state navy".
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.medium),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.medium),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        ),
+      ),
+    );
+  }
 }

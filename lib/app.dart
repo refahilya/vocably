@@ -6,6 +6,7 @@ import 'screens/auth/complete_registration_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/placeholders/student_placeholder.dart';
 import 'screens/placeholders/teacher_placeholder.dart';
+import 'theme/theme.dart';
 import 'utils/role.dart';
 
 /// Root widget of the Vocably app.
@@ -17,6 +18,7 @@ class VocablyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Vocably',
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.themeData,
       home: const _RootRouter(),
     );
   }
