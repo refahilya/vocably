@@ -9,6 +9,7 @@ import '../../../theme/theme.dart';
 import '../../../utils/normalize_word.dart';
 import '../../../utils/vocab_browse_filter.dart';
 import 'learning_cart_screen.dart';
+import 'word_detail_screen.dart';
 
 const _cefrLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
@@ -292,28 +293,42 @@ class _VocabWordTile extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.word,
-                  style: AppTextStyles.wordTitle.copyWith(fontSize: 18),
+            // Tap-to-open Kamus Detail (`SPEC.md` §3.5) is scoped to just
+            // this word-info area, deliberately kept as a sibling of the
+            // trailing cart IconButton below rather than an ancestor
+            // wrapping it — avoids relying on Flutter's nested-gesture-
+            // arena tap disambiguation to keep "open detail" and "toggle
+            // cart" from both firing on one tap.
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.medium),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => WordDetailScreen(entry: entry),
                 ),
-                if (primary.translationId != null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(primary.translationId!, style: AppTextStyles.body),
-                ],
-                if (entry.posList.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    runSpacing: AppSpacing.xs,
-                    children: [
-                      for (final pos in entry.posList) _Badge(text: pos),
-                    ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.word,
+                    style: AppTextStyles.wordTitle.copyWith(fontSize: 18),
                   ),
+                  if (primary.translationId != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(primary.translationId!, style: AppTextStyles.body),
+                  ],
+                  if (entry.posList.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        for (final pos in entry.posList) _Badge(text: pos),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),

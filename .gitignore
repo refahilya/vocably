@@ -25,3 +25,5 @@ Thumbs.db
 # --- Misc ---
 *.log
 migrate_working_dir/
+
+/data/oxford/
