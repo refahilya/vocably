@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/app_user.dart';
 import '../../../providers/auth_providers.dart';
+import '../vocab_browser/vocab_browser_screen.dart';
 
 /// Placeholder body for the "Belajar" navigation destination.
 ///
@@ -36,6 +37,19 @@ class DashboardPlaceholder extends ConsumerWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
+          // TODO(Milestone 6): TEMPORARY entry point for Milestone 4 Stage
+          // 5's vocabulary browse screen. The real navigation into browse
+          // is the "Level" card's 6 CEFR pills (DESIGN_REFERENCE.md §5.1),
+          // which doesn't exist until Milestone 6 builds the real
+          // dashboard here. Remove this button (and this import) once
+          // that card replaces this whole placeholder.
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const VocabBrowserScreen()),
+            ),
+            child: const Text('Jelajahi Kosakata (Sementara)'),
+          ),
+          const SizedBox(height: 12),
           FilledButton(
             onPressed: () => ref.read(authServiceProvider).signOut(),
             child: const Text('Keluar'),
