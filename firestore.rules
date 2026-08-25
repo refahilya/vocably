@@ -3,9 +3,16 @@ rules_version = '2';
 // Milestone 2: real users/teacherAccessCodes rules. Field matrix and
 // exact rationale for every clause below were reviewed and approved
 // against DATA_MODEL.md §1 before this was written — see project chat
-// history for the field-by-field justification. Every other collection
-// still defaults to deny-all (untouched Milestone 1 baseline) since no
-// other schema exists yet.
+// history for the field-by-field justification.
+//
+// Milestone 4 Stage 2: read-only vocabWords/topics access for any
+// signed-in user (DATA_MODEL.md §2/§2b — "read-only total untuk siswa").
+// Guru write access (Tambah Kosakata / Edit Kata) is deliberately NOT
+// implemented here — that lands in Milestone 5 with the actual guru
+// vocabulary-management feature.
+//
+// Every other collection still defaults to deny-all (untouched Milestone 1
+// baseline) since no other schema exists yet.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -70,6 +77,27 @@ service cloud.firestore {
 
     match /teacherAccessCodes/{code} {
       allow read, write: if false;
+    }
+
+    // Milestone 4 Stage 2 (DATA_MODEL.md §2): bank kosakata master data.
+    // Read-only for every signed-in user — no role check, since nothing in
+    // the docs restricts read to siswa specifically, and guru will need
+    // the same read access for its own future browse/edit UI. Write stays
+    // fully denied for now: the only documented writers are the dev import
+    // script (Admin SDK, bypasses these rules entirely) and guru via the
+    // Milestone 5 "Tambah Kosakata"/"Edit Kata" feature, not built yet.
+    match /vocabWords/{wordId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Milestone 4 Stage 2 (DATA_MODEL.md §2b): canonical topic list.
+    // Same treatment as vocabWords above — read-only for any signed-in
+    // user, write deferred to Milestone 5 (only guru/csvImport ever write
+    // here, per §2b).
+    match /topics/{topicId} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
 
     match /{document=**} {
