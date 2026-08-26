@@ -5,22 +5,22 @@ import 'package:vocably/models/vocab_word.dart';
 
 void main() {
   group('VocabMeaning', () {
-    test('fromMap/toMap round-trip preserves pos and translationId', () {
+    test('fromMap/toMap round-trip preserves pos and translation', () {
       final meaning = VocabMeaning.fromMap({
         'pos': 'noun',
-        'translationId': 'oleh-oleh',
+        'translation': 'oleh-oleh',
       });
 
       expect(meaning.pos, 'noun');
-      expect(meaning.translationId, 'oleh-oleh');
-      expect(meaning.toMap(), {'pos': 'noun', 'translationId': 'oleh-oleh'});
+      expect(meaning.translation, 'oleh-oleh');
+      expect(meaning.toMap(), {'pos': 'noun', 'translation': 'oleh-oleh'});
     });
 
-    test('translationId can be null (not yet generated)', () {
-      final meaning = VocabMeaning.fromMap({'pos': 'verb', 'translationId': null});
+    test('translation can be null (not yet generated)', () {
+      final meaning = VocabMeaning.fromMap({'pos': 'verb', 'translation': null});
 
-      expect(meaning.translationId, isNull);
-      expect(meaning.toMap()['translationId'], isNull);
+      expect(meaning.translation, isNull);
+      expect(meaning.toMap()['translation'], isNull);
     });
   });
 
@@ -33,8 +33,8 @@ void main() {
         'word': 'souvenir',
         'meanings': meanings ??
             [
-              {'pos': 'noun', 'translationId': 'oleh-oleh'},
-              {'pos': 'verb', 'translationId': 'mengenang'},
+              {'pos': 'noun', 'translation': 'oleh-oleh'},
+              {'pos': 'verb', 'translation': 'mengenang'},
             ],
         // Present in real documents, but deliberately ignored on read —
         // see the dedicated test below.
@@ -61,13 +61,13 @@ void main() {
       expect(word.updatedAt, updatedAt);
     });
 
-    test('supports multiple meanings with independent pos and translationId', () {
+    test('supports multiple meanings with independent pos and translation', () {
       final word = VocabWord.fromFirestore(firestoreData());
 
       expect(word.meanings[0].pos, 'noun');
-      expect(word.meanings[0].translationId, 'oleh-oleh');
+      expect(word.meanings[0].translation, 'oleh-oleh');
       expect(word.meanings[1].pos, 'verb');
-      expect(word.meanings[1].translationId, 'mengenang');
+      expect(word.meanings[1].translation, 'mengenang');
     });
 
     test('meanings[0] is exposed as primaryMeaning', () {
@@ -106,17 +106,17 @@ void main() {
       expect(word.addedByTeacherId, 'teacher-uid-1');
     });
 
-    test('a meaning with a null translationId parses without error', () {
+    test('a meaning with a null translation parses without error', () {
       final data = firestoreData(
         meanings: [
-          {'pos': 'noun', 'translationId': null},
+          {'pos': 'noun', 'translation': null},
         ],
       );
 
       final word = VocabWord.fromFirestore(data);
 
       expect(word.meanings, hasLength(1));
-      expect(word.meanings.single.translationId, isNull);
+      expect(word.meanings.single.translation, isNull);
     });
 
     test('toMap -> fromFirestore round-trips to an equivalent VocabWord', () {
@@ -136,8 +136,8 @@ void main() {
       for (var i = 0; i < original.meanings.length; i++) {
         expect(roundTripped.meanings[i].pos, original.meanings[i].pos);
         expect(
-          roundTripped.meanings[i].translationId,
-          original.meanings[i].translationId,
+          roundTripped.meanings[i].translation,
+          original.meanings[i].translation,
         );
       }
     });

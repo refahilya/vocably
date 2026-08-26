@@ -170,14 +170,82 @@ class _ModeSelector extends ConsumerWidget {
   }
 }
 
-class _LevelContent extends ConsumerWidget {
+/// [ConsumerStatefulWidget] rather than the usual [ConsumerWidget] purely
+/// so it can **memoize** filter/sort/distinct-extraction across page
+/// changes (Milestone 4 finalization). [VocabBrowserFilterState.page]
+/// changes far more often than `mode`/`selectedTopic`/`selectedPos` once
+/// pagination exists — clicking "Next" 17 times on a 900-word A1 list
+/// shouldn't re-run [applyVocabBrowseFilter]/[distinctTopics]/
+/// [distinctPosValues] over all 900 entries 17 times for a result that's
+/// identical every time. The cache below is keyed on exactly the inputs
+/// that actually affect it (not `page`), invalidated with simple field
+/// comparison — no new package, no app-wide state-management change.
+class _LevelContent extends ConsumerStatefulWidget {
   const _LevelContent({required this.allEntries, required this.filter});
 
   final List<VocabBundleEntry> allEntries;
   final VocabBrowserFilterState filter;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LevelContent> createState() => _LevelContentState();
+}
+
+class _LevelContentState extends ConsumerState<_LevelContent> {
+  List<VocabBundleEntry>? _allEntriesCacheKey;
+  VocabBrowseMode? _modeCacheKey;
+  String? _topicCacheKey;
+  String? _posCacheKey;
+  List<VocabBundleEntry>? _cachedFiltered;
+  List<String>? _cachedTopics;
+  List<String>? _cachedPosValues;
+
+  List<VocabBundleEntry> _filteredEntries() {
+    final filter = widget.filter;
+    final cacheValid =
+        identical(_allEntriesCacheKey, widget.allEntries) &&
+        _modeCacheKey == filter.mode &&
+        _topicCacheKey == filter.selectedTopic &&
+        _posCacheKey == filter.selectedPos;
+    if (cacheValid) return _cachedFiltered!;
+
+    final result = applyVocabBrowseFilter(
+      widget.allEntries,
+      mode: filter.mode,
+      selectedTopic: filter.selectedTopic,
+      selectedPos: filter.selectedPos,
+    );
+    _allEntriesCacheKey = widget.allEntries;
+    _modeCacheKey = filter.mode;
+    _topicCacheKey = filter.selectedTopic;
+    _posCacheKey = filter.selectedPos;
+    _cachedFiltered = result;
+    return result;
+  }
+
+  List<VocabBundleEntry>? _allEntriesForTopicsCache;
+  List<VocabBundleEntry>? _allEntriesForPosCache;
+
+  List<String> _distinctTopics() {
+    if (!identical(_allEntriesForTopicsCache, widget.allEntries)) {
+      _cachedTopics = distinctTopics(widget.allEntries);
+      _allEntriesForTopicsCache = widget.allEntries;
+    }
+    return _cachedTopics!;
+  }
+
+  List<String> _distinctPosValues() {
+    if (!identical(_allEntriesForPosCache, widget.allEntries)) {
+      _cachedPosValues = distinctPosValues(widget.allEntries);
+      _allEntriesForPosCache = widget.allEntries;
+    }
+    return _cachedPosValues!;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allEntries = widget.allEntries;
+    final filter = widget.filter;
+
     // DESIGN_REFERENCE.md §5.8: "Level C2 (atau level mana pun) tidak
     // punya kata" — a level with genuinely zero words, not a filter
     // producing zero results (handled separately below).
@@ -188,12 +256,8 @@ class _LevelContent extends ConsumerWidget {
       );
     }
 
-    final filtered = applyVocabBrowseFilter(
-      allEntries,
-      mode: filter.mode,
-      selectedTopic: filter.selectedTopic,
-      selectedPos: filter.selectedPos,
-    );
+    final filtered = _filteredEntries();
+    final paged = paginate(filtered, page: filter.page);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -202,7 +266,7 @@ class _LevelContent extends ConsumerWidget {
           _ValueDropdown(
             label: 'Pilih Topik',
             value: filter.selectedTopic,
-            options: distinctTopics(allEntries),
+            options: _distinctTopics(),
             onChanged: (value) =>
                 ref.read(vocabBrowserFilterProvider.notifier).selectTopic(value),
           ),
@@ -210,7 +274,7 @@ class _LevelContent extends ConsumerWidget {
           _ValueDropdown(
             label: 'Pilih POS',
             value: filter.selectedPos,
-            options: distinctPosValues(allEntries),
+            options: _distinctPosValues(),
             onChanged: (value) =>
                 ref.read(vocabBrowserFilterProvider.notifier).selectPos(value),
           ),
@@ -223,14 +287,76 @@ class _LevelContent extends ConsumerWidget {
                   suggestion: 'Coba pilih topik atau POS lain.',
                 )
               : ListView.separated(
-                  itemCount: filtered.length,
+                  itemCount: paged.items.length,
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (context, index) =>
-                      _VocabWordTile(entry: filtered[index]),
+                      _VocabWordTile(entry: paged.items[index]),
                 ),
         ),
+        // Pagination controls (Milestone 4 finalization) — hidden
+        // entirely when everything already fits on one page, per the
+        // "not unnecessarily prominent" requirement; showing a
+        // permanently-disabled "Halaman 1 dari 1" control would just be
+        // visual noise for the common case of a small filtered result.
+        if (paged.totalPages > 1)
+          _PaginationBar(
+            pageIndex: paged.pageIndex,
+            totalPages: paged.totalPages,
+            onPrevious: paged.pageIndex > 0
+                ? () => ref
+                      .read(vocabBrowserFilterProvider.notifier)
+                      .goToPage(paged.pageIndex - 1)
+                : null,
+            onNext: paged.pageIndex < paged.totalPages - 1
+                ? () => ref
+                      .read(vocabBrowserFilterProvider.notifier)
+                      .goToPage(paged.pageIndex + 1)
+                : null,
+          ),
       ],
+    );
+  }
+}
+
+/// Previous/Next + "Halaman X dari Y" (Milestone 4 finalization —
+/// pagination over the browse result, `kVocabBrowsePageSize` per page).
+class _PaginationBar extends StatelessWidget {
+  const _PaginationBar({
+    required this.pageIndex,
+    required this.totalPages,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int pageIndex;
+  final int totalPages;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          OutlinedButton.icon(
+            onPressed: onPrevious,
+            icon: const Icon(Icons.chevron_left),
+            label: const Text('Sebelumnya'),
+          ),
+          Text(
+            'Halaman ${pageIndex + 1} dari $totalPages',
+            style: AppTextStyles.body,
+          ),
+          OutlinedButton.icon(
+            onPressed: onNext,
+            icon: const Icon(Icons.chevron_right),
+            label: const Text('Selanjutnya'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -313,9 +439,9 @@ class _VocabWordTile extends ConsumerWidget {
                     entry.word,
                     style: AppTextStyles.wordTitle.copyWith(fontSize: 18),
                   ),
-                  if (primary.translationId != null) ...[
+                  if (primary.translation != null) ...[
                     const SizedBox(height: AppSpacing.xs),
-                    Text(primary.translationId!, style: AppTextStyles.body),
+                    Text(primary.translation!, style: AppTextStyles.body),
                   ],
                   if (entry.posList.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.sm),

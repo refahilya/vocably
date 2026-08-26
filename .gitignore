@@ -26,4 +26,8 @@ Thumbs.db
 *.log
 migrate_working_dir/
 
-/data/oxford/
+# --- Vocab import pipeline (tools/vocab_import/, dev-side only) ---
+# Moved here from the old /data/oxford/ location during Milestone 4.
+/tools/vocab_import/node_modules/
+/tools/vocab_import/input/*.csv
+/tools/vocab_import/output/

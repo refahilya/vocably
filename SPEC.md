@@ -475,16 +475,20 @@ sebagai dua field independen di data model (bukan satu enum gabungan), lihat
 
 ## 7. Bank Kosakata (sisi pengembang)
 
-- Bank kosakata di-import ke Firestore lewat file CSV (proses manual oleh
-  dev di laptop sendiri, pakai API key dev sendiri — bukan tugas Claude,
-  dan tidak lewat Cloudflare Worker karena ini proses one-off, bukan
-  traffic produksi dari user).
+- Bank kosakata di-import ke Firestore lewat pipeline `tools/vocab_import/`
+  (dijalankan dev di laptop sendiri; kode pipeline-nya boleh ditulis/
+  dipelihara Claude, tapi `OPENAI_API_KEY` dan kredensial Admin SDK tetap
+  milik dev, dan tidak lewat Cloudflare Worker karena ini proses one-off,
+  bukan traffic produksi dari user — lihat `tools/vocab_import/README.md`).
 - Sumber: Oxford 3000 dan Oxford 5000, cakupan level **A1–C1** (lihat catatan
   di 3.2 soal level C2).
-- **Format CSV sumber punya 4 kolom:** `word`, `topics`, `pos`, `sumber`.
-  Karena topik ikut di CSV, `topics` sudah terisi sejak import — master
-  list topik (`DATA_MODEL.md` §2b) juga langsung terbentuk dari kolom ini,
-  jadi tidak ada kata tanpa topik dan mode browse tema tidak pernah kosong.
+- **Format CSV sumber punya 5 kolom:** `word`, `cefrLevel`, `topics`, `pos`,
+  `source` — `cefrLevel` dan `source` sudah terisi langsung dari CSV
+  (koreksi dari deskripsi lama yang menyebut 4 kolom tanpa `cefrLevel`,
+  ditemukan saat audit data Milestone 4). Karena topik ikut di CSV, `topics`
+  sudah terisi sejak import — master list topik (`DATA_MODEL.md` §2b) juga
+  langsung terbentuk dari kolom ini, jadi tidak ada kata tanpa topik dan
+  mode browse tema tidak pernah kosong.
 - **Setiap kata disimpan sebagai satu dokumen** dengan `docId` = kata itu
   sendiri yang dinormalisasi (lowercase + trim), bukan auto-generated ID —
   ini mencegah duplikat kata secara struktural. Kalau satu kata punya lebih

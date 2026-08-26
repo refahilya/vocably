@@ -24,7 +24,7 @@ class VocabBundleEntry {
   final String word;
 
   /// Reuses [VocabMeaning] from `vocab_word.dart` rather than duplicating
-  /// the meaning shape — same `pos`/`translationId` pair either way.
+  /// the meaning shape — same `pos`/`translation` pair either way.
   final List<VocabMeaning> meanings;
 
   final String cefrLevel;

@@ -2,7 +2,7 @@
 /// (`SPEC.md` §3.5, `DATA_MODEL.md` §2). This is English-only reference data
 /// (definition, example sentence, phonetic spelling, whether a recorded
 /// pronunciation exists) — it never carries the Indonesian translation,
-/// which always comes from `VocabBundleEntry.meanings[].translationId`
+/// which always comes from `VocabBundleEntry.meanings[].translation`
 /// instead (Firestore/bundle, not this API).
 ///
 /// The live API actually returns a JSON **array** of these "entry"
@@ -47,6 +47,62 @@ class DictionaryEntry {
   final Map<String, List<DictionaryDefinition>> meaningsByPos;
 
   static const _empty = <String, List<DictionaryDefinition>>{};
+
+  /// Known POS-taxonomy mismatches between Vocably's own tags (from the
+  /// Oxford 3000/5000 CSVs) and DictionaryAPI's Wiktionary-derived
+  /// `partOfSpeech` values — confirmed empirically against the live API
+  /// (not assumed), one representative word per row: `modal`→"can"/
+  /// "must"/"need"/"should"/"shall" are tagged `verb`; `auxiliary`→"do"/
+  /// "have" are tagged `verb`; `number`→"one"/"million"/"thousand" are
+  /// tagged `numeral`, but a few (e.g. "billion", "hundred") are only
+  /// tagged `noun` — confirmed that noun definition IS the numeric one
+  /// ("a thousand million...") rather than an unrelated sense, so `noun`
+  /// is a safe second fallback here specifically; `exclamation`→"oh"/
+  /// "well"/"yes"/"sorry"/"welcome" are tagged `interjection`;
+  /// `determiner`→"this"/"some"/"each"/"such"/"whose" are tagged
+  /// `pronoun` (occasionally `adjective`). Without this, a lookup by
+  /// Vocably's exact tag silently found nothing even though the API
+  /// actually had the definitions, under a different tag — this is what
+  /// [definitionsForPos] fixes.
+  ///
+  /// **Deliberately left unmapped** (confirmed via the same live-API
+  /// testing to have no reliable equivalent, not simply untested):
+  /// `article` ("a"/"the" — API tags these adverb/preposition/noun, none
+  /// of which are the article sense), and specific words within an
+  /// otherwise-mapped category can still legitimately have nothing at
+  /// all under any tag (e.g. "would"/"ought" as `modal` — the API only
+  /// has an unrelated noun sense for these, no verb entry exists to
+  /// alias to; "no" as `determiner` — none of noun/adverb/preposition
+  /// correspond to the determiner sense). These remain genuine
+  /// DictionaryAPI content gaps, not a mapping bug — [definitionsForPos]
+  /// correctly returns `null` for them and the UI's existing "not
+  /// available" fallback is the right behavior, not a bug to paper over
+  /// with a forced, semantically-wrong alias.
+  static const _posAliases = <String, List<String>>{
+    'modal': ['verb'],
+    'auxiliary': ['verb'],
+    'number': ['numeral', 'noun'],
+    'exclamation': ['interjection'],
+    'determiner': ['pronoun', 'adjective'],
+  };
+
+  /// Looks up [meaningsByPos] by Vocably's own POS tag first; if that
+  /// finds nothing, falls back to [_posAliases]' known equivalent
+  /// DictionaryAPI tags for that POS, in order, returning the first
+  /// non-empty match. Returns `null` only when neither the exact tag nor
+  /// any known alias has anything — genuinely missing data, not a
+  /// tagging mismatch (`SPEC.md` §3.5 Layer 1 still applies for that
+  /// case: show the "not available" fallback, not an error).
+  List<DictionaryDefinition>? definitionsForPos(String pos) {
+    final direct = meaningsByPos[pos];
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    for (final alias in _posAliases[pos] ?? const []) {
+      final aliased = meaningsByPos[alias];
+      if (aliased != null && aliased.isNotEmpty) return aliased;
+    }
+    return null;
+  }
 
   /// Parses the raw decoded JSON array the API returns for a successful
   /// (200) lookup. Deliberately lenient field-by-field (a missing/wrong-

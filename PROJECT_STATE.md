@@ -8,193 +8,340 @@
 
 ## 1. Current Status
 
-**Milestone 2 (Auth: sign up, login, role-based routing) is complete,
-committed locally, and manually verified end-to-end against the real
-Firebase project.** It has not yet been pushed to `origin`.
-
-Milestone 1 (skeleton + Firebase connection) is complete and pushed.
+**Milestones 1–3 complete and pushed to `origin/main`.** Milestone 4
+(Vocabulary Module) is now considered **done, pending only the final
+manual re-verification listed in §7.** Real data is live in Firestore
+(4,952 documents, seeded and confirmed by the project owner); the
+composite-index bug that initially broke browse is fixed in code (§5b);
+Word Detail's English-definition coverage was audited twice — once for
+the POS-taxonomy alias mismatch (§5c), once more end-to-end after
+manual re-testing still found gaps, which turned up one more real alias
+gap plus a genuine UI bug conflating "loading"/"permanently
+unavailable"/"transient failure" into one message (§5d, now fixed); and
+client-side pagination (50/page) was added to the browse screen along
+with a targeted rebuild-memoization fix for the lag the project owner
+observed on the real ~900-word A1 list (§5e). One Firestore index
+deploy command (§7) is the only action still needed from the project
+owner.
 
 ## 2. Milestone History
 
-Per the build order in `CLAUDE.md` §7:
+| # | Milestone | Status |
+|---|---|---|
+| 1 | Skeleton project + Firebase connection | **Complete, pushed** |
+| 2 | Auth: sign up, login, role-based routing | **Complete, pushed** |
+| 3 | Design system / theme layer + responsive nav shell | **Complete, pushed** |
+| 4 | Vocab module: `vocabWords`, CSV import, CEFR bundles, browse, DictionaryAPI, TTS | **Complete** (real data seeded, a post-seed Firestore-index bug found and fixed — see §5b) |
+| 5 | Cloudflare Worker + guru "Tambah Kosakata" | Not started |
+| 6 | Student dashboard + Riwayat + Placement/Pre-Post-Test scaffolds | Not started |
+| 7 | Storyfier core (3-phase learning flow) | Not started |
+| 8 | Guru: Set Target Kata + Edit Kata | Not started |
 
-| # | Milestone | Status | Commit | What was delivered |
-|---|---|---|---|---|
-| 1 | Skeleton project + Firebase connection | **Complete, pushed** | `123eb38` | Flutter web scaffold (`com.uns.refa.vocably`, web-only), Firebase Auth/Firestore/Core wired via FlutterFire against the existing `vocably-idn-en` project, Riverpod codegen + `riverpod_lint` established, deny-all baseline Firestore rules deployed, `.gitignore` protecting `.env` |
-| 2 | Auth: sign up, login, role-based routing | **Complete, committed locally, not yet pushed** | `ff705ea` | Email/password sign up + login, client-side `users/{uid}` creation (default `siswa`, `guru` via access code), full field-matrix Firestore rules, role-based root routing, orphaned-account recovery, siswa/guru placeholder screens, retirement of the Milestone 1 connection-check code |
-| 3 | Design system / theme layer + responsive nav shell | **Not started** | — | Planned: `lib/theme/theme.dart`, rail/tab nav shell per `DESIGN_REFERENCE.md` §6 |
-| 4 | Vocab module (no Worker): `vocabWords`, CSV import, CEFR bundles, browse, DictionaryAPI | **Not started** | — | — |
-| 5 | Cloudflare Worker + guru "Tambah Kosakata" | **Not started** | — | — |
-| 6 | Student dashboard + Riwayat + Placement/Pre-Post-Test scaffolds | **Not started** | — | — |
-| 7 | Storyfier core (3-phase learning flow) | **Not started** | — | — |
-| 8 | Guru: Set Target Kata + Edit Kata | **Not started** | — | — |
+### Milestone 4 stage detail
 
-No milestones beyond these eight are documented anywhere; none are invented here.
+| Stage | What | Status |
+|---|---|---|
+| 1 | `VocabWord`/`VocabMeaning` models, `normalizeWord()` | Complete |
+| 2 | Firestore rules: `vocabWords`/`topics` read-only for authenticated users | Complete, deployed by the project owner |
+| 3 | `VocabBundleEntry` model + pure parser | Complete |
+| 4 | `VocabBundleService` (asset load + Firestore delta merge) + providers | Complete |
+| 5 | Vocabulary browse screen (abjad/tema/POS, 6 CEFR levels) | Complete |
+| 6 | Learning cart (`LearningCart` Riverpod notifier, session-local) | Complete |
+| 7 | Dev-side CSV import pipeline (`tools/vocab_import/`) — parse, validate, merge Oxford 3000+5000 | **Complete — run for real against the actual CSVs (§5)** |
+| 8 | One-off Indonesian translation generation (OpenAI-compatible API) | **Complete — all 5,936 meanings translated and cached (§5)** |
+| 9 | Firestore seed/import (Admin SDK) | **Complete — run for real by the project owner, 4,952 documents confirmed live (§5)** |
+| 10 | Bundle generation (`assets/vocab/vocab_*.json`) | **Complete — real bundle files generated and verified against the actual `VocabBundleEntry` parser (§5)** |
+| 11 | DictionaryAPI integration (word-detail screen, Layer 1 fallback) | Complete |
+| 12 | TTS integration (`flutter_tts`, Layer 2 audio fallback) | Complete |
+| 13 | Temporary dashboard entry point to browse | Still temporary and intentionally left in place — Milestone 6 replaces it |
 
 ## 3. Current Architecture
 
-- **Framework:** Flutter (web-only target — no android/ios/desktop platform folders exist), Dart, `environment: sdk: ^3.11.4` in `pubspec.yaml`.
-- **Firebase services in use:** `firebase_core`, `firebase_auth`, `cloud_firestore` — all wired against project **`vocably-idn-en`**, app **`vocably (web)`**. No Cloud Functions (project-wide decision, Spark plan).
-- **State management:** Riverpod exclusively, with code generation (`@riverpod` / `riverpod_generator`) — no manual `Provider`/`StateNotifierProvider`. `riverpod_lint` active via `analysis_options.yaml`'s `plugins:` key (not `custom_lint` — that package was deliberately not added; see §8).
-- **Routing:** no routing package. Root routing is a single `switch` in `lib/app.dart` (`_RootRouter`) driven by an `AppAuthStatus` sealed class from Riverpod state. Screen-to-screen navigation (login ↔ sign-up) uses plain `Navigator.push`/`MaterialPageRoute`.
-- **Backend/API:** no Cloudflare Worker exists yet (Milestone 5). No AI calls, no DictionaryAPI integration yet. The only backend is Firebase itself.
-- **Directory structure actually present today:**
-  ```
-  lib/
-    app.dart                  # root widget + _RootRouter
-    main.dart                 # Firebase bootstrap + runApp
-    firebase_options.dart     # FlutterFire-generated, web only
-    models/
-      app_user.dart
-    services/
-      firebase_service.dart   # SDK instance accessor only
-      auth_service.dart
-      user_service.dart
-    providers/
-      auth_providers.dart(+.g.dart)
-      sign_up_controller.dart(+.g.dart)
-      login_controller.dart(+.g.dart)
-      complete_registration_controller.dart(+.g.dart)
-    screens/
-      auth/
-        login_screen.dart
-        sign_up_screen.dart
-        complete_registration_screen.dart
-      placeholders/           # temporary, see §8 — not in CLAUDE.md's canonical tree
-        student_placeholder.dart
-        teacher_placeholder.dart
-    utils/
-      role.dart
-  test/
-    widget_test.dart
-  ```
-  `widgets/` and `theme/` (documented in `CLAUDE.md` §3) do not exist yet — they start in Milestone 3.
+- **Framework:** Flutter (web-only), Dart, Riverpod with code generation exclusively.
+- **Firebase:** `firebase_core`, `firebase_auth`, `cloud_firestore`, project `vocably-idn-en`, Spark plan, no Cloud Functions.
+- **Design system:** `lib/theme/theme.dart` (`AppColors`/`AppSpacing`/`AppRadius`/`AppTextStyles`/`AppTheme`).
+- **Navigation:** `AppNavShell` (`lib/widgets/app_nav_shell.dart`) — `NavigationRail` on wide screens, top tabs on narrow/mobile, one reusable widget for both siswa and guru.
+- **Vocabulary data flow:** `assets/vocab/vocab_{level}.json` bundles (generated by `tools/vocab_import/`, loaded via `VocabBundleService`) + a live Firestore delta query for anything newer than the bundle's generation timestamp (`kBundleGeneratedAt`, `lib/utils/vocab_bundle_constants.dart`).
+- **`meanings[].translation`** (renamed from `translationId` during this Milestone 4 run — see §8) holds the Indonesian translation text **directly**, inline — there is no separate `translations` collection.
+- **DictionaryAPI + TTS:** `DictionaryApiService` (English definitions/phonetics, direct client call, no proxy) + `TtsService` (`flutter_tts`, always used for the speaker button — see §7's disclosed limitation on real recorded-audio playback).
+- **Dev-side data pipeline:** `tools/vocab_import/` (Node.js, separate from the Flutter app) — see §5.
+- **Backend/API beyond Firebase:** none yet. No Cloudflare Worker (Milestone 5).
+
+### Directory structure (current)
+
+```
+lib/
+  app.dart, main.dart, firebase_options.dart
+  models/
+    app_user.dart, vocab_word.dart, vocab_bundle_entry.dart, dictionary_entry.dart
+  services/
+    firebase_service.dart, auth_service.dart, user_service.dart,
+    vocab_bundle_service.dart, dictionary_api_service.dart, tts_service.dart
+  providers/
+    auth_providers(+.g), sign_up_controller(+.g), login_controller(+.g),
+    complete_registration_controller(+.g), vocab_bundle_providers(+.g),
+    vocab_browser_providers(+.g), learning_cart_providers(+.g),
+    dictionary_providers(+.g)
+  screens/
+    auth/login_screen.dart, sign_up_screen.dart, complete_registration_screen.dart
+    student/
+      dashboard/dashboard_placeholder.dart   # temporary browse entry point, §7
+      history/history_placeholder.dart
+      vocab_browser/vocab_browser_screen.dart, learning_cart_screen.dart, word_detail_screen.dart
+    teacher/
+      target_words/target_words_placeholder.dart
+      vocab_management/vocab_management_placeholder.dart
+  theme/theme.dart
+  utils/role.dart, normalize_word.dart, vocab_browse_filter.dart, vocab_bundle_constants.dart
+  widgets/app_nav_shell.dart
+
+tools/vocab_import/            # separate Node.js tool, not part of the Flutter app — see §5
+  bin/merge.js, translate.js, seed_firestore.js, generate_bundles.js
+  lib/csvParser.js, normalize.js, merge.js, translateClient.js,
+      translationCache.js, seedDecision.js, bundleGen.js, dotenv.js
+  test/*.test.js
+  input/ (git-ignored), output/ (git-ignored)
+
+assets/vocab/                  # .gitkeep only as of this snapshot — real
+                                # bundle files land once Stage 8/10 finish (§5)
+```
+
+`lib/screens/placeholders/` (Milestone 2's temporary routing-proof screens) has been deleted, as planned, once Milestone 3's real nav shell landed.
 
 ## 4. Authentication and Authorization
 
-- **Method:** Firebase Auth email/password only (`createUserWithEmailAndPassword` / `signInWithEmailAndPassword` / `signOut`). No other provider (Google, phone, anonymous, etc.) is wired anywhere — verified by repo-wide search.
-- **Roles:** `siswa` (default) and `guru`, as string constants in `lib/utils/role.dart` (`Role.siswa`, `Role.guru`).
-- **Teacher access code:** sign-up form has a "Daftar sebagai Guru?" toggle revealing a code field. The client sends `role: "guru"` + `teacherCodeInput`; **Firestore Security Rules** (not client code) verify the code exists in `teacherAccessCodes` and is `active == true`. No fallback to `siswa` on failure — the create is rejected outright.
-- **`users/{uid}` schema (implemented, matches `DATA_MODEL.md` §1):**
-  - Always present: `uid`, `email`, `name`, `role`, `createdAt`.
-  - `siswa` only: `cefrLevel` (`null` at creation), `placementTestCompleted` (`false`), `placementTestPrompted` (`false`).
-  - `guru` only: `teacherCodeInput` (non-empty string).
-  - Cross-role fields are structurally forbidden by the rules' `hasOnly()` whitelists — a `guru` doc can never contain `cefrLevel` etc., and a `siswa` doc can never contain `teacherCodeInput`.
-- **Role immutability:** `role` cannot change after creation (enforced in rules: `request.resource.data.role == resource.data.role`, unconditionally).
-- **`teacherCodeInput` behavior:** stored permanently as an audit trail (documented decision, not a bug); immutable after creation; never present on `siswa` docs.
-- **Self-update permissions (final, implemented):**
-  - `siswa` may update: `name`, `cefrLevel`, `placementTestCompleted`, `placementTestPrompted`.
-  - `guru` may update: `name` only.
-  - `uid`, `email`, `role`, `createdAt`, `teacherCodeInput` are immutable for both roles.
-- **Logout:** `AuthService.signOut()`, exposed from both placeholder screens and the recovery screen.
-- **Session restoration:** driven entirely by `authStateChanges()` (via `authStateProvider`), watched permanently by the root router — no separate/parallel session mechanism.
-- **Orphaned-account recovery:** if Firebase Auth has a signed-in user but `users/{uid}` doesn't exist (interrupted/failed registration — *not* the confirmed-invalid-teacher-code case, which instead rolls back the Auth account), the app shows `CompleteRegistrationScreen`, which can **only ever create a `siswa` profile** (`CompleteRegistrationController` calls `createStudentProfile` exclusively — no code path to `createTeacherProfile` exists here). See `DATA_MODEL.md` §1 point 7.
-- **Sign-up rollback:** a `permission-denied` confirmed to originate from a `role: "guru"` create attempt triggers `AuthService.deleteCurrentUser()` before surfacing "Kode akses tidak valid" to the user. Any other failure (network, transient Firestore errors) does *not* trigger rollback — the orphaned-account flow handles that case instead.
-- **Out of scope for Milestone 2 (deliberately not built):** password reset, email verification, profile-editing UI beyond the rules-permitted self-update fields.
+Unchanged since Milestone 2 — see `DATA_MODEL.md` §1 for the full schema/rules. No auth-related work happened in Milestone 3 or 4.
 
-## 5. Firebase / Firestore State
+## 5. Data Population Pipeline (`tools/vocab_import/`) — detail
 
-- **Project:** `vocably-idn-en` (Firestore in **Native mode**, region `asia-southeast1`).
-- **Services enabled/used:** Firebase Auth (email/password provider), Cloud Firestore. No Cloud Functions, no Hosting deploy yet, no Storage.
-- **Firestore collections that currently exist in the schema/rules (not necessarily populated with data):**
-  - `users/{uid}` — real rules in place, described in §4 above.
-  - `teacherAccessCodes/{code}` — rules deny all client read/write (`allow read, write: if false`); only reachable via `exists()`/`get()` from the `users` create rule. **No document has been seeded into this collection yet** — teacher sign-up cannot succeed against real data until at least one `teacherAccessCodes` document is created manually via the Firebase Console (`docId` = the code itself, fields `active: true`, `createdAt`).
-  - Everything else (`vocabWords`, `learningProgress`, `learningSessions`, `targetWordSets`, `topics`, `placementTestResults`, `researchAssessmentResults`) — **not yet modeled in rules or code**; still covered only by the deny-all fallback (`match /{document=**} { allow read, write: if false; }`).
-- **Security Rules file:** `firestore.rules` at repo root, `rules_version = '2'`. Deployed to the live project as of Milestone 2 (confirmed via `firebase deploy --only firestore:rules` during Milestone 2 implementation; not re-deployed since).
-- **Config files:** `.firebaserc` (default project = `vocably-idn-en`), `firebase.json` (maps `lib/firebase_options.dart` to the web app + points to `firestore.rules`/`firestore.indexes.json`), `firestore.indexes.json` (empty — no composite indexes needed yet).
-- No secrets or credential values are recorded in this file or in any tracked file — `.env` (OpenAI-related dev config, unrelated to Firebase) remains untracked and git-ignored.
+This is new in this Milestone 4 session. Full rationale/usage in
+`tools/vocab_import/README.md`; summary here for the progress ledger.
 
-## 6. Implemented Features
+**Why Claude built this (context for future sessions):** `CLAUDE.md`/
+`DATA_MODEL.md` originally reserved CSV import, translation generation,
+and bundle generation as "not Claude's job" (dev-only, own laptop, own
+keys). The project owner explicitly authorized Claude to build this
+pipeline mid-Milestone-4, on the condition that secrets and the first
+real run of any costly/production-writing stage stay developer-gated.
+`CLAUDE.md`/`DATA_MODEL.md` were updated to reflect this (§8 below).
 
-- Flutter web scaffold, running via `flutter run -d chrome`.
-- Firebase initialization (`main.dart`), with a graceful in-app error screen if `Firebase.initializeApp` itself throws.
-- Student sign-up (email/password + name) → `users/{uid}` created with `role: "siswa"`.
-- Teacher sign-up (same + "Daftar sebagai Guru?" toggle + access code) → `users/{uid}` created with `role: "guru"`, gated by a valid/active `teacherAccessCodes` document.
-- Invalid teacher code → sign-up rejected, Auth account rolled back, friendly inline error shown.
-- Login (email/password).
-- Logout.
-- Session restoration across page refresh.
-- Role-based routing to one of two temporary placeholder screens.
-- Orphaned-account recovery ("Lengkapi Pendaftaran" → default `siswa` profile only).
-- All of the above were manually tested by the project owner against the real `vocably-idn-en` project and reported as passing (student sign-up, logout, re-login, session restoration after refresh, valid-code teacher sign-up, invalid-code teacher sign-up with rollback).
+**Stage 1 (merge) — run for real, against the actual Oxford CSVs:**
+- Oxford 3000: 3,308 data rows. Oxford 5000: 2,015 data rows. 0 malformed rows in either file.
+- **4,952 unique canonical `vocabWords` documents** after merging duplicates and the 21 Oxford 3000/5000 overlap words.
+- 353 duplicate-word groups merged (multiple CSV rows → one document).
+- CEFR distribution of the merged documents: A1 898, A2 792, B1 690, B2 1295, C1 1277 (no C2, as expected — Oxford source data doesn't reach C2).
+- 10 "same-POS collision" cases flagged for manual review (same word + same POS contributed by two different rows — see `tools/vocab_import/README.md`'s "Known limitation" section and `DATA_MODEL.md` §2's translation note). Full list in `output/import_report.json`.
+- Output: `tools/vocab_import/output/canonical_vocab.json` (git-ignored, regenerate anytime via `node bin/merge.js`).
 
-## 7. Not Yet Implemented
+**Stage 2 (translate) — complete, real run against the configured API:**
+- Configuration (`.env` at repo root, not committed): `OPENAI_BASE_URL=https://ai.dinoiki.com/v1`, `OPENAI_API_PATH=/chat/completions`, `OPENAI_MODEL=gpt-4o-mini` — a pre-existing developer-configured OpenAI-compatible endpoint, not something Claude set up.
+- A 5-item smoke test ran first and was manually spot-checked for quality (e.g. "abandon"→"meninggalkan", "ability"→"kemampuan" — correct, natural Indonesian) before scaling up.
+- Full run: 5,936 total meanings across all 4,952 documents, batches of 25. One batch (of 238) reliably failed with a JSON-parsing error on the model's response for that specific 25-item grouping (not a transient network issue — retried identically and failed the same way); re-running with a smaller batch size isolated and resolved it — all 25 items translated fine individually. **Final state: all 5,936 meanings have a non-null translation, 0 remaining.**
+- Spot-checked quality on several words post-completion — all correct and properly disambiguated by POS (e.g. "run" verb→"berlari"/noun→"lari", "light" noun/adjective/verb → "cahaya"/"ringan"/"menyalakan"). One minor known imperfection: "equal" as a noun (a rarer sense, "no equal") translated to "sama" (matches the adjective sense) rather than something like "tandingan" — not corrupted, just an imperfect rare-sense translation, worth a teacher's eventual review alongside the same-POS collision list.
+- Output: `tools/vocab_import/output/translations_cache.json` (resumable cache, 5,936 entries) + `output/canonical_vocab_translated.json` (canonical data with translations applied, 0 nulls).
 
-**Future milestone work (Milestones 3–8, per `CLAUDE.md` §7):** theme/design system, responsive nav shell, `vocabWords` + CSV import + CEFR bundles, vocab browsing (3 modes), DictionaryAPI integration, Cloudflare Worker (`vocably-ai-worker/`, separate repo — does not exist yet), guru "Tambah Kosakata", real student dashboard, Riwayat, the 3-phase Storyfier learning flow, guru "Set Target Kata" + "Edit Kata".
+**Stage 3 (seed to Firestore) — complete, run for real by the project owner:**
+- The project owner generated a service-account key (kept outside the repo), set `GOOGLE_APPLICATION_CREDENTIALS`, ran `node bin/seed_firestore.js --dry-run` then `--yes`, and confirmed in the Firebase Console that all 4,952 `vocabWords` documents (+ the `topics` master list) are now really present in the `vocably-idn-en` project.
+- The decision logic (create vs. update vs. skip-unchanged vs. skip-foreign, idempotent reruns, never touching `source: "guru"` documents) was already fully unit-tested (`test/seedDecision.test.js`) before this run; it now also has a real production run behind it.
+- A minor gap was found and fixed *after* this run (§5b): the seed pipeline never wrote the documented `posList` field. Not re-seeded now (harmless — nothing reads it from Firestore today); the fix makes a future rerun self-heal it (see §5b).
 
-**Intentionally out of scope (not a gap, a decision):** password reset, email verification, any auth provider besides email/password — per explicit Milestone 2 scope decision, not revisited yet.
+**Stage 4 (bundle generation) — complete, run for real:**
+- `assets/vocab/vocab_a1.json` (898 words), `vocab_a2.json` (792), `vocab_b1.json` (690), `vocab_b2.json` (1295), `vocab_c1.json` (1277) — all generated from the real translated canonical data. No `vocab_c2.json` (no C2 data, as expected). `.gitkeep` removed since real files now exist.
+- `lib/utils/vocab_bundle_constants.dart`'s `kBundleGeneratedAt` updated to the real generation timestamp.
+- **Verified against the actual Flutter model**, not just assumed correct: a temporary test loaded all 5 files through the real `VocabBundleEntry.listFromJson` parser — **0 of 4,952 entries failed to parse**, every entry has a non-empty `word`/`meanings` and the expected `cefrLevel`.
+- **A real regression was caught and fixed by this verification**: `test/screens/vocab_browser_screen_test.dart` started hanging (`pumpAndSettle` timeout) once real, sizeable bundle files existed, because it had been implicitly relying on `rootBundle.loadString` failing fast (asset didn't exist yet) — a genuine multi-hundred-KB disk read doesn't resolve within `flutter test`'s fake-async pump loop without `tester.runAsync()`. This is a test-harness artifact, not a production bug (a real running app resolves this normally) — fixed by injecting a fake `AssetBundle` in that test, the same pattern `vocab_bundle_service_test.dart` already used, so the test no longer depends on real disk I/O timing.
 
-**Unresolved / TBD (per `CLAUDE.md` §10, not to be assumed or invented):** Placement Test scoring/level-determination algorithm; Pre-Test/Post-Test instrument and scoring; the ChatGPT-based DictionaryAPI fallback (`/word-details`) — pending a word-coverage measurement during CSV import; `flutter_tts` (or equivalent) as the audio fallback dependency — not yet confirmed/approved; the exact behavior for abandoned/incomplete `learningSessions` (explicitly flagged as an open question to revisit before Milestone 7, not decided).
+## 5b. Bug Fix — Vocabulary Browse Failed to Load Real Data
 
-## 8. Important Architectural Decisions
+**Symptom:** after the real Firestore seed (§5) completed and was verified in the console, `Jelajahi Kosakata` → any CEFR level × any browse mode (A1/A2/B1 × Abjad/Tema all tried) hung loading, then showed "Gagal memuat kosakata" / "Coba lagi" — which just repeated the same failure.
 
-These must be preserved by future work unless explicitly revisited in discussion:
-
-- **Riverpod with code generation is the only state-management approach** — no manual `Provider`/`StateNotifierProvider`, no other state library.
-- **No routing package** (no `go_router`/`auto_route`) — plain `Navigator` + a status-driven `switch` in `app.dart` is the deliberate choice for as long as it stays adequate.
-- **No `custom_lint`** — `riverpod_lint` (≥3.1.0) is implemented on `analysis_server_plugin`, not `custom_lint`; do not add `custom_lint` "for Riverpod" without a new, independent reason.
-- **Role assignment happens through Firestore Security Rules, not client code or Cloud Functions** — the client cannot self-grant `guru`; the rules' `exists()`/`active==true` check against `teacherAccessCodes` is the only gate.
-- **`role` and `teacherCodeInput` are permanently immutable** after `users/{uid}` creation, for both roles.
-- **`teacherCodeInput` is a permanent, intentional audit trail** — not a temporary field, not something to later "clean up."
-- **Self-update permissions are role-specific and enforced as closed whitelists** (`hasOnly()`) in rules: `siswa` gets 4 fields, `guru` gets `name` only. Extending this requires a rules change, reviewed the same way the original matrix was.
-- **Orphaned-account recovery can only ever create a `siswa` profile** — this is a deliberate privilege-escalation guard, not an oversight to "complete" later by adding a guru path.
-- **`lib/screens/placeholders/` is temporary**, not a permanent architectural layer — it exists only to prove role-based routing before Milestone 3 (nav shell) and Milestones 6/8 (real dashboards) exist, and should be deleted once those land. It is deliberately *not* part of `CLAUDE.md` §3's canonical folder structure (see the exception note added there).
-- **Generated `.g.dart` files are committed to git** — not regenerated-on-clone-only; this was an explicit Milestone 1 decision.
-- **The client-side data-integrity limitation is an accepted trade-off, not a bug**: `learningProgress`, `placementTestResults`, and `researchAssessmentResults` are written directly by the client with no server-side validator confirming the underlying activity actually happened — documented in `DATA_MODEL.md` §3 as a deliberate consequence of the no-Cloud-Functions architecture, not something Milestone work should try to "fix" without an explicit new discussion.
-
-## 9. Current File Structure
-
+**Root cause (confirmed, not guessed):** `VocabBundleService.fetchDelta()` runs
+```dart
+firestore.collection('vocabWords')
+  .where('cefrLevel', isEqualTo: cefrLevel)
+  .where('updatedAt', isGreaterThan: Timestamp.fromDate(bundleGeneratedAt))
 ```
-vocably/
-  CLAUDE.md, SPEC.md, DATA_MODEL.md, DESIGN_REFERENCE.md, PROJECT_STATE.md
-  README.md
-  pubspec.yaml, pubspec.lock, analysis_options.yaml
-  firebase.json, .firebaserc, firestore.rules, firestore.indexes.json
-  .gitignore, .env (untracked, git-ignored)
-  lib/
-    app.dart, main.dart, firebase_options.dart
-    models/app_user.dart
-    services/firebase_service.dart, auth_service.dart, user_service.dart
-    providers/auth_providers.dart(+.g), sign_up_controller.dart(+.g),
-              login_controller.dart(+.g), complete_registration_controller.dart(+.g)
-    screens/auth/login_screen.dart, sign_up_screen.dart, complete_registration_screen.dart
-    screens/placeholders/student_placeholder.dart, teacher_placeholder.dart
-    utils/role.dart
-  test/widget_test.dart
-  web/                          # Flutter web scaffold assets (icons, manifest, index.html)
-```
-Not yet present: `lib/widgets/`, `lib/theme/`, `assets/vocab/`, `vocably-ai-worker/` (separate repo, per `CLAUDE.md` §3).
+— an equality filter on one field plus a range filter on a *different* field, which Firestore requires a composite index for. `DATA_MODEL.md` §11.5 already documented that this index was needed ("index baru `cefrLevel + updatedAt` ditambahkan untuk query delta") — but `firestore.indexes.json` still had `"indexes": []`, and running `firebase firestore:indexes` against the live project confirmed **zero composite indexes actually existed there either.** The index was described in the docs but never actually created. With an empty `vocabWords` collection (before the real seed) this never mattered; once ~5,000 real documents existed and the query actually ran, Firestore rejected it with `FAILED_PRECONDITION` ("query requires an index"). `loadLevelWithDelta()` didn't catch this, so the exception propagated all the way to the `vocabLevel` provider as an `AsyncError` — for every level and every browse mode, since the failure happens before any level/mode-specific logic runs at all. This matches the reported symptom exactly.
 
-## 10. Verification Status
+**Files changed:**
+- `firestore.indexes.json` — added the `vocabWords` composite index (`cefrLevel` ASC, `updatedAt` ASC) that should have been there since Milestone 4 Stage 2.
+- `lib/services/vocab_bundle_service.dart` — `loadLevelWithDelta()` now catches a `fetchDelta()` failure and falls back to bundle-only data (logged via `debugPrint`) instead of letting the whole level fail. This means: (a) the browse screen now works immediately even before the index finishes deploying/building, and (b) any *future* transient delta failure (index rebuild, brief network issue) degrades to "no freshness top-up this load" instead of an outright failure — matching the graceful-degradation pattern `SPEC.md` §3.5 already uses for DictionaryAPI.
+- `test/services/vocab_bundle_service_test.dart` — two new tests: `fetchDelta` throwing still returns bundle data (this is the regression test; confirmed it fails against the pre-fix code via a manual revert-and-rerun), and `fetchDelta` succeeding still merges normally.
+- `tools/vocab_import/lib/seedDecision.js` (+ `test/seedDecision.test.js`) — secondary finding from the same investigation, not the crash's cause: the seed pipeline never wrote the documented `posList` field (`DATA_MODEL.md` §2 says Firestore must persist it since there are no computed fields; `VocabWord.toMap()` on the Dart side already does). Fixed so future creates/updates include it, and so an existing document missing it is now detected as needing an update (self-healing backfill on the next rerun) rather than wrongly treated as already up to date. **Not a cause of the reported bug** — `VocabWord.fromFirestore` never reads `posList` back — and the already-seeded 4,952 documents were deliberately **not** re-seeded for this alone.
+- `DATA_MODEL.md` §11.3/§11.5 — recorded this bug and its fix inline.
 
-Latest results (Milestone 2, immediately pre-commit):
+**Verification:**
+- `flutter analyze`: no issues.
+- `flutter test`: **116/116 passing** (full suite).
+- `tools/vocab_import` (`node --test`): **43/43 passing**.
+- The new regression test was confirmed to actually fail against the pre-fix code (temporarily reverted `vocab_bundle_service.dart` via `git stash`, reran, saw it fail with the exact simulated exception, then restored the fix and confirmed it passes again).
+- **Not yet re-verified against the real running web app** by a human — the `fetchDelta`-failure path was exercised automatically (unit test) but the *actual* browse screen, against the *actual* seeded Firestore data, has not been manually re-tested since this fix. The code-level fix means it should now work regardless of whether the index has been deployed yet (bundle-only fallback), but a real click-through is still recommended.
 
-| Check | Result |
-|---|---|
-| `flutter analyze` | No issues found |
-| `flutter test` | 1/1 passed |
-| `dart run build_runner build` | 0 new outputs (all generated files current) |
-| `flutter build web` | Succeeded |
-| Manual Milestone 2 test matrix (against real `vocably-idn-en` project) | All 6 scenarios passed: student sign-up, logout, re-login, session restoration after refresh, valid-code teacher sign-up, invalid-code teacher sign-up with Auth rollback |
+**Remaining manual action:** deploy the index so the freshness-delta feature actually works (not just degrades gracefully): from the repo root, `firebase deploy --only firestore:indexes`. Not run automatically this session (same standing rule as Firestore rules — Claude edits the config file, the project owner deploys it). Note indexes can take some time to finish building on a ~5,000-document collection; until built, the graceful-degradation fix means browse still works, just without the live top-up.
 
-## 11. Current Git State
+## 5c. Audit — Word Detail English Definition/Example/Phonetic Coverage
 
-- **Branch:** `main`
-- **Latest commit:** `ff705ea` — "Milestone 2: Firebase Auth and role-based routing"
-- **Working tree:** clean (before this file was added)
-- **Remote relationship:** `main` is ahead of `origin/main` by 1 commit (Milestone 2 committed locally, **not yet pushed**)
+**Trigger:** manual end-to-end testing (post-§5b fix) found Word Detail
+often shows "Definisi saat ini tidak tersedia" and inconsistent
+phonetic/example-sentence coverage. Audited against `SPEC.md`,
+`DATA_MODEL.md`, `DESIGN_REFERENCE.md`, `CLAUDE.md` before touching code.
 
-## 12. Next Recommended Step
+**1. Explicitly required for Milestone 4:** POS (Vocably's own data,
+always present) and Indonesian translation per meaning (`meanings[].translation`,
+from the bank kosakata) — `SPEC.md` §3.5. Layer 1 graceful degradation
+(a friendly fallback message when English content is missing) and Layer
+2 audio fallback (TTS) are both explicitly "wajib" (mandatory) — and both
+are implemented.
 
-Per `CLAUDE.md` §7, **Milestone 3: design system / theme layer + responsive navigation shell** (`NavigationRail` for wide screens, top tabs for narrow/mobile screens — not bottom nav), based on `DESIGN_REFERENCE.md`. This has not been implemented, planned in detail, or started — this document only names it as the next milestone in sequence per the existing build order; it does not design or scaffold it.
+**2. Only optional/best-effort:** English definition, example sentence,
+and phonetic text are **all** sourced from DictionaryAPI, which
+`SPEC.md` §3.5 explicitly and repeatedly describes as unreliable: *"API
+tersebut adalah layanan komunitas gratis tanpa jaminan uptime — jadi
+kegagalan harus dianggap normal, bukan kasus tepi"* ("failure must be
+considered normal, not an edge case"). The exact fallback text this
+session's implementation shows ("Definisi bahasa Inggris tidak tersedia
+untuk kata ini" / current wording) is the literal example string
+`SPEC.md` §3.5 Layer 1 gives.
 
-Before that, two operational loose ends from Milestone 2 remain the project owner's decision, not a blocker to Milestone 3 itself: (a) whether/when to `git push` the Milestone 2 commit, and (b) seeding at least one real `teacherAccessCodes` document via the Firebase Console so teacher sign-up can be exercised against production data going forward.
+**3. Bug or expected limitation?** **Both** — split findings:
+- Missing content for genuinely rare/uncommon words, or for function
+  words (articles) DictionaryAPI just doesn't model well, is **expected**
+  per the SPEC's own framing above. Not a bug.
+- However, empirical testing (live calls to the real DictionaryAPI for
+  representative words spanning every POS tag Vocably's data actually
+  uses) found a **genuine implementation bug**: Oxford's POS taxonomy
+  doesn't match DictionaryAPI's (Wiktionary-derived) tags for several
+  categories — confirmed against the live API, not assumed:
+  - Vocably `modal` (e.g. "can", "must") — DictionaryAPI tags these `verb`, never `modal`.
+  - Vocably `auxiliary` (e.g. "do") — DictionaryAPI tags `verb`.
+  - Vocably `number` (e.g. "one") — DictionaryAPI tags `numeral`.
+  - Vocably `exclamation` (e.g. "oh") — DictionaryAPI tags `interjection`.
+  - Vocably `determiner` (e.g. "this", "some", "each") — DictionaryAPI tags `pronoun` (occasionally `adjective`), never `determiner`.
+  - `article` (e.g. "a"/"the") has no reliable DictionaryAPI equivalent found — genuinely unavailable, not a mismatch.
+  
+  Since the old code matched Vocably's tag against DictionaryAPI's
+  `partOfSpeech` by **exact string equality**, every word whose Vocably
+  POS falls into one of the first five categories above was silently
+  shown "not available" **even when the API actually had the
+  definition**, just filed under a different tag name.
 
-## 13. Handoff Instructions for a New AI Session
+**4. Did the current code fail to display data it actually had?** **Yes,
+confirmed** — this is exactly the bug in point 3. Phonetic text is
+**not** affected by this bug (it's word-level, not per-POS); its
+inconsistent presence is the expected DictionaryAPI-completeness
+limitation from point 3's first bullet.
 
-1. Read this file (`PROJECT_STATE.md`) first for orientation.
-2. Then read `CLAUDE.md` in full — it is the authoritative project-rules document and must be read every session per its own header.
-3. Read `SPEC.md`, `DATA_MODEL.md`, and `DESIGN_REFERENCE.md` as needed for the specific task at hand.
-4. **Inspect the live repository** (git log, git status, actual file contents) before changing anything — do not assume this file is still accurate; it is a snapshot from a specific point in time (Milestone 2 completion) and will drift as work continues.
-5. If the live repository contradicts anything written here, **trust the live repository**, not this file — and consider updating this file to match.
-6. Preserve the architectural decisions in §8 unless the project owner explicitly reopens discussion on one of them. Do not silently redesign role assignment, state management, routing, or the rules-enforced field matrix.
+**5–7. Fix (schema/API unchanged, as instructed):**
+- `lib/models/dictionary_entry.dart` — added `DictionaryEntry.definitionsForPos(pos)`: tries the exact tag first, then a small, empirically-verified alias table (`modal`/`auxiliary`→`verb`, `number`→`numeral`, `exclamation`→`interjection`, `determiner`→`pronoun` then `adjective`) before giving up. `article` deliberately left unmapped — no evidence-based fallback exists for it.
+- `lib/screens/student/vocab_browser/word_detail_screen.dart` — now calls `definitionsForPos(meaning.pos)` instead of the exact-match `meaningsByPos[meaning.pos]`.
+- `test/models/dictionary_entry_test.dart` — 7 new tests, including one confirmed to fail (a compile error, since the method didn't exist) against the pre-fix code via a manual `git stash`/rerun/restore cycle.
+- No schema change, no new dependency, no new API — exactly as instructed.
+
+**Verification:** `flutter analyze` clean; `flutter test` all passing (124 total). Not yet re-verified against the real running app with a live "can"/"must"/"one"/"oh" lookup — worth a quick manual check, but the fix is a pure, fully-tested local lookup change with no external-service risk.
+
+**Recorded as a known, accepted limitation going forward (not something to "fix" further without a new decision):** `article`-tagged words, and any word DictionaryAPI genuinely has no entry for, will continue to show the Layer 1 fallback message — this is by design, not a gap.
+
+## 5d. Follow-up Investigation — English Definitions Still Missing After §5c
+
+Manual re-testing after §5c's alias fix still found missing English
+definitions in Word Detail. Investigated end-to-end (Oxford entry →
+`dictionaryLookupProvider` → real DictionaryAPI request → response
+parsing → POS matching → rendering) with real, spaced-out calls to the
+live API — not assumed.
+
+**Findings, with evidence:**
+- The §5c alias table itself is **confirmed correct** on real bundle data — spot-checked real words for every aliased category (`do`/`have`→auxiliary, `all`/`another`/`any`/`both`/`each`/`enough`→determiner, `bye`/`goodbye`/`hello`/`hey`/`hi`→exclamation) and all matched successfully.
+- **New, real gap found:** `number`→"one"/"million"/"thousand" are tagged `numeral`, but a few (e.g. "billion") are tagged only `noun` — confirmed the noun definition ("a thousand million...") *is* the correct numeric one, not an unrelated sense. **Fixed:** `number` alias extended to `['numeral', 'noun']`.
+- **A rapid-fire diagnostic script hitting ~45 real API calls without delay produced a large false "networkError" batch** (words like "can"/"address"/"eight" that a spaced-out, separate real curl check confirmed work fine) — this is DictionaryAPI's own rate limiting, not a Vocably bug, but it surfaced a real, separate implementation gap (next point).
+- **Real bug found:** the UI collapsed three different situations into the exact same "Definisi bahasa Inggris tidak tersedia" message: (a) still loading, (b) a genuine permanent content gap, (c) a transient failure (network error/rate limit) that might well succeed on retry. (a) could flash a false "unavailable" before the API even responded; (c) gave the user no way to tell a fixable failure apart from a real gap, or to retry.
+- **Confirmed genuine, permanent DictionaryAPI content gaps** (not a bug — correctly left as-is): `article` ("a"/"the" — no equivalent tag), `be` (404, no entry at all for the bare word), `would`/`ought` as `modal` (API only has an unrelated noun sense, no verb entry exists to alias to), `no` as `determiner` (none of the API's tags for "no" correspond to that sense), `ok` as `exclamation` (API only tags it adjective).
+
+**Fix:**
+- `lib/models/dictionary_entry.dart` — extended the `number` alias (`['numeral', 'noun']`); expanded the doc comment with the full evidence trail (which words were tested, what was confirmed unmappable and why).
+- `lib/screens/student/vocab_browser/word_detail_screen.dart` — replaced the flat nullable-list rendering with a small `_DictionaryContent` sealed type (`_DictionaryLoading` / `_DictionaryFound` / `_DictionaryUnavailable` / `_DictionaryRetryable`), computed via `_dictionaryContentFor()`. Loading now shows a small spinner + "Memuat definisi..."; a permanent gap shows the original fallback text unchanged; a transient failure shows "Gagal memuat definisi. Periksa koneksi lalu coba lagi." with a working "Coba lagi" button that calls `ref.invalidate(dictionaryLookupProvider(...))`.
+- `test/models/dictionary_entry_test.dart` — 7 new tests for `definitionsForPos` (exact match, each alias, the deliberately-unmapped `article` case).
+- `test/screens/word_detail_screen_test.dart` — rewritten: separate tests for the 404/permanent path (no retry button), the loading path (spinner, no premature "unavailable" text), the 500/retryable path (retry button present, tapping it re-triggers the lookup — verified via a call counter), and a `modal`→`verb` end-to-end proof that a definition that previously failed to appear now renders.
+
+**Genuine remaining DictionaryAPI limitations (not bugs, not to be "fixed" further without a new decision):** `article`, `be` (as a bare auxiliary), specific modal words with no verb entry in the API's data (`would`, `ought`), `no` as a determiner, `ok` as an exclamation, and any multi-word phrase (unchanged from §5c/`SPEC.md`'s original framing).
+
+## 5e. Pagination Added to Vocabulary Browse
+
+The real A1 bundle (~900 words) rendered its entire filtered/sorted
+result at once, and was reported as noticeably laggy in the real Chrome
+app. Added client-side pagination — no bundle format change, no
+Firestore change, no server-side pagination.
+
+- **Page size: 50** (`kVocabBrowsePageSize`, `lib/utils/vocab_browse_filter.dart`).
+- New pure `paginate<T>(items, {page, pageSize})` → `VocabBrowsePage<T>` (`items`, `pageIndex`, `totalPages`) — generic, no `VocabBundleEntry` dependency, always called **after** `applyVocabBrowseFilter` (filter/sort first, paginate the result, never the other way around).
+- `VocabBrowserFilterState` gained a `page` field (0-indexed). `selectLevel`/`selectMode`/`selectTopic`/`selectPos` all reset it to `0`; a new `goToPage(int)` sets it directly.
+- UI: a `_PaginationBar` (Previous/Next `OutlinedButton`s + "Halaman X dari Y") appears below the list only when `totalPages > 1` — hidden entirely (not just disabled) when everything fits on one page, per the "not unnecessarily prominent" requirement. Previous/Next disable via `onPressed: null` at the first/last page respectively.
+- **Performance:** `_LevelContent` was converted from `ConsumerWidget` to `ConsumerStatefulWidget` purely to memoize `applyVocabBrowseFilter`/`distinctTopics`/`distinctPosValues` — these are cached (invalidated on `identical()`/field-equality checks against `allEntries`/`mode`/`selectedTopic`/`selectedPos`) so paging through 18 pages of A1 no longer re-filters/re-sorts/re-derives the full ~900-word list on every click, only on an actual level/mode/filter change. No new package, no app-wide state-management change — a contained, single-widget memoization.
+
+**Tests added:**
+- `test/utils/vocab_browse_filter_test.dart` — 9 new `paginate` tests: 0 results, fewer than a page, exactly one page, multiple pages with a smaller last page, page-index clamping past the end/below zero (acts as disabled Next/Previous), full next/previous walk with no gaps/overlap, no mutation of the input, custom page size.
+- `test/providers/vocab_browser_providers_test.dart` (new file) — 8 tests confirming every mutating action (`selectLevel`/`selectMode`/`selectTopic`/`selectPos`) resets `page` to `0`, `goToPage` doesn't disturb other selection fields, and vice versa.
+- `test/screens/vocab_browser_screen_test.dart` — 10 new widget tests against a 120-word fake A1 bundle (+ a 75-word A2 bundle): page-1 rendering, Previous disabled on page 1, Next navigation + Previous re-enabling, last-page-smaller-than-page-size disabling Next, Previous navigating back, level switch resetting to page 1, mode switch resetting to page 1, a topic filter narrowing to 30 results (under one page) both resetting to page 1 *and* hiding the pagination bar, and an empty level showing no pagination bar.
+
+## 6. Firebase / Firestore State
+
+- **Project:** `vocably-idn-en`, Firestore Native mode, `asia-southeast1`.
+- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2), `vocabWords`/`topics` — read-only for any authenticated user, `allow write: if false` for both (Milestone 4 Stage 2, deployed).
+- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3). A missing composite index initially made the browse screen unable to read this data correctly (§5b) — fixed in code; the index config exists but still needs a manual `firebase deploy --only firestore:indexes` (§7). Everything else (`learningProgress`, `learningSessions`, `targetWordSets`, `placementTestResults`, `researchAssessmentResults`) remains unmodeled, deny-all by the catch-all rule.
+
+## 7. Manual Actions Required
+
+These are the only things this session could not safely do itself:
+
+1. **Deploy the Firestore composite index** this session added to `firestore.indexes.json` (§5b): from the repo root, `firebase deploy --only firestore:indexes`. The browse screen already works without this (graceful fallback to bundle-only data), but the live Firestore-freshness top-up won't actually run until the index is deployed and finishes building.
+2. **Manually re-verify the browse screen** (`flutter run -d chrome`) — confirm pagination (§5e: "Halaman X dari Y", Previous/Next, resets on level/mode/filter change) and that A1/A2/B1 × Abjad/Tema all still load correctly end-to-end. Verified via automated tests only so far this session.
+3. **Manually re-check Word Detail** for words like "can" (modal), "billion" (number), "one", "oh", "this" now that the extended alias table and the loading/retryable/unavailable UI split are in place (§5c/§5d) — verified via unit/widget tests only so far.
+4. **Review the 10 same-POS collisions** in `tools/vocab_import/output/import_report.json` (`samePosCollisions`) — not blocking, but worth a look since the schema can only keep one sense per POS.
+5. **Optionally spot-check translation quality** beyond what this session sampled — `tools/vocab_import/output/canonical_vocab_translated.json` has all 4,952 documents; the "equal"/noun case (§5) is the one known imperfect example found so far.
+6. Decide whether/when to `git add`/commit/push this session's changes — not done automatically, per your standing instruction.
+
+## 8. Important Architectural Decisions (this session)
+
+- **`translationId` renamed to `translation`** everywhere (Dart models, Firestore field, bundle field, the new import pipeline, tests, docs) — the old name wrongly implied a foreign key into a separate collection; it always held the translation text directly, and no separate `translations` collection exists or is planned. Safe to do because `vocabWords` had no real production data yet.
+- **`cefrLevel` stays one-per-document, set to the LOWEST level found across a word's contributing CSV rows** — all distinct meanings/POS are kept regardless of the level they originally came from (per-word, not per-meaning, CEFR — a known, accepted simplification, documented in `DATA_MODEL.md` §2).
+- **Oxford 3000 + Oxford 5000 are one merged dataset** — a word in both becomes one document; `source` = `"oxford3000"` if present there, else `"oxford5000"` (no new enum value).
+- **`CLAUDE.md`/`DATA_MODEL.md`'s "CSV import is not Claude's job" language was revised** (not deleted) to: Claude may write/maintain the pipeline; secrets and the first full run of a costly/production-writing stage stay developer-gated. See `tools/vocab_import/README.md` for the exact split.
+- **Same-POS collisions are surfaced, not silently resolved** — first-encountered row wins, the discarded alternative is logged for manual review, since the current schema has no way to represent two senses of the same POS for one word.
+- **`test/screens/vocab_browser_screen_test.dart` now injects a fake `AssetBundle`** instead of relying on the real `rootBundle` — needed once real, sizeable bundle files existed (a `flutter test` fake-async-pump artifact, not a production bug; see §5's Stage 4 entry for the full explanation). Follow this same pattern (reuse the existing `_FakeAssetBundle`/`_EmptyAssetBundle` style) for any future widget test that touches `vocabLevelProvider`.
+- **`test/services/vocab_bundle_service_test.dart` gained two tests exercising `loadLevelWithDelta`'s failure path directly** via subclassing (`_ThrowingDeltaVocabBundleService`/`_StubDeltaVocabBundleService`, overriding just `fetchDelta`) — the first direct test coverage this method has ever had (previously flagged as a disclosed gap since it needs Firestore). Follow this same subclassing pattern for any future test needing to control `fetchDelta` without a real/fake Firestore instance.
+- **`DictionaryEntry.definitionsForPos` alias table** (`modal`/`auxiliary`→`verb`, `number`→`numeral`/`noun`, `exclamation`→`interjection`, `determiner`→`pronoun`/`adjective`) reconciles Vocably/Oxford's POS taxonomy against DictionaryAPI's Wiktionary-derived tags — confirmed empirically against the live API twice (§5c, §5d), not guessed. `article` deliberately left unmapped (no evidence-based equivalent found). Extend this table, not the matching logic's shape, if another mismatch is found later.
+- **Word Detail's dictionary content is now a 4-state sealed type** (`_DictionaryLoading`/`_DictionaryFound`/`_DictionaryUnavailable`/`_DictionaryRetryable`, `word_detail_screen.dart`) instead of a flat nullable list — loading, a permanent content gap, and a transient/retryable failure are visually distinct, with a working retry action for the last one. Follow this same distinction (don't collapse states back into one) if this screen changes again.
+- **Vocabulary browse is paginated (50/page, §5e)** — always filter/sort first via `applyVocabBrowseFilter`, then paginate via `paginate()`. Never paginate before filtering.
+- All Milestone 1–3 decisions from the previous snapshot (Riverpod-only, no routing package, no `custom_lint`, rules-enforced role assignment, etc.) remain unchanged and still apply — not re-litigated this session.
+
+## 9. Verification Status
+
+- `flutter analyze`: **no issues** (final run this session, after all fixes).
+- `flutter test`: **153/153 passing** (full run this session — includes the real-bundle-data test fix, `loadLevelWithDelta` regression tests, `definitionsForPos` tests, the rewritten Word Detail loading/retryable/unavailable tests, and the new pagination tests across `vocab_browse_filter_test.dart`, `vocab_browser_providers_test.dart`, and `vocab_browser_screen_test.dart`).
+- `tools/vocab_import` pure-logic tests (`node --test`): **43/43 passing** (added one test for the `posList` backfill-on-update behavior).
+- Stage 1 (merge): run for real against the actual Oxford CSVs — 0 malformed rows, 4,952 documents.
+- Stage 2 (translate): run for real to completion — 5,936/5,936 meanings translated, spot-checked for quality.
+- Stage 3 (seed): **run for real by the project owner** — 4,952 documents confirmed live in Firestore.
+- Stage 4 (bundle generation): run for real — all 5 non-empty levels written and verified to parse cleanly via the actual `VocabBundleEntry` model (0/4,952 parse failures).
+- **Post-seed bug found and fixed** (§5b): missing Firestore composite index made every level fail to load; fixed via the index config + a graceful-degradation code change.
+- **English-definition gaps investigated twice** (§5c, §5d): one more real alias gap found and fixed (`number`→also `noun`), one real UI bug fixed (loading/permanent/retryable states no longer collapsed into one message), remaining gaps confirmed as genuine DictionaryAPI content limitations with concrete evidence, not guesses.
+- **Pagination added** (§5e): 50 items/page, filter-then-paginate order preserved, resets on level/mode/topic/pos change, memoized to avoid re-filtering the full list on every page click.
+- All of the above verified via automated tests only this session — **not yet re-verified by a human against the real running app** (§7).
+
+## 10. Current Git State
+
+- **Branch:** `main`, in sync with `origin/main` at the start of this session (nothing ahead/behind).
+- **Working tree at the end of this session:** modified (this session's changes are **uncommitted** — `translation` rename, `CLAUDE.md`/`DATA_MODEL.md`/`SPEC.md` doc updates, new `tools/vocab_import/`, real `assets/vocab/*.json` bundles, the Firestore-index bug fix, the English-definition fixes, pagination, updated `.gitignore`, this file). Commit/push remains the project owner's action per standing instruction.
+
+## 11. Next Recommended Step
+
+1. Run `firebase deploy --only firestore:indexes` (§7) so the delta-freshness query actually works, not just degrades gracefully.
+2. Manually re-test the browse screen (`flutter run -d chrome`) against the real seeded data — pagination, filtering, and Word Detail's definition states — confirm end-to-end, not just via automated tests.
+3. Only after that, Milestone 5 (Cloudflare Worker + guru "Tambah Kosakata") is next in sequence — **not started, not to be started without explicit instruction.**
+
+## 12. Handoff Instructions for a New AI Session
+
+1. Read this file first for orientation, then `CLAUDE.md` in full (its own header requires this every session).
+2. Read `SPEC.md`, `DATA_MODEL.md`, `DESIGN_REFERENCE.md` as needed.
+3. **Inspect the live repository** before changing anything — `git log`, `git status`, actual file contents, and (for the import pipeline) `tools/vocab_import/output/*.json` and `translate_full_run.log` for the real current data-population state. This file drifts; the repository doesn't.
+4. Check whether the Stage 2 translation run (§5) has finished and whether Stage 3/4 have been run since this snapshot was written — §7's manual actions may already be done.
+5. Preserve §8's decisions unless the project owner explicitly reopens discussion on one of them.

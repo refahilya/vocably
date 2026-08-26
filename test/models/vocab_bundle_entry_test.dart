@@ -14,8 +14,8 @@ void main() {
       'word': word,
       'meanings': meanings ??
           [
-            {'pos': 'noun', 'translationId': 'oleh-oleh'},
-            {'pos': 'verb', 'translationId': 'mengenang'},
+            {'pos': 'noun', 'translation': 'oleh-oleh'},
+            {'pos': 'verb', 'translation': 'mengenang'},
           ],
       // Present in real bundle files (DATA_MODEL.md §11.2), deliberately
       // ignored on read — see the dedicated test below.
@@ -40,9 +40,9 @@ void main() {
 
       expect(entry.meanings[0], isA<VocabMeaning>());
       expect(entry.meanings[0].pos, 'noun');
-      expect(entry.meanings[0].translationId, 'oleh-oleh');
+      expect(entry.meanings[0].translation, 'oleh-oleh');
       expect(entry.meanings[1].pos, 'verb');
-      expect(entry.meanings[1].translationId, 'mengenang');
+      expect(entry.meanings[1].translation, 'mengenang');
     });
 
     test('supports multiple topics', () {

@@ -88,3 +88,63 @@ List<VocabBundleEntry> applyVocabBrowseFilter(
   }
   return sortAlphabetically(result);
 }
+
+/// Page size for browse-result pagination (Milestone 4 finalization —
+/// the real Oxford bundle puts ~900 words in a single A1 list, which
+/// noticeably lagged rendered all at once).
+const int kVocabBrowsePageSize = 50;
+
+/// One page's worth of an **already-filtered-and-sorted** list, plus
+/// enough bookkeeping (`pageIndex`, `totalPages`) that the UI never has
+/// to re-derive page-count math itself. Pure and generic — no
+/// `VocabBundleEntry` dependency — so it composes with
+/// [applyVocabBrowseFilter]'s output without knowing anything about it:
+/// callers always filter/sort first, then paginate
+/// (`paginate(applyVocabBrowseFilter(...), page: ...)`), never the other
+/// way around — pagination must never narrow the set a filter still
+/// needs to run over.
+class VocabBrowsePage<T> {
+  const VocabBrowsePage({
+    required this.items,
+    required this.pageIndex,
+    required this.totalPages,
+  });
+
+  /// This page's slice — at most [kVocabBrowsePageSize] items.
+  final List<T> items;
+
+  /// 0-indexed, already clamped into `[0, totalPages - 1]` (or `0` when
+  /// [totalPages] is `0`) — never out of range even if the requested
+  /// page came from a stale/larger result set (e.g. a filter just
+  /// narrowed the list out from under a page the user was already on).
+  final int pageIndex;
+
+  /// `0` only when [items]' source list was empty; otherwise always
+  /// `>= 1`, including when everything fits on a single page.
+  final int totalPages;
+}
+
+/// Slices an already-filtered/sorted [items] list into one page.
+/// [page] is the *requested* 0-indexed page — not assumed valid; this
+/// clamps it itself, so a caller never needs its own bounds-checking
+/// before calling this (`SPEC` requirement: level/mode/filter changes
+/// reset to page 0 themselves, but this stays safe even if a stale page
+/// number is passed for any other reason).
+VocabBrowsePage<T> paginate<T>(
+  List<T> items, {
+  required int page,
+  int pageSize = kVocabBrowsePageSize,
+}) {
+  if (items.isEmpty) {
+    return const VocabBrowsePage(items: [], pageIndex: 0, totalPages: 0);
+  }
+  final totalPages = (items.length / pageSize).ceil();
+  final pageIndex = page.clamp(0, totalPages - 1);
+  final start = pageIndex * pageSize;
+  final end = (start + pageSize < items.length) ? start + pageSize : items.length;
+  return VocabBrowsePage(
+    items: items.sublist(start, end),
+    pageIndex: pageIndex,
+    totalPages: totalPages,
+  );
+}

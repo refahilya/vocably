@@ -156,7 +156,7 @@ Bank kosakata master (bukan per-siswa). Di-import via CSV dari Oxford
 > **Collection ini read-only untuk siswa.** Satu-satunya penulis adalah
 > skrip import dev (lewat Admin SDK lokal) dan akun guru. Tidak ada alur
 > apa pun di aplikasi siswa yang menulis ke sini — lihat "Alur generate
-> translationId" di bawah. Konsekuensinya untuk browse: karena bank
+> translation" di bawah. Konsekuensinya untuk browse: karena bank
 > kosakata praktis statis, browse **tidak membaca dari Firestore** melainkan
 > dari aset statis per level (§11).
 
@@ -205,10 +205,10 @@ Bank kosakata master (bukan per-siswa). Di-import via CSV dari Oxford
 | Field (di dalam tiap elemen `meanings`) | Tipe | Keterangan |
 |---|---|---|
 | `pos` | string | mis. `"noun"`, `"verb"` |
-| `translationId` | string \| null | terjemahan Indonesia **untuk makna ini secara spesifik** — nullable, lihat alur generate di bawah |
+| `translation` | string \| null | terjemahan Indonesia **untuk makna ini secara spesifik** — nullable, lihat alur generate di bawah. **Rename (Milestone 4):** field ini sebelumnya bernama `translationId`, walau isinya selalu teks terjemahan itu sendiri (bukan ID/referensi ke collection lain — tidak pernah ada collection `translations` terpisah). Nama lama menyesatkan, jadi di-rename ke `translation` di seluruh model Dart, Firestore, skrip import, dan bundle sebelum ada data produksi yang ditulis — aman dilakukan karena `vocabWords` masih kosong saat rename ini terjadi |
 
 > **Kenapa `meanings` (array of map), bukan `pos: array<string>` +
-> `translationId: string` tunggal?** Karena satu kata bisa punya makna
+> `translation: string` tunggal?** Karena satu kata bisa punya makna
 > berbeda dengan **informasi yang berbeda pula per makna** — contoh
 > "souvenir" sebagai noun ("oleh-oleh") vs verb (makna & terjemahan
 > berbeda). Dengan `meanings`, tiap kombinasi POS+terjemahan berdiri sendiri
@@ -244,23 +244,28 @@ Bank kosakata master (bukan per-siswa). Di-import via CSV dari Oxford
 >   manual daripada membangun endpoint Worker baru. Jangan tambahkan
 >   endpoint `/word-details` sebelum angka ini ada.
 
-> **Alur generate `meanings[].translationId` (via ChatGPT API) — direvisi di
+> **Alur generate `meanings[].translation` (via ChatGPT API) — direvisi di
 > v6:**
-> 1. **Saat CSV import** (dev-side script, jalan di laptop dev, pakai API
->    key dev sendiri langsung — bukan lewat Worker karena ini bukan traffic
->    dari user produksi): skrip generate terjemahan untuk semua makna
->    sekaligus (batched) lalu langsung menyimpan hasilnya ke Firestore
->    lewat Admin SDK/service account milik dev.
+> 1. **Saat CSV import** (pipeline `tools/vocab_import/`, dijalankan dev di
+>    laptop sendiri, pakai `OPENAI_API_KEY` dari `.env` root — bukan lewat
+>    Worker karena ini bukan traffic dari user produksi): skrip generate
+>    terjemahan untuk semua makna sekaligus (batched, di-cache lokal di
+>    `output/translations_cache.json` supaya tidak digenerate ulang) lalu
+>    menyimpan hasilnya ke Firestore lewat Admin SDK/service account milik
+>    dev (`GOOGLE_APPLICATION_CREDENTIALS`). **Claude boleh menulis dan
+>    memelihara kode pipeline ini**; menjalankannya untuk menulis ke
+>    Firestore produksi tetap butuh kredensial dev sendiri — lihat
+>    `tools/vocab_import/README.md`.
 > 2. **Saat guru menambah kata baru / makna baru** lewat "Tambah Kosakata"
 >    (SPEC §4.1): client (akun guru yang login) memanggil **Cloudflare
 >    Worker** endpoint `/translate` (§10) dengan kata + POS. Worker balikin
 >    teks terjemahan, lalu **client guru yang menulis** hasilnya ke
 >    `vocabWords/{id}` di Firestore.
-> 3. Kalau panggilan Worker gagal, `translationId` makna itu tetap `null` —
+> 3. Kalau panggilan Worker gagal, `translation` makna itu tetap `null` —
 >    tidak ada retry otomatis di background (tidak ada scheduler tanpa Cloud
 >    Functions).
 > 4. **Lazy display (menggantikan "lazy retry" v5):** saat siswa membuka
->    kamus detail kata yang punya `translationId` masih `null`, client
+>    kamus detail kata yang punya `translation` masih `null`, client
 >    memanggil Worker `/translate` untuk makna itu dan **menampilkan
 >    hasilnya di layar saja — TIDAK menulis ke Firestore.** Hasilnya boleh
 >    di-cache di memori selama sesi aplikasi berjalan supaya tidak dipanggil
@@ -269,7 +274,7 @@ Bank kosakata master (bukan per-siswa). Di-import via CSV dari Oxford
 > > **Kenapa berubah dari v5?** Rencana lama (siswa menulis balik hasil
 > > terjemahan) mengharuskan akun siswa punya izin `update` ke
 > > `vocabWords`, dan aturan pengamannya — "hanya boleh mengubah
-> > `meanings[i].translationId` dari `null` ke non-null" — **tidak bisa
+> > `meanings[i].translation` dari `null` ke non-null" — **tidak bisa
 > > ditulis di Security Rules**: bahasa rules tidak punya perulangan, jadi
 > > tidak ada cara memeriksa elemen-per-elemen pada array yang panjangnya
 > > berubah-ubah. Satu-satunya rule yang bisa ditulis adalah izin
@@ -279,9 +284,9 @@ Bank kosakata master (bukan per-siswa). Di-import via CSV dari Oxford
 > > dengan penghematan beberapa panggilan API. Maka: **siswa read-only,
 > > titik.**
 >
-> 5. Kekosongan `translationId` yang bertahan adalah **tugas dev/guru**,
+> 5. Kekosongan `translation` yang bertahan adalah **tugas dev/guru**,
 >    bukan siswa. Sediakan cara sederhana untuk menemukannya saat analisis
->    (mis. skrip dev yang men-scan `meanings[].translationId == null`), dan
+>    (mis. skrip dev yang men-scan `meanings[].translation == null`), dan
 >    isi lewat jalur guru atau skrip.
 
 > **Alur "kata sudah ada" saat guru Tambah Kosakata / saat CSV import
@@ -289,7 +294,7 @@ Bank kosakata master (bukan per-siswa). Di-import via CSV dari Oxford
 > dinormalisasi, kata yang sudah ada tidak bisa dibuat ulang. Tangani ini
 > sebagai **operasi tambah elemen ke `meanings`** pada dokumen yang sudah
 > ada, bukan error mentah:
-> - **CSV import** (skrip manual dev, bukan tugas Claude): kalau baris CSV
+> - **CSV import** (`tools/vocab_import/lib/merge.js`): kalau baris CSV
 >   berikutnya punya kata yang sama, gabungkan maknanya ke `meanings`
 >   dokumen yang sama (dan jaga agar makna utama tetap di indeks 0).
 > - **Guru "Tambah Kosakata"**: kalau kata yang diinput guru sudah ada,
@@ -313,6 +318,15 @@ Kata") atau menambah kata baru.
 | Field | Tipe | Keterangan |
 |---|---|---|
 | `name` | string | nama topik, mis. `"Perjalanan"`, `"Aktivitas Harian"` — **unik**, dipakai juga sebagai nilai yang direferensikan di `vocabWords.topics` |
+
+> **`docId` (klarifikasi Milestone 4):** dokumen ini tidak punya aturan
+> normalisasi docId yang didokumentasikan sebelumnya (beda dengan
+> `vocabWords` yang eksplisit pakai `normalizeWord(word)`). Pipeline
+> import (`tools/vocab_import/lib/seedDecision.js`, fungsi `topicSlug()`)
+> memakai slug deterministik (lowercase, spasi/simbol → `_`) supaya
+> re-run pipeline idempoten. Kalau fitur guru "tambah topik baru" (§4.1)
+> dibangun nanti, pakai fungsi slug yang sama persis — jangan pakai
+> auto-generated ID.
 | `createdBy` | string | `"csvImport"` \| `uid` guru — asal topik ini pertama kali dibuat |
 | `createdAt` | Timestamp | |
 
@@ -874,7 +888,7 @@ flag apakah giliran ini memakai fitur "saran menulis".
 Dipanggil dari dua tempat:
 - **Guru** saat menambah kata/makna baru → hasilnya **ditulis** ke
   Firestore oleh client guru.
-- **Siswa** saat membuka kamus detail kata yang `translationId`-nya `null`
+- **Siswa** saat membuka kamus detail kata yang `translation`-nya `null`
   → hasilnya **hanya ditampilkan**, tidak ditulis ke Firestore (§2).
 
 > Endpoint `/word-details` (definisi Inggris via ChatGPT sebagai fallback
@@ -887,9 +901,11 @@ Dipanggil dari dua tempat:
   ada secret.
 - **Text-to-speech fallback** — Web Speech API di browser, tidak ada API
   eksternal.
-- **CSV import Oxford 3000/5000** — skrip dev-side, jalan lokal, pakai API
-  key dev sendiri (proses one-off, bukan traffic user produksi).
-- **Generate bundle statis** (§11) — skrip dev-side, tidak ada AI.
+- **CSV import Oxford 3000/5000** (`tools/vocab_import/`) — jalan lokal di
+  mesin dev, pakai `OPENAI_API_KEY` dari `.env` root untuk terjemahan
+  (proses one-off, bukan traffic user produksi).
+- **Generate bundle statis** (§11, `tools/vocab_import/bin/generate_bundles.js`)
+  — tidak ada AI, transform lokal murni dari data kanonik hasil import.
 - **Cloze test** (SPEC §5.2) — tidak butuh AI; blank diturunkan dari
   penanda di `storyContent` dan pencocokan jawaban cuma perbandingan string
   di client.
@@ -988,6 +1004,26 @@ Hasil delta biasanya beberapa dokumen saja, jadi biaya pembacaannya
 diabaikan. Regenerate bundle secara manual sesekali (mis. setelah guru
 menambah banyak kata) supaya delta tidak menumpuk.
 
+> **Bug ditemukan & diperbaiki (Milestone 4, setelah seeding data asli):**
+> query di atas butuh **composite index** `cefrLevel + updatedAt` (equality
+> + range di field berbeda — auto single-field index Firestore tidak
+> cukup). Index ini sudah disebutkan sejak v6 di §11.5 di bawah, tapi
+> **tidak pernah benar-benar ditambahkan ke `firestore.indexes.json` atau
+> di-deploy** — jadi sampai ada data asli yang cukup besar untuk membuat
+> query ini benar-benar berjalan, kegagalannya tidak pernah kelihatan.
+> Begitu bank kosakata asli di-seed, query ini gagal dengan
+> `FAILED_PRECONDITION` untuk **setiap level**, dan karena
+> `loadLevelWithDelta` dulu tidak menangkap error dari `fetchDelta`,
+> seluruh level gagal dimuat — bukan cuma delta-nya. Diperbaiki dua arah:
+> index-nya sekarang ada di `firestore.indexes.json` (masih perlu
+> di-deploy manual, lihat `PROJECT_STATE.md`), **dan**
+> `VocabBundleService.loadLevelWithDelta` sekarang menangkap kegagalan
+> `fetchDelta` lalu jatuh ke data bundle saja (bukan ke error) — supaya
+> masalah index/delta di masa depan (mis. index sedang dibangun ulang)
+> tidak pernah membuat seluruh fitur browse mati total, konsisten dengan
+> prinsip degradasi rapi yang sama dipakai di `SPEC.md` §3.5 untuk
+> DictionaryAPI.
+
 ### 11.4 Data yang TETAP dibaca live dari Firestore
 
 Bundle hanya untuk bank kosakata. Yang berikut tetap query Firestore
@@ -1004,7 +1040,10 @@ normal, karena volumenya kecil dan/atau harus selalu segar:
 ### 11.5 Konsekuensi ke bagian lain dokumen ini
 
 - §8: dua composite index `vocabWords` untuk browse **dihapus**; index baru
-  `cefrLevel + updatedAt` ditambahkan untuk query delta.
+  `cefrLevel + updatedAt` ditambahkan untuk query delta. **Status:**
+  sekarang benar-benar ada di `firestore.indexes.json` (lihat catatan bug
+  di §11.3) — deploy manual (`firebase deploy --only firestore:indexes`)
+  masih tugas dev, lihat `PROJECT_STATE.md`.
 - §2: field `posList` tidak lagi dipakai untuk query Firestore, tapi tetap
   dipertahankan karena ikut masuk bundle dan dipakai filter POS di memori.
 - Skema `vocabWords` **tidak berubah** selain penambahan `updatedAt` —

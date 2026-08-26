@@ -4,9 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Indonesian translation. A word can have more than one of these (e.g.
 /// "souvenir" as a noun vs. a verb, each with its own translation) — see
 /// `DATA_MODEL.md` §2's rationale for why this is an array of maps rather
-/// than a single `pos`/`translationId` pair on the word itself.
+/// than a single `pos`/`translation` pair on the word itself.
 class VocabMeaning {
-  const VocabMeaning({required this.pos, this.translationId});
+  const VocabMeaning({required this.pos, this.translation});
 
   /// e.g. `"noun"`, `"verb"`.
   final String pos;
@@ -16,17 +16,17 @@ class VocabMeaning {
   /// stays `null` until dev/guru fills it in. Students never write this
   /// field (`CLAUDE.md` §8 "Bank kosakata" — `vocabWords` is read-only
   /// total for siswa).
-  final String? translationId;
+  final String? translation;
 
   factory VocabMeaning.fromMap(Map<String, dynamic> data) {
     return VocabMeaning(
       pos: data['pos'] as String,
-      translationId: data['translationId'] as String?,
+      translation: data['translation'] as String?,
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {'pos': pos, 'translationId': translationId};
+    return {'pos': pos, 'translation': translation};
   }
 }
 

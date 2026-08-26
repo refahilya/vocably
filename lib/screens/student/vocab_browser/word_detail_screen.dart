@@ -60,13 +60,8 @@ class WordDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: _MeaningBlock(
                   meaning: meaning,
-                  dictionaryDefinitions: lookupAsync.whenOrNull(
-                    data: (result) => switch (result) {
-                      DictionaryLookupSuccess(entry: final dictEntry) =>
-                        dictEntry.meaningsByPos[meaning.pos],
-                      DictionaryLookupError() => null,
-                    },
-                  ),
+                  content: _dictionaryContentFor(lookupAsync, meaning.pos),
+                  onRetry: () => ref.invalidate(dictionaryLookupProvider(normalized)),
                 ),
               ),
           ],
@@ -74,6 +69,68 @@ class WordDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// What a [_MeaningBlock] should show for its English-content area —
+/// computed once here from the lookup's [AsyncValue] state rather than a
+/// flat nullable list, so "still loading", "a transient failure worth
+/// retrying", and "this word/POS genuinely has no English content" are
+/// distinguishable (Milestone 4 bug fix: previously all three collapsed
+/// into the exact same "not available" text, which is wrong for the
+/// first two — a loading lookup isn't "unavailable", and a network/rate-
+/// limit hiccup is retryable, unlike a genuine content gap).
+sealed class _DictionaryContent {
+  const _DictionaryContent();
+}
+
+class _DictionaryLoading extends _DictionaryContent {
+  const _DictionaryLoading();
+}
+
+class _DictionaryFound extends _DictionaryContent {
+  const _DictionaryFound(this.definitions);
+  final List<DictionaryDefinition> definitions;
+}
+
+/// Genuinely no English content for this word/POS — either the API has
+/// no entry at all (`DictionaryLookupFailure.notFound`, the documented-
+/// as-normal case for phrases etc.), or it has an entry but neither the
+/// exact POS tag nor any known alias matched anything.
+class _DictionaryUnavailable extends _DictionaryContent {
+  const _DictionaryUnavailable();
+}
+
+/// A transient failure (network error, rate limiting, an unexpected
+/// malformed response) — unlike [_DictionaryUnavailable], retrying might
+/// well succeed, so the UI offers a retry action instead of presenting
+/// it identically to a permanent content gap.
+class _DictionaryRetryable extends _DictionaryContent {
+  const _DictionaryRetryable();
+}
+
+_DictionaryContent _dictionaryContentFor(
+  AsyncValue<DictionaryLookupResult> lookupAsync,
+  String pos,
+) {
+  return lookupAsync.when(
+    loading: () => const _DictionaryLoading(),
+    // The service itself never throws (DictionaryApiService.lookup always
+    // returns a DictionaryLookupResult) — an AsyncError here would only
+    // come from something unexpected at the provider level, so treat it
+    // the same as a transient failure: retryable, not a permanent gap.
+    error: (_, _) => const _DictionaryRetryable(),
+    data: (result) => switch (result) {
+      DictionaryLookupSuccess(entry: final dictEntry) =>
+        switch (dictEntry.definitionsForPos(pos)) {
+          final defs? when defs.isNotEmpty => _DictionaryFound(defs),
+          _ => const _DictionaryUnavailable(),
+        },
+      DictionaryLookupError(reason: DictionaryLookupFailure.notFound) =>
+        const _DictionaryUnavailable(),
+      DictionaryLookupError(reason: DictionaryLookupFailure.networkError) =>
+        const _DictionaryRetryable(),
+    },
+  );
 }
 
 class _HeaderCard extends ConsumerWidget {
@@ -174,11 +231,13 @@ class _HeaderCard extends ConsumerWidget {
 class _MeaningBlock extends StatelessWidget {
   const _MeaningBlock({
     required this.meaning,
-    required this.dictionaryDefinitions,
+    required this.content,
+    required this.onRetry,
   });
 
   final VocabMeaning meaning;
-  final List<DictionaryDefinition>? dictionaryDefinitions;
+  final _DictionaryContent content;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -196,11 +255,11 @@ class _MeaningBlock extends StatelessWidget {
             children: [
               _Badge(text: meaning.pos, emphasized: true),
               const SizedBox(width: AppSpacing.sm),
-              if (meaning.translationId != null) ...[
+              if (meaning.translation != null) ...[
                 const Text('🇮🇩 '),
                 Expanded(
                   child: Text(
-                    meaning.translationId!,
+                    meaning.translation!,
                     style: AppTextStyles.body.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -219,36 +278,66 @@ class _MeaningBlock extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          if (dictionaryDefinitions == null || dictionaryDefinitions!.isEmpty)
-            Text(
+          switch (content) {
+            _DictionaryLoading() => Row(
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  'Memuat definisi...',
+                  style: AppTextStyles.body.copyWith(color: Colors.black45),
+                ),
+              ],
+            ),
+            _DictionaryUnavailable() => Text(
               'Definisi bahasa Inggris tidak tersedia untuk kata ini.',
               style: AppTextStyles.body.copyWith(color: Colors.black45),
-            )
-          else
-            for (final definition in dictionaryDefinitions!)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('•  ${definition.definition}', style: AppTextStyles.body),
-                    if (definition.example != null)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          left: AppSpacing.md,
-                          top: 2,
-                        ),
-                        child: Text(
-                          '"${definition.example}"',
-                          style: AppTextStyles.body.copyWith(
-                            color: Colors.black54,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                  ],
+            ),
+            _DictionaryRetryable() => Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Gagal memuat definisi. Periksa koneksi lalu coba lagi.',
+                    style: AppTextStyles.body.copyWith(color: Colors.black45),
+                  ),
                 ),
-              ),
+                TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
+              ],
+            ),
+            _DictionaryFound(:final definitions) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final definition in definitions)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('•  ${definition.definition}', style: AppTextStyles.body),
+                        if (definition.example != null)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: AppSpacing.md,
+                              top: 2,
+                            ),
+                            child: Text(
+                              '"${definition.example}"',
+                              style: AppTextStyles.body.copyWith(
+                                color: Colors.black54,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          },
         ],
       ),
     );

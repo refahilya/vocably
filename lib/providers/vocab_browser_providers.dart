@@ -16,12 +16,20 @@ class VocabBrowserFilterState {
     this.mode = VocabBrowseMode.alphabetical,
     this.selectedTopic,
     this.selectedPos,
+    this.page = 0,
   });
 
   final String cefrLevel;
   final VocabBrowseMode mode;
   final String? selectedTopic;
   final String? selectedPos;
+
+  /// 0-indexed current page (Milestone 4 finalization — pagination over
+  /// the already-filtered/sorted result, see [paginate]). Every method
+  /// below that changes level/mode/topic/pos resets this to `0`, since a
+  /// page number chosen for one result set has no guaranteed meaning for
+  /// a different one.
+  final int page;
 
   VocabBrowserFilterState copyWith({
     String? cefrLevel,
@@ -35,12 +43,14 @@ class VocabBrowserFilterState {
     bool clearTopic = false,
     String? selectedPos,
     bool clearPos = false,
+    int? page,
   }) {
     return VocabBrowserFilterState(
       cefrLevel: cefrLevel ?? this.cefrLevel,
       mode: mode ?? this.mode,
       selectedTopic: clearTopic ? null : (selectedTopic ?? this.selectedTopic),
       selectedPos: clearPos ? null : (selectedPos ?? this.selectedPos),
+      page: page ?? this.page,
     );
   }
 }
@@ -51,24 +61,37 @@ class VocabBrowserFilter extends _$VocabBrowserFilter {
   VocabBrowserFilterState build() => const VocabBrowserFilterState();
 
   /// Switching level resets any topic/POS selection — a value chosen for
-  /// one level's data has no guaranteed meaning for another's.
+  /// one level's data has no guaranteed meaning for another's — and, per
+  /// the pagination requirement, resets back to page 0.
   void selectLevel(String cefrLevel) {
     state = state.copyWith(
       cefrLevel: cefrLevel,
       clearTopic: true,
       clearPos: true,
+      page: 0,
     );
   }
 
   void selectMode(VocabBrowseMode mode) {
-    state = state.copyWith(mode: mode);
+    state = state.copyWith(mode: mode, page: 0);
   }
 
   void selectTopic(String? topic) {
-    state = state.copyWith(selectedTopic: topic, clearTopic: topic == null);
+    state = state.copyWith(
+      selectedTopic: topic,
+      clearTopic: topic == null,
+      page: 0,
+    );
   }
 
   void selectPos(String? pos) {
-    state = state.copyWith(selectedPos: pos, clearPos: pos == null);
+    state = state.copyWith(selectedPos: pos, clearPos: pos == null, page: 0);
+  }
+
+  /// Jumps to [page] (0-indexed) directly — bounds-checking against the
+  /// actual result set's page count is [paginate]'s job (called from the
+  /// screen), not this notifier's; it just stores whatever was asked.
+  void goToPage(int page) {
+    state = state.copyWith(page: page);
   }
 }

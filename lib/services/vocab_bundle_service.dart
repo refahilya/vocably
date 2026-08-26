@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart' show AssetBundle, rootBundle;
 
 import '../models/vocab_bundle_entry.dart';
@@ -82,15 +83,36 @@ class VocabBundleService {
   /// words present in both are replaced by the Firestore/delta version;
   /// nothing is duplicated. See [mergeBundleWithDelta] for the merge step
   /// itself, factored out separately so it's testable without Firestore.
+  ///
+  /// **[fetchDelta] failing does not fail the whole level** (Milestone 4
+  /// bug fix — found via the real seeded dataset: the composite index
+  /// `fetchDelta`'s query needs didn't exist yet, so every level failed
+  /// outright even though the bundle itself loaded fine). The bundle is
+  /// the reliable, always-available source of truth for browse; the
+  /// delta is a nice-to-have freshness top-up. A delta failure (missing
+  /// index while one's still building, a transient network blip, a
+  /// permission problem) is logged and treated as "no new words this
+  /// time" rather than surfacing as a hard error that hides otherwise-
+  /// perfectly-good bundle data — the same graceful-degradation
+  /// principle `SPEC.md` §3.5 already applies to DictionaryAPI failures.
   Future<List<VocabBundleEntry>> loadLevelWithDelta({
     required String cefrLevel,
     required DateTime bundleGeneratedAt,
   }) async {
     final bundle = await loadLevel(cefrLevel);
-    final delta = await fetchDelta(
-      cefrLevel: cefrLevel,
-      bundleGeneratedAt: bundleGeneratedAt,
-    );
+    List<VocabBundleEntry> delta;
+    try {
+      delta = await fetchDelta(
+        cefrLevel: cefrLevel,
+        bundleGeneratedAt: bundleGeneratedAt,
+      );
+    } catch (error) {
+      debugPrint(
+        'VocabBundleService.fetchDelta failed for level "$cefrLevel" — '
+        'falling back to bundle-only data. Error: $error',
+      );
+      delta = const [];
+    }
     return mergeBundleWithDelta(bundle, delta);
   }
 }

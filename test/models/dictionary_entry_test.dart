@@ -146,4 +146,147 @@ void main() {
       expect(entry.meaningsByPos, isEmpty);
     });
   });
+
+  group('DictionaryEntry.definitionsForPos', () {
+    test('finds an exact POS match directly, no alias needed', () {
+      final entry = DictionaryEntry.fromJsonArray([
+        {
+          'meanings': [
+            {
+              'partOfSpeech': 'noun',
+              'definitions': [
+                {'definition': 'a round fruit'},
+              ],
+            },
+          ],
+        },
+      ], word: 'apple');
+
+      expect(entry.definitionsForPos('noun')!.single.definition, 'a round fruit');
+    });
+
+    test(
+      'regression: "modal" (Vocably/Oxford tag) finds DictionaryAPI\'s '
+      '"verb" meanings — confirmed against the real API that words like '
+      '"can"/"must" are tagged "verb", never "modal", so an exact-match '
+      'lookup used to silently show "not available" even though the '
+      'API actually had the definition',
+      () {
+        final entry = DictionaryEntry.fromJsonArray([
+          {
+            'meanings': [
+              {
+                'partOfSpeech': 'verb',
+                'definitions': [
+                  {'definition': 'used to express ability'},
+                ],
+              },
+            ],
+          },
+        ], word: 'can');
+
+        // Vocably's own data tags "can" as "modal" — DictionaryAPI never
+        // returns that key, only "verb".
+        expect(entry.meaningsByPos.containsKey('modal'), isFalse);
+        expect(
+          entry.definitionsForPos('modal')!.single.definition,
+          'used to express ability',
+        );
+      },
+    );
+
+    test('"number" (Vocably) finds DictionaryAPI\'s "numeral"', () {
+      final entry = DictionaryEntry.fromJsonArray([
+        {
+          'meanings': [
+            {
+              'partOfSpeech': 'numeral',
+              'definitions': [
+                {'definition': 'the number 1'},
+              ],
+            },
+          ],
+        },
+      ], word: 'one');
+
+      expect(entry.definitionsForPos('number')!.single.definition, 'the number 1');
+    });
+
+    test('"exclamation" (Vocably) finds DictionaryAPI\'s "interjection"', () {
+      final entry = DictionaryEntry.fromJsonArray([
+        {
+          'meanings': [
+            {
+              'partOfSpeech': 'interjection',
+              'definitions': [
+                {'definition': 'used to express surprise'},
+              ],
+            },
+          ],
+        },
+      ], word: 'oh');
+
+      expect(
+        entry.definitionsForPos('exclamation')!.single.definition,
+        'used to express surprise',
+      );
+    });
+
+    test(
+      '"determiner" (Vocably) tries "pronoun" then "adjective", in order',
+      () {
+        final pronounOnly = DictionaryEntry.fromJsonArray([
+          {
+            'meanings': [
+              {
+                'partOfSpeech': 'pronoun',
+                'definitions': [
+                  {'definition': 'used to indicate something nearby'},
+                ],
+              },
+            ],
+          },
+        ], word: 'this');
+        expect(pronounOnly.definitionsForPos('determiner'), isNotNull);
+
+        final adjectiveOnly = DictionaryEntry.fromJsonArray([
+          {
+            'meanings': [
+              {
+                'partOfSpeech': 'adjective',
+                'definitions': [
+                  {'definition': 'every one of two or more'},
+                ],
+              },
+            ],
+          },
+        ], word: 'every');
+        expect(adjectiveOnly.definitionsForPos('determiner'), isNotNull);
+      },
+    );
+
+    test('returns null when neither the exact tag nor any alias matches anything', () {
+      final entry = DictionaryEntry.fromJsonArray([
+        {
+          'meanings': [
+            {
+              'partOfSpeech': 'adverb',
+              'definitions': [
+                {'definition': 'unrelated'},
+              ],
+            },
+          ],
+        },
+      ], word: 'the');
+
+      // "article" has no known alias — genuinely unavailable, not a
+      // mismatch this method should paper over.
+      expect(entry.definitionsForPos('article'), isNull);
+    });
+
+    test('never returns an empty-but-non-null list from an alias', () {
+      final entry = DictionaryEntry.fromJsonArray([], word: 'word');
+      expect(entry.definitionsForPos('modal'), isNull);
+    });
+  });
 }

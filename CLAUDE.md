@@ -215,11 +215,19 @@ dulu kalau perlu penyesuaian.
 4. **Modul kosakata dasar — TANPA Worker:**
    - Setup collection `vocabWords` dengan `docId = normalizeWord(word)`,
      struktur `meanings`, dan field `updatedAt` (lihat §8).
-   - Import CSV Oxford 3000/5000 (skrip manual oleh dev **di laptop
-     sendiri, pakai API key dev sendiri** — bukan tugas Claude, dan tidak
-     lewat Worker karena ini proses one-off).
-   - Generate bundle aset per level CEFR (`assets/vocab/`), juga skrip
-     dev-side.
+   - Import CSV Oxford 3000/5000 via `tools/vocab_import/` (dibangun
+     Claude, direvisi keputusan sejak Milestone 4 autonomous run). **Claude
+     boleh menulis/memelihara skrip pipeline-nya** (parsing, merge,
+     dry-run report, panggilan API terjemahan, seed Firestore, generate
+     bundle) — tapi **secret tetap milik dev**: `OPENAI_API_KEY` dari
+     `.env` root (bukan lewat Worker, karena ini proses one-off, bukan
+     traffic user produksi) dan kredensial Admin SDK
+     (`GOOGLE_APPLICATION_CREDENTIALS`) dari mesin dev sendiri. **Eksekusi
+     nyata yang menulis ke Firestore produksi atau memanggil API
+     berbayar dalam skala penuh tetap butuh keputusan/kredensial dev** —
+     lihat `tools/vocab_import/README.md` untuk pembagian tepatnya.
+   - Generate bundle aset per level CEFR (`assets/vocab/`) — bagian dari
+     pipeline yang sama di atas, bukan skrip terpisah.
    - Siswa: browse kosakata 3 mode (abjad/tema/POS) **dari bundle di
      memori** + keranjang "pelajari".
    - Integrasi DictionaryAPI untuk kamus detail, termasuk fallback lapisan

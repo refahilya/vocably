@@ -41,7 +41,7 @@ class DictionaryLookupError extends DictionaryLookupResult {
 /// §3.5, `CLAUDE.md` §2). Called **directly from the client** — no secret
 /// involved, so no Cloudflare Worker proxy here (unlike the ChatGPT
 /// endpoints). This is English reference data only; it has nothing to do
-/// with `meanings[].translationId` (Indonesian) or the `/translate` Worker
+/// with `meanings[].translation` (Indonesian) or the `/translate` Worker
 /// endpoint (`DATA_MODEL.md` §2) — those are separate lookups this
 /// service doesn't touch.
 class DictionaryApiService {

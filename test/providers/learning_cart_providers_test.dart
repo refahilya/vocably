@@ -9,7 +9,7 @@ void main() {
     return VocabBundleEntry.fromMap({
       'word': word,
       'meanings': [
-        {'pos': 'noun', 'translationId': 'terjemahan'},
+        {'pos': 'noun', 'translation': 'terjemahan'},
       ],
       'posList': [],
       'cefrLevel': 'A1',

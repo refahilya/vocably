@@ -13,7 +13,7 @@ void main() {
     return VocabBundleEntry.fromMap({
       'word': word,
       'meanings': meanings ?? [
-        {'pos': 'noun', 'translationId': 'x'},
+        {'pos': 'noun', 'translation': 'x'},
       ],
       'posList': [],
       'cefrLevel': cefrLevel,
@@ -74,14 +74,14 @@ void main() {
         entry(
           word: 'souvenir',
           meanings: [
-            {'pos': 'noun', 'translationId': 'a'},
-            {'pos': 'verb', 'translationId': 'b'},
+            {'pos': 'noun', 'translation': 'a'},
+            {'pos': 'verb', 'translation': 'b'},
           ],
         ),
         entry(
           word: 'apple',
           meanings: [
-            {'pos': 'noun', 'translationId': 'c'},
+            {'pos': 'noun', 'translation': 'c'},
           ],
         ),
       ];
@@ -98,7 +98,7 @@ void main() {
         entry(
           word: 'apple',
           meanings: [
-            {'pos': 'noun', 'translationId': 'c'},
+            {'pos': 'noun', 'translation': 'c'},
           ],
         ),
       ];
@@ -122,14 +122,14 @@ void main() {
         entry(
           word: 'souvenir',
           meanings: [
-            {'pos': 'verb', 'translationId': 'a'},
-            {'pos': 'noun', 'translationId': 'b'},
+            {'pos': 'verb', 'translation': 'a'},
+            {'pos': 'noun', 'translation': 'b'},
           ],
         ),
         entry(
           word: 'apple',
           meanings: [
-            {'pos': 'noun', 'translationId': 'c'},
+            {'pos': 'noun', 'translation': 'c'},
           ],
         ),
       ];
@@ -150,14 +150,14 @@ void main() {
         word: 'apple',
         topics: ['Makanan'],
         meanings: [
-          {'pos': 'noun', 'translationId': 'a'},
+          {'pos': 'noun', 'translation': 'a'},
         ],
       ),
       entry(
         word: 'run',
         topics: ['Aktivitas'],
         meanings: [
-          {'pos': 'verb', 'translationId': 'b'},
+          {'pos': 'verb', 'translation': 'b'},
         ],
       ),
     ];
@@ -210,6 +210,83 @@ void main() {
       applyVocabBrowseFilter(data, mode: VocabBrowseMode.pos, selectedPos: 'verb');
 
       expect(data.map((e) => e.word).toList(), originalOrder);
+    });
+  });
+
+  group('paginate', () {
+    List<int> range(int n) => List.generate(n, (i) => i);
+
+    test('0 results: 0 total pages, empty items, no crash', () {
+      final result = paginate<int>(const [], page: 0);
+      expect(result.items, isEmpty);
+      expect(result.totalPages, 0);
+      expect(result.pageIndex, 0);
+    });
+
+    test('fewer than a full page (30 of 50): a single page containing all of them', () {
+      final result = paginate(range(30), page: 0);
+      expect(result.items, range(30));
+      expect(result.totalPages, 1);
+      expect(result.pageIndex, 0);
+    });
+
+    test('exactly one page size (50): a single page, not an empty trailing second page', () {
+      final result = paginate(range(50), page: 0);
+      expect(result.items, hasLength(50));
+      expect(result.totalPages, 1);
+    });
+
+    test('more than one page (120 items -> 3 pages of 50/50/20)', () {
+      final items = range(120);
+      final page0 = paginate(items, page: 0);
+      final page1 = paginate(items, page: 1);
+      final page2 = paginate(items, page: 2);
+
+      expect(page0.totalPages, 3);
+      expect(page0.items, hasLength(50));
+      expect(page0.items.first, 0);
+      expect(page1.items, hasLength(50));
+      expect(page1.items.first, 50);
+      // last page smaller than the page size
+      expect(page2.items, hasLength(20));
+      expect(page2.items.first, 100);
+      expect(page2.items.last, 119);
+    });
+
+    test('requesting a page past the last one clamps to the last page (acts as "Next" disabled)', () {
+      final result = paginate(range(120), page: 99);
+      expect(result.pageIndex, 2);
+      expect(result.items, hasLength(20));
+    });
+
+    test('requesting a negative page clamps to page 0 (acts as "Previous" disabled)', () {
+      final result = paginate(range(120), page: -5);
+      expect(result.pageIndex, 0);
+      expect(result.items.first, 0);
+    });
+
+    test('next/previous navigation walks pages in order without gaps or overlap', () {
+      final items = range(120);
+      final seen = <int>[];
+      for (var page = 0; page < paginate(items, page: 0).totalPages; page++) {
+        seen.addAll(paginate(items, page: page).items);
+      }
+      expect(seen, items);
+    });
+
+    test('does not mutate the original list', () {
+      final items = range(120);
+      final originalCopy = [...items];
+
+      paginate(items, page: 1);
+
+      expect(items, originalCopy);
+    });
+
+    test('a custom page size is respected', () {
+      final result = paginate(range(10), page: 0, pageSize: 4);
+      expect(result.totalPages, 3); // 4, 4, 2
+      expect(result.items, hasLength(4));
     });
   });
 }

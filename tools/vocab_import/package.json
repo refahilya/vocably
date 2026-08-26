@@ -1,0 +1,17 @@
+{
+  "name": "vocab-import",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Developer-side Oxford CSV -> Firestore vocabWords import pipeline for Vocably (Milestone 4). Not part of the Flutter app; never shipped, never run at app runtime.",
+  "type": "commonjs",
+  "scripts": {
+    "merge": "node bin/merge.js",
+    "translate": "node bin/translate.js",
+    "seed": "node bin/seed_firestore.js",
+    "bundle": "node bin/generate_bundles.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

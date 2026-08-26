@@ -29,6 +29,38 @@ class _FakeAssetBundle extends AssetBundle {
   }
 }
 
+/// Test double for the `loadLevelWithDelta` resilience tests below —
+/// overrides just [fetchDelta] (the Firestore-dependent half) so its
+/// failure/success can be controlled directly, without needing a real
+/// or fake Firestore instance for what's otherwise a pure
+/// bundle-vs-delta merge behavior.
+class _ThrowingDeltaVocabBundleService extends VocabBundleService {
+  _ThrowingDeltaVocabBundleService({required super.assetBundle});
+
+  @override
+  Future<List<VocabBundleEntry>> fetchDelta({
+    required String cefrLevel,
+    required DateTime bundleGeneratedAt,
+  }) {
+    throw Exception('simulated Firestore failure (e.g. missing index)');
+  }
+}
+
+class _StubDeltaVocabBundleService extends VocabBundleService {
+  _StubDeltaVocabBundleService({
+    required super.assetBundle,
+    required this.stubDelta,
+  });
+
+  final List<VocabBundleEntry> stubDelta;
+
+  @override
+  Future<List<VocabBundleEntry>> fetchDelta({
+    required String cefrLevel,
+    required DateTime bundleGeneratedAt,
+  }) async => stubDelta;
+}
+
 Map<String, dynamic> bundleEntryJson({
   required String word,
   String cefrLevel = 'A1',
@@ -38,7 +70,7 @@ Map<String, dynamic> bundleEntryJson({
   return {
     'word': word,
     'meanings': meanings ?? [
-      {'pos': 'noun', 'translationId': 'terjemahan'},
+      {'pos': 'noun', 'translation': 'terjemahan'},
     ],
     'posList': ['noun'],
     'cefrLevel': cefrLevel,
@@ -112,12 +144,57 @@ void main() {
     });
   });
 
+  group('VocabBundleService.loadLevelWithDelta', () {
+    test(
+      'degrades gracefully to bundle-only data when fetchDelta throws '
+      '(regression: the real Firestore project was missing the '
+      'cefrLevel+updatedAt composite index the delta query needs, which '
+      'used to fail the entire level even though the bundle loaded fine)',
+      () async {
+        final bundle = _FakeAssetBundle({
+          'assets/vocab/vocab_a1.json': jsonEncode([
+            bundleEntryJson(word: 'apple'),
+            bundleEntryJson(word: 'run'),
+          ]),
+        });
+        final service = _ThrowingDeltaVocabBundleService(assetBundle: bundle);
+
+        final result = await service.loadLevelWithDelta(
+          cefrLevel: 'A1',
+          bundleGeneratedAt: DateTime(2020),
+        );
+
+        expect(result.map((e) => e.word), containsAll(['apple', 'run']));
+        expect(result, hasLength(2));
+      },
+    );
+
+    test('still merges in the delta normally when fetchDelta succeeds', () async {
+      final bundle = _FakeAssetBundle({
+        'assets/vocab/vocab_a1.json': jsonEncode([bundleEntryJson(word: 'apple')]),
+      });
+      final service = _StubDeltaVocabBundleService(
+        assetBundle: bundle,
+        stubDelta: [
+          VocabBundleEntry.fromMap(bundleEntryJson(word: 'banana')),
+        ],
+      );
+
+      final result = await service.loadLevelWithDelta(
+        cefrLevel: 'A1',
+        bundleGeneratedAt: DateTime(2020),
+      );
+
+      expect(result.map((e) => e.word), containsAll(['apple', 'banana']));
+    });
+  });
+
   group('VocabBundleEntry.fromVocabWord', () {
     test('narrows a full VocabWord down to the bundle-shape fields', () {
       final word = VocabWord.fromFirestore({
         'word': 'souvenir',
         'meanings': [
-          {'pos': 'noun', 'translationId': 'oleh-oleh'},
+          {'pos': 'noun', 'translation': 'oleh-oleh'},
         ],
         'cefrLevel': 'B1',
         'topics': ['Perjalanan'],
@@ -133,18 +210,18 @@ void main() {
       expect(entry.cefrLevel, 'B1');
       expect(entry.topics, ['Perjalanan']);
       expect(entry.meanings.single.pos, 'noun');
-      expect(entry.meanings.single.translationId, 'oleh-oleh');
+      expect(entry.meanings.single.translation, 'oleh-oleh');
     });
   });
 
   group('mergeBundleWithDelta', () {
-    VocabBundleEntry entry(String word, {String cefrLevel = 'A1', String? translationId}) {
+    VocabBundleEntry entry(String word, {String cefrLevel = 'A1', String? translation}) {
       return VocabBundleEntry.fromMap(
         bundleEntryJson(
           word: word,
           cefrLevel: cefrLevel,
           meanings: [
-            {'pos': 'noun', 'translationId': translationId ?? 'original'},
+            {'pos': 'noun', 'translation': translation ?? 'original'},
           ],
         ),
       );
@@ -161,24 +238,24 @@ void main() {
     });
 
     test('a word present in both is replaced by the delta version, not duplicated', () {
-      final bundle = [entry('apple', translationId: 'stale')];
-      final delta = [entry('apple', translationId: 'fresh')];
+      final bundle = [entry('apple', translation: 'stale')];
+      final delta = [entry('apple', translation: 'fresh')];
 
       final result = mergeBundleWithDelta(bundle, delta);
 
       expect(result, hasLength(1));
       expect(result.single.word, 'apple');
-      expect(result.single.meanings.single.translationId, 'fresh');
+      expect(result.single.meanings.single.translation, 'fresh');
     });
 
     test('matching is normalized — differing case still counts as the same word', () {
-      final bundle = [entry('Apple', translationId: 'stale')];
-      final delta = [entry('apple', translationId: 'fresh')];
+      final bundle = [entry('Apple', translation: 'stale')];
+      final delta = [entry('apple', translation: 'fresh')];
 
       final result = mergeBundleWithDelta(bundle, delta);
 
       expect(result, hasLength(1));
-      expect(result.single.meanings.single.translationId, 'fresh');
+      expect(result.single.meanings.single.translation, 'fresh');
     });
 
     test('an empty delta leaves the bundle unchanged', () {

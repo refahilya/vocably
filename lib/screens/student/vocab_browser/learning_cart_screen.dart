@@ -85,9 +85,9 @@ class _CartItemTile extends StatelessWidget {
                   entry.word,
                   style: AppTextStyles.wordTitle.copyWith(fontSize: 18),
                 ),
-                if (primary.translationId != null) ...[
+                if (primary.translation != null) ...[
                   const SizedBox(height: AppSpacing.xs),
-                  Text(primary.translationId!, style: AppTextStyles.body),
+                  Text(primary.translation!, style: AppTextStyles.body),
                 ],
               ],
             ),
