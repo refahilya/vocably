@@ -282,6 +282,51 @@ Firestore change, no server-side pagination.
 - `test/providers/vocab_browser_providers_test.dart` (new file) — 8 tests confirming every mutating action (`selectLevel`/`selectMode`/`selectTopic`/`selectPos`) resets `page` to `0`, `goToPage` doesn't disturb other selection fields, and vice versa.
 - `test/screens/vocab_browser_screen_test.dart` — 10 new widget tests against a 120-word fake A1 bundle (+ a 75-word A2 bundle): page-1 rendering, Previous disabled on page 1, Next navigation + Previous re-enabling, last-page-smaller-than-page-size disabling Next, Previous navigating back, level switch resetting to page 1, mode switch resetting to page 1, a topic filter narrowing to 30 results (under one page) both resetting to page 1 *and* hiding the pagination bar, and an empty level showing no pagination bar.
 
+## 5f. UI Fix — Pagination Bar Horizontal Overflow
+
+Milestone 4 was committed and pushed (`24cd651 Complete Milestone 4
+vocabulary module`) before this fix. Manual testing in real Chrome at
+the canonical ~390px mobile width then found a visible `RenderFlex`
+horizontal overflow in the vocab-browser pagination bar (§5e) — the
+right side clipped/broke the layout.
+
+- **Root cause:** `_PaginationBar`'s Previous/Next were
+  `OutlinedButton.icon` widgets with text labels ("Sebelumnya"/
+  "Selanjutnya"). Two such buttons (icon + label + default Material
+  button padding) plus the "Halaman X dari Y" indicator text, laid out
+  in a plain `Row(mainAxisAlignment: spaceBetween)` with no flexible
+  child, together demanded more intrinsic width than fits at ~390px —
+  confirmed by reverting the fix and re-running the new regression test
+  below, which reported "A RenderFlex overflowed by 298 pixels on the
+  right."
+- **Fix:** Previous/Next rebuilt as small, fixed-size **icon-only**
+  buttons (`_PageNavButton`, 40×40, tight padding, `VisualDensity.compact`)
+  wrapped in `Tooltip` (keeps "Sebelumnya"/"Selanjutnya" available on
+  hover/long-press and supplies the accessibility label, since `Tooltip`
+  auto-generates a semantics label from its `message`). The page
+  indicator text is wrapped in `Expanded` + `overflow: TextOverflow.ellipsis`
+  so it can never itself force an overflow. Because the two nav buttons
+  now have a small, fixed intrinsic width (no longer text-length-dependent)
+  and the indicator is the only flexible element, the row structurally
+  fits at any supported viewport width rather than being tuned to one
+  screenshot. Added `AppTextStyles.caption` (12px, `lib/theme/theme.dart`)
+  for the now-smaller page-indicator text, per `CLAUDE.md` §5 ("jangan
+  hardcode nilai style di widget individual").
+- **No behavior change:** page size (50), Previous/Next enable/disable
+  logic, "Halaman X dari Y" text, reset-on-level/mode/topic/POS-change,
+  filter-then-paginate order, and the empty-state/hidden-when-one-page
+  rules are all unchanged — this was a layout-only fix.
+- **Tests:** existing pagination widget tests updated to locate the
+  Previous/Next buttons by `Key` (`vocabBrowserPreviousPage`/
+  `vocabBrowserNextPage`) instead of by visible button text, since the
+  buttons no longer carry text. One new regression test added —
+  `'pagination bar does not overflow at the canonical ~390px mobile
+  width'` (`test/screens/vocab_browser_screen_test.dart`) — sets
+  `tester.view.physicalSize` to 390×844 and asserts
+  `tester.takeException()` is `null`. Confirmed to fail against the
+  pre-fix code (298px overflow) and pass after the fix, via
+  `git stash`/`git stash pop` on just the two source files.
+
 ## 6. Firebase / Firestore State
 
 - **Project:** `vocably-idn-en`, Firestore Native mode, `asia-southeast1`.
@@ -315,8 +360,8 @@ These are the only things this session could not safely do itself:
 
 ## 9. Verification Status
 
-- `flutter analyze`: **no issues** (final run this session, after all fixes).
-- `flutter test`: **153/153 passing** (full run this session — includes the real-bundle-data test fix, `loadLevelWithDelta` regression tests, `definitionsForPos` tests, the rewritten Word Detail loading/retryable/unavailable tests, and the new pagination tests across `vocab_browse_filter_test.dart`, `vocab_browser_providers_test.dart`, and `vocab_browser_screen_test.dart`).
+- `flutter analyze`: **no issues** (final run this session, after all fixes, including the §5f pagination-bar layout fix).
+- `flutter test`: **154/154 passing** (153 from the committed Milestone 4 work, +1 new overflow regression test from §5f). Includes the real-bundle-data test fix, `loadLevelWithDelta` regression tests, `definitionsForPos` tests, the rewritten Word Detail loading/retryable/unavailable tests, the pagination tests across `vocab_browse_filter_test.dart`/`vocab_browser_providers_test.dart`/`vocab_browser_screen_test.dart`, and the §5f pagination-bar overflow regression test.
 - `tools/vocab_import` pure-logic tests (`node --test`): **43/43 passing** (added one test for the `posList` backfill-on-update behavior).
 - Stage 1 (merge): run for real against the actual Oxford CSVs — 0 malformed rows, 4,952 documents.
 - Stage 2 (translate): run for real to completion — 5,936/5,936 meanings translated, spot-checked for quality.
@@ -325,18 +370,21 @@ These are the only things this session could not safely do itself:
 - **Post-seed bug found and fixed** (§5b): missing Firestore composite index made every level fail to load; fixed via the index config + a graceful-degradation code change.
 - **English-definition gaps investigated twice** (§5c, §5d): one more real alias gap found and fixed (`number`→also `noun`), one real UI bug fixed (loading/permanent/retryable states no longer collapsed into one message), remaining gaps confirmed as genuine DictionaryAPI content limitations with concrete evidence, not guesses.
 - **Pagination added** (§5e): 50 items/page, filter-then-paginate order preserved, resets on level/mode/topic/pos change, memoized to avoid re-filtering the full list on every page click.
-- All of the above verified via automated tests only this session — **not yet re-verified by a human against the real running app** (§7).
+- **Pagination bar overflow fixed** (§5f) after real-Chrome manual testing surfaced it — verified both that the new regression test fails pre-fix and passes post-fix.
+- All of the above verified via automated tests only — **not yet re-verified by a human against the real running app** (§7), except the pagination overflow itself, which the project owner already reproduced manually in real Chrome before requesting §5f (still worth a quick re-check that the fixed layout looks right, not just non-overflowing).
 
 ## 10. Current Git State
 
-- **Branch:** `main`, in sync with `origin/main` at the start of this session (nothing ahead/behind).
-- **Working tree at the end of this session:** modified (this session's changes are **uncommitted** — `translation` rename, `CLAUDE.md`/`DATA_MODEL.md`/`SPEC.md` doc updates, new `tools/vocab_import/`, real `assets/vocab/*.json` bundles, the Firestore-index bug fix, the English-definition fixes, pagination, updated `.gitignore`, this file). Commit/push remains the project owner's action per standing instruction.
+- **Branch:** `main`, in sync with `origin/main`.
+- Milestone 4 (translation rename, doc updates, `tools/vocab_import/`, real `assets/vocab/*.json` bundles, Firestore-index fix, English-definition fixes, pagination, this file) is **committed and pushed** (`24cd651 Complete Milestone 4 vocabulary module`).
+- **Working tree as of §5f:** modified but **uncommitted** — `lib/screens/student/vocab_browser/vocab_browser_screen.dart`, `lib/theme/theme.dart`, `test/screens/vocab_browser_screen_test.dart` (the pagination-bar overflow fix), plus this file. Commit/push remains the project owner's action per standing instruction.
 
 ## 11. Next Recommended Step
 
-1. Run `firebase deploy --only firestore:indexes` (§7) so the delta-freshness query actually works, not just degrades gracefully.
-2. Manually re-test the browse screen (`flutter run -d chrome`) against the real seeded data — pagination, filtering, and Word Detail's definition states — confirm end-to-end, not just via automated tests.
-3. Only after that, Milestone 5 (Cloudflare Worker + guru "Tambah Kosakata") is next in sequence — **not started, not to be started without explicit instruction.**
+1. Manually re-verify the pagination bar in real Chrome at the ~390px width where the overflow was originally seen (§5f) — confirm it no longer overflows/clips and looks proportionate.
+2. Run `firebase deploy --only firestore:indexes` (§7) so the delta-freshness query actually works, not just degrades gracefully.
+3. Manually re-test the browse screen (`flutter run -d chrome`) against the real seeded data — pagination, filtering, and Word Detail's definition states — confirm end-to-end, not just via automated tests.
+4. Only after that, Milestone 5 (Cloudflare Worker + guru "Tambah Kosakata") is next in sequence — **not started, not to be started without explicit instruction.**
 
 ## 12. Handoff Instructions for a New AI Session
 

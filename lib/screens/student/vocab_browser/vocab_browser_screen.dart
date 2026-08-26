@@ -321,6 +321,20 @@ class _LevelContentState extends ConsumerState<_LevelContent> {
 
 /// Previous/Next + "Halaman X dari Y" (Milestone 4 finalization —
 /// pagination over the browse result, `kVocabBrowsePageSize` per page).
+///
+/// Milestone 4 finalization (UI fix): rebuilt with compact icon-only
+/// Previous/Next buttons after manual testing at the canonical ~390px
+/// mobile width showed a `RenderFlex` horizontal overflow here — the
+/// original `OutlinedButton.icon` labels ("Sebelumnya"/"Selanjutnya")
+/// plus default Material button padding, next to the page indicator
+/// text, didn't fit on one row. Icon-only buttons have a small, fixed
+/// intrinsic width, so this fits at any supported viewport width by
+/// construction rather than by tuning pixels for one screenshot; the
+/// page indicator is additionally wrapped in [Expanded] with
+/// `overflow: TextOverflow.ellipsis` so it can never force an overflow
+/// either. `Tooltip` keeps Previous/Next understandable (hover/long-press
+/// text) and accessible (it also supplies the semantics label) despite
+/// having no visible text label. See `PROJECT_STATE.md`.
 class _PaginationBar extends StatelessWidget {
   const _PaginationBar({
     required this.pageIndex,
@@ -337,25 +351,68 @@ class _PaginationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          OutlinedButton.icon(
+          _PageNavButton(
+            navKey: const Key('vocabBrowserPreviousPage'),
+            icon: Icons.chevron_left,
+            tooltip: 'Sebelumnya',
             onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left),
-            label: const Text('Sebelumnya'),
           ),
-          Text(
-            'Halaman ${pageIndex + 1} dari $totalPages',
-            style: AppTextStyles.body,
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              'Halaman ${pageIndex + 1} dari $totalPages',
+              style: AppTextStyles.caption,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          OutlinedButton.icon(
+          const SizedBox(width: AppSpacing.xs),
+          _PageNavButton(
+            navKey: const Key('vocabBrowserNextPage'),
+            icon: Icons.chevron_right,
+            tooltip: 'Selanjutnya',
             onPressed: onNext,
-            icon: const Icon(Icons.chevron_right),
-            label: const Text('Selanjutnya'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A small, fixed-size icon-only nav button used by [_PaginationBar].
+/// Kept as its own widget so its compact, always-fits [ButtonStyle]
+/// (no text label, tight padding/tap-target) lives in one place.
+class _PageNavButton extends StatelessWidget {
+  const _PageNavButton({
+    required this.navKey,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final Key navKey;
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: OutlinedButton(
+        key: navKey,
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(40, 40),
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Icon(icon, size: 20),
       ),
     );
   }

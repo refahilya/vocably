@@ -133,11 +133,28 @@ void main() {
       expect(find.text('word050'), findsNothing); // that's page 2
     });
 
+    testWidgets(
+      'pagination bar does not overflow at the canonical ~390px mobile '
+      'width (regression test for the real-Chrome layout overflow found '
+      'during manual verification — see PROJECT_STATE.md)',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await pumpBrowser(tester);
+
+        expect(find.text('Halaman 1 dari 3'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('Previous is disabled on the first page', (tester) async {
       await pumpBrowser(tester);
 
       final previousButton = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Sebelumnya'),
+        find.byKey(const Key('vocabBrowserPreviousPage')),
       );
       expect(previousButton.onPressed, isNull);
     });
@@ -147,7 +164,7 @@ void main() {
     ) async {
       await pumpBrowser(tester);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Selanjutnya'));
+      await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
       await tester.pumpAndSettle();
 
       expect(find.text('Halaman 2 dari 3'), findsOneWidget);
@@ -155,7 +172,7 @@ void main() {
       expect(find.text('word000'), findsNothing);
 
       final previousButton = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Sebelumnya'),
+        find.byKey(const Key('vocabBrowserPreviousPage')),
       );
       expect(previousButton.onPressed, isNotNull);
     });
@@ -165,16 +182,16 @@ void main() {
       (tester) async {
         await pumpBrowser(tester);
 
-        await tester.tap(find.widgetWithText(OutlinedButton, 'Selanjutnya'));
+        await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(OutlinedButton, 'Selanjutnya'));
+        await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
         await tester.pumpAndSettle();
 
         expect(find.text('Halaman 3 dari 3'), findsOneWidget);
         expect(find.text('word100'), findsOneWidget);
 
         final nextButton = tester.widget<OutlinedButton>(
-          find.widgetWithText(OutlinedButton, 'Selanjutnya'),
+          find.byKey(const Key('vocabBrowserNextPage')),
         );
         expect(nextButton.onPressed, isNull);
       },
@@ -183,9 +200,9 @@ void main() {
     testWidgets('Previous navigates back a page', (tester) async {
       await pumpBrowser(tester);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Selanjutnya'));
+      await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Sebelumnya'));
+      await tester.tap(find.byKey(const Key('vocabBrowserPreviousPage')));
       await tester.pumpAndSettle();
 
       expect(find.text('Halaman 1 dari 3'), findsOneWidget);
@@ -195,7 +212,7 @@ void main() {
     testWidgets('switching CEFR level resets pagination to page 1', (tester) async {
       await pumpBrowser(tester);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Selanjutnya'));
+      await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
       await tester.pumpAndSettle();
       expect(find.text('Halaman 2 dari 3'), findsOneWidget);
 
@@ -211,7 +228,7 @@ void main() {
       (tester) async {
         await pumpBrowser(tester);
 
-        await tester.tap(find.widgetWithText(OutlinedButton, 'Selanjutnya'));
+        await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
         await tester.pumpAndSettle();
         expect(find.text('Halaman 2 dari 3'), findsOneWidget);
 
@@ -228,7 +245,7 @@ void main() {
       (tester) async {
         await pumpBrowser(tester);
 
-        await tester.tap(find.widgetWithText(OutlinedButton, 'Selanjutnya'));
+        await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
         await tester.pumpAndSettle();
         expect(find.text('Halaman 2 dari 3'), findsOneWidget);
 

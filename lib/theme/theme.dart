@@ -130,6 +130,14 @@ abstract final class AppTextStyles {
     fontWeight: FontWeight.w600,
     color: Colors.black87,
   );
+
+  /// Small secondary text — smaller than [body], for auxiliary UI chrome
+  /// that shouldn't compete visually with the main content (e.g. the
+  /// vocab-browser pagination indicator, Milestone 4 finalization).
+  static const TextStyle caption = TextStyle(
+    fontSize: 12,
+    color: Colors.black87,
+  );
 }
 
 /// Builds the application [ThemeData] from the tokens above — the only
