@@ -5,6 +5,7 @@ import '../../../models/dictionary_entry.dart';
 import '../../../models/vocab_bundle_entry.dart';
 import '../../../models/vocab_word.dart';
 import '../../../providers/dictionary_providers.dart';
+import '../../../providers/lazy_translation_providers.dart';
 import '../../../providers/learning_cart_providers.dart';
 import '../../../services/dictionary_api_service.dart';
 import '../../../theme/theme.dart';
@@ -59,6 +60,7 @@ class WordDetailScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: _MeaningBlock(
+                  word: entry.word,
                   meaning: meaning,
                   content: _dictionaryContentFor(lookupAsync, meaning.pos),
                   onRetry: () => ref.invalidate(dictionaryLookupProvider(normalized)),
@@ -228,19 +230,21 @@ class _HeaderCard extends ConsumerWidget {
 /// return a matching POS key** — absent (either the API had no entry at
 /// all, or had one but not for this exact POS) degrades to just the
 /// Vocably data, per `SPEC.md` §3.5 Layer 1.
-class _MeaningBlock extends StatelessWidget {
+class _MeaningBlock extends ConsumerWidget {
   const _MeaningBlock({
+    required this.word,
     required this.meaning,
     required this.content,
     required this.onRetry,
   });
 
+  final String word;
   final VocabMeaning meaning;
   final _DictionaryContent content;
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -255,8 +259,8 @@ class _MeaningBlock extends StatelessWidget {
             children: [
               _Badge(text: meaning.pos, emphasized: true),
               const SizedBox(width: AppSpacing.sm),
-              if (meaning.translation != null) ...[
-                const Text('🇮🇩 '),
+              const Text('🇮🇩 '),
+              if (meaning.translation != null)
                 Expanded(
                   child: Text(
                     meaning.translation!,
@@ -264,17 +268,13 @@ class _MeaningBlock extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-              ] else
-                Expanded(
-                  child: Text(
-                    'Terjemahan belum tersedia',
-                    style: AppTextStyles.body.copyWith(
-                      color: Colors.black45,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
+                )
+              else
+                // DATA_MODEL.md §2 point 4 / DESIGN_REFERENCE.md §5.8:
+                // an empty translation is generated lazily via the
+                // Worker and shown on-screen only — never written back
+                // to Firestore (see LazyTranslationText's doc comment).
+                Expanded(child: _LazyTranslationText(word: word, pos: meaning.pos)),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -339,6 +339,54 @@ class _MeaningBlock extends StatelessWidget {
             ),
           },
         ],
+      ),
+    );
+  }
+}
+
+/// Fills in a meaning's empty `translation` on-screen by calling the
+/// Worker's `/translate` (`DATA_MODEL.md` §2 point 4) — never written
+/// back to Firestore; `lazyTranslationProvider` caches the result in
+/// memory for the rest of the session (see its own doc comment), so
+/// reopening this word/meaning during the same session doesn't call the
+/// Worker again. `DESIGN_REFERENCE.md` §5.8: skeleton while loading, a
+/// dim "—" if the Worker call also fails — never an error screen.
+class _LazyTranslationText extends ConsumerWidget {
+  const _LazyTranslationText({required this.word, required this.pos});
+
+  final String word;
+  final String pos;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final normalized = normalizeWord(word);
+    final translationAsync = ref.watch(lazyTranslationProvider(normalized, pos));
+
+    return translationAsync.when(
+      loading: () => Row(
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            'Menerjemahkan...',
+            style: AppTextStyles.body.copyWith(
+              color: Colors.black45,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+      error: (_, _) => Text(
+        '—',
+        style: AppTextStyles.body.copyWith(color: Colors.black45),
+      ),
+      data: (translation) => Text(
+        translation,
+        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }

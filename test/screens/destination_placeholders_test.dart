@@ -7,7 +7,6 @@ import 'package:vocably/providers/auth_providers.dart';
 import 'package:vocably/screens/student/dashboard/dashboard_placeholder.dart';
 import 'package:vocably/screens/student/history/history_placeholder.dart';
 import 'package:vocably/screens/teacher/target_words/target_words_placeholder.dart';
-import 'package:vocably/screens/teacher/vocab_management/vocab_management_placeholder.dart';
 import 'package:vocably/services/auth_service.dart';
 import 'package:vocably/utils/role.dart';
 
@@ -140,19 +139,6 @@ void main() {
       await tester.pump();
 
       expect(fakeAuth.signOutCalled, isTrue);
-    });
-  });
-
-  group('VocabManagementPlaceholder (Kosakata)', () {
-    testWidgets('shows destination name, no logout button, no nested Scaffold/AppBar', (
-      tester,
-    ) async {
-      await _pumpDestination(tester, const VocabManagementPlaceholder());
-
-      expect(find.text('Kosakata'), findsOneWidget);
-      expect(find.text('Keluar'), findsNothing);
-      expect(find.byType(Scaffold), findsOneWidget);
-      expect(find.byType(AppBar), findsOneWidget);
     });
   });
 }

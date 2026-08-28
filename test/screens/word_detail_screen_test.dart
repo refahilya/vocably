@@ -9,9 +9,24 @@ import 'package:http/testing.dart';
 
 import 'package:vocably/models/vocab_bundle_entry.dart';
 import 'package:vocably/models/vocab_word.dart';
+import 'package:vocably/providers/ai_worker_providers.dart';
 import 'package:vocably/providers/dictionary_providers.dart';
 import 'package:vocably/screens/student/vocab_browser/word_detail_screen.dart';
+import 'package:vocably/services/ai_worker_service.dart';
 import 'package:vocably/services/dictionary_api_service.dart';
+
+/// Always fails — used everywhere in this file except the dedicated lazy-
+/// translation test group, so the `verb` meaning below (deliberately
+/// `translation: null`, to exercise the lazy-translate display alongside
+/// the DictionaryAPI states this file is actually about) settles to a
+/// deterministic "—" instead of incidentally depending on Firebase not
+/// being initialized under `flutter test`.
+class _AlwaysFailingAiWorkerService extends AiWorkerService {
+  @override
+  Future<String> translate({required String word, required String pos}) {
+    throw const AiWorkerException('simulated failure for this test');
+  }
+}
 
 void main() {
   final entry = VocabBundleEntry(
@@ -42,6 +57,7 @@ void main() {
             dictionaryApiServiceProvider.overrideWithValue(
               DictionaryApiService(client: fakeClient),
             ),
+            aiWorkerServiceProvider.overrideWithValue(_AlwaysFailingAiWorkerService()),
           ],
           child: MaterialApp(home: WordDetailScreen(entry: entry)),
         ),
@@ -53,7 +69,11 @@ void main() {
       expect(find.text('noun'), findsOneWidget);
       expect(find.text('verb'), findsOneWidget);
       expect(find.text('alamat'), findsOneWidget);
-      expect(find.text('Terjemahan belum tersedia'), findsOneWidget);
+      // "verb"'s translation is null — lazy-translate is attempted via
+      // aiWorkerServiceProvider (stubbed to always fail here, see
+      // _AlwaysFailingAiWorkerService), so it settles to "—" rather than
+      // hanging or showing an error screen (DESIGN_REFERENCE.md §5.8).
+      expect(find.text('—'), findsOneWidget);
       expect(
         find.text('Definisi bahasa Inggris tidak tersedia untuk kata ini.'),
         findsNWidgets(2),
@@ -81,6 +101,7 @@ void main() {
             dictionaryApiServiceProvider.overrideWithValue(
               DictionaryApiService(client: fakeClient),
             ),
+            aiWorkerServiceProvider.overrideWithValue(_AlwaysFailingAiWorkerService()),
           ],
           child: MaterialApp(home: WordDetailScreen(entry: entry)),
         ),
@@ -120,6 +141,7 @@ void main() {
             dictionaryApiServiceProvider.overrideWithValue(
               DictionaryApiService(client: fakeClient),
             ),
+            aiWorkerServiceProvider.overrideWithValue(_AlwaysFailingAiWorkerService()),
           ],
           child: MaterialApp(home: WordDetailScreen(entry: entry)),
         ),
@@ -181,6 +203,7 @@ void main() {
             dictionaryApiServiceProvider.overrideWithValue(
               DictionaryApiService(client: fakeClient),
             ),
+            aiWorkerServiceProvider.overrideWithValue(_AlwaysFailingAiWorkerService()),
           ],
           child: MaterialApp(home: WordDetailScreen(entry: modalEntry)),
         ),

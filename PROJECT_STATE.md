@@ -8,21 +8,21 @@
 
 ## 1. Current Status
 
-**Milestones 1–3 complete and pushed to `origin/main`.** Milestone 4
-(Vocabulary Module) is now considered **done, pending only the final
-manual re-verification listed in §7.** Real data is live in Firestore
-(4,952 documents, seeded and confirmed by the project owner); the
-composite-index bug that initially broke browse is fixed in code (§5b);
-Word Detail's English-definition coverage was audited twice — once for
-the POS-taxonomy alias mismatch (§5c), once more end-to-end after
-manual re-testing still found gaps, which turned up one more real alias
-gap plus a genuine UI bug conflating "loading"/"permanently
-unavailable"/"transient failure" into one message (§5d, now fixed); and
-client-side pagination (50/page) was added to the browse screen along
-with a targeted rebuild-memoization fix for the lag the project owner
-observed on the real ~900-word A1 list (§5e). One Firestore index
-deploy command (§7) is the only action still needed from the project
-owner.
+**Milestones 1–4 complete and pushed to `origin/main`** (`bab8170`),
+including the post-Milestone-4 pagination-bar layout fix. **Milestone 5
+(Cloudflare Worker + guru "Tambah Kosakata") is now complete** —
+implemented (§5g), a real CORS configuration bug found and fixed during
+manual testing (§5h), and manually verified end-to-end by the project
+owner against the real deployed Worker and live Firestore (§5h). A new
+sibling repo, `vocably-ai-worker/` (TypeScript, separate git history,
+not a subdirectory of this Flutter repo, now has its own first commit)
+holds the Worker itself; this repo's changes are the Flutter-side
+integration (new services/providers/screens, `firestore.rules` guru
+write access — deployed and confirmed working by real writes during
+E2E testing). **One thing explicitly remains unconfirmed, not just
+undeployed:** whether Cloudflare's native Rate Limiting binding is
+available on the project owner's Workers plan — the Worker still runs
+on the in-memory fallback (§5g/§7).
 
 ## 2. Milestone History
 
@@ -31,8 +31,8 @@ owner.
 | 1 | Skeleton project + Firebase connection | **Complete, pushed** |
 | 2 | Auth: sign up, login, role-based routing | **Complete, pushed** |
 | 3 | Design system / theme layer + responsive nav shell | **Complete, pushed** |
-| 4 | Vocab module: `vocabWords`, CSV import, CEFR bundles, browse, DictionaryAPI, TTS | **Complete** (real data seeded, a post-seed Firestore-index bug found and fixed — see §5b) |
-| 5 | Cloudflare Worker + guru "Tambah Kosakata" | Not started |
+| 4 | Vocab module: `vocabWords`, CSV import, CEFR bundles, browse, DictionaryAPI, TTS | **Complete, pushed** (real data seeded, a post-seed Firestore-index bug found and fixed — see §5b; pagination-bar overflow fix — see §5f) |
+| 5 | Cloudflare Worker + guru "Tambah Kosakata" | **Complete — implemented, deployed, and manually verified end-to-end (§5g/§5h). Uncommitted in both repos — see §10.** |
 | 6 | Student dashboard + Riwayat + Placement/Pre-Post-Test scaffolds | Not started |
 | 7 | Storyfier core (3-phase learning flow) | Not started |
 | 8 | Guru: Set Target Kata + Edit Kata | Not started |
@@ -65,7 +65,7 @@ owner.
 - **`meanings[].translation`** (renamed from `translationId` during this Milestone 4 run — see §8) holds the Indonesian translation text **directly**, inline — there is no separate `translations` collection.
 - **DictionaryAPI + TTS:** `DictionaryApiService` (English definitions/phonetics, direct client call, no proxy) + `TtsService` (`flutter_tts`, always used for the speaker button — see §7's disclosed limitation on real recorded-audio playback).
 - **Dev-side data pipeline:** `tools/vocab_import/` (Node.js, separate from the Flutter app) — see §5.
-- **Backend/API beyond Firebase:** none yet. No Cloudflare Worker (Milestone 5).
+- **Backend/API beyond Firebase:** `vocably-ai-worker/` (Cloudflare Worker, TypeScript, separate sibling git repo — see §5g), accessed from Flutter via `AiWorkerService`.
 
 ### Directory structure (current)
 
@@ -73,15 +73,19 @@ owner.
 lib/
   app.dart, main.dart, firebase_options.dart
   models/
-    app_user.dart, vocab_word.dart, vocab_bundle_entry.dart, dictionary_entry.dart
+    app_user.dart, vocab_word.dart, vocab_bundle_entry.dart, dictionary_entry.dart,
+    topic.dart                                            # Milestone 5
   services/
     firebase_service.dart, auth_service.dart, user_service.dart,
-    vocab_bundle_service.dart, dictionary_api_service.dart, tts_service.dart
+    vocab_bundle_service.dart, dictionary_api_service.dart, tts_service.dart,
+    ai_worker_service.dart, vocab_word_service.dart, topics_service.dart   # Milestone 5
   providers/
     auth_providers(+.g), sign_up_controller(+.g), login_controller(+.g),
     complete_registration_controller(+.g), vocab_bundle_providers(+.g),
     vocab_browser_providers(+.g), learning_cart_providers(+.g),
-    dictionary_providers(+.g)
+    dictionary_providers(+.g),
+    ai_worker_providers(+.g), vocab_management_providers(+.g),
+    lazy_translation_providers(+.g)                        # Milestone 5
   screens/
     auth/login_screen.dart, sign_up_screen.dart, complete_registration_screen.dart
     student/
@@ -90,9 +94,10 @@ lib/
       vocab_browser/vocab_browser_screen.dart, learning_cart_screen.dart, word_detail_screen.dart
     teacher/
       target_words/target_words_placeholder.dart
-      vocab_management/vocab_management_placeholder.dart
+      vocab_management/tambah_kosakata_screen.dart   # Milestone 5 — replaces the old placeholder
   theme/theme.dart
-  utils/role.dart, normalize_word.dart, vocab_browse_filter.dart, vocab_bundle_constants.dart
+  utils/role.dart, normalize_word.dart, vocab_browse_filter.dart, vocab_bundle_constants.dart,
+    cefr_levels.dart, topic_slug.dart, worker_config.dart   # Milestone 5
   widgets/app_nav_shell.dart
 
 tools/vocab_import/            # separate Node.js tool, not part of the Flutter app — see §5
@@ -102,11 +107,20 @@ tools/vocab_import/            # separate Node.js tool, not part of the Flutter 
   test/*.test.js
   input/ (git-ignored), output/ (git-ignored)
 
-assets/vocab/                  # .gitkeep only as of this snapshot — real
-                                # bundle files land once Stage 8/10 finish (§5)
+assets/vocab/                  # real per-level bundle files, generated by
+                                # tools/vocab_import/ (§5, Stage 4/10)
 ```
 
-`lib/screens/placeholders/` (Milestone 2's temporary routing-proof screens) has been deleted, as planned, once Milestone 3's real nav shell landed.
+```
+# SEPARATE REPO (sibling directory, own git history) — see §5g:
+vocably-ai-worker/
+  src/index.ts, auth.ts, cors.ts, rateLimit.ts, openai.ts, env.ts
+  src/handlers/translate.ts, generateStory.ts, cowriteTurn.ts
+  test/*.test.ts, test/handlers/*.test.ts
+  wrangler.jsonc, vitest.config.ts, README.md
+```
+
+`lib/screens/placeholders/` (Milestone 2's temporary routing-proof screens) has been deleted, as planned, once Milestone 3's real nav shell landed. `lib/screens/teacher/vocab_management/vocab_management_placeholder.dart` was deleted the same way in Milestone 5, once `tambah_kosakata_screen.dart` replaced it.
 
 ## 4. Authentication and Authorization
 
@@ -327,22 +341,235 @@ right side clipped/broke the layout.
   pre-fix code (298px overflow) and pass after the fix, via
   `git stash`/`git stash pop` on just the two source files.
 
+## 5g. Milestone 5 — Cloudflare Worker + Guru "Tambah Kosakata"
+
+Implemented per the plan the project owner approved (decisions a–e: separate
+sibling Worker repo; reuse the existing Dinoiki OpenAI-compatible endpoint/
+model; `wrangler dev` for local Worker development; in-memory rate-limit
+fallback if the native binding turns out unavailable on the Free plan;
+Tambah Kosakata only — no inert Edit Kata tab).
+
+**New sibling repo: `vocably-ai-worker/`** (TypeScript, own `git init`, not
+part of this Flutter repo) — see its own `README.md` for setup/dev/deploy.
+Summary:
+- `src/index.ts` — router: CORS preflight → origin allowlist → Firebase ID
+  token verification (`src/auth.ts`, `jose`, against Google's JWKS endpoint
+  — the JWKS-shaped variant of the same keys `DATA_MODEL.md` §10.1's X.509
+  URL names, since `jose`'s `createRemoteJWKSet` wants that shape) → rate
+  limiting (`src/rateLimit.ts`) → dispatch. `handleRequest` takes an
+  injectable `RouterDeps` so routing/CORS/status-code logic is unit-tested
+  without real network calls or a real rate-limit window.
+- **All three endpoints implemented to their full `DATA_MODEL.md` §10.2
+  contracts** (`/translate`, `/generate-story`, `/cowrite-turn`) — `CLAUDE.md`
+  §7 Milestone 5 lists all three under the Worker-setup step. Only
+  `/translate` has a Flutter caller yet; the other two are built and
+  Worker-side-tested now so Milestone 7 doesn't need to revisit this
+  infrastructure, but have no Flutter integration until then.
+- **Rate limiting:** ships *without* Cloudflare's native Rate Limiting
+  binding configured in `wrangler.jsonc` (commented out, with instructions)
+  — its Free-plan availability couldn't be confirmed from Cloudflare's docs.
+  `src/rateLimit.ts` auto-detects `env.RATE_LIMITER` and falls back to a
+  zero-cost in-memory per-isolate sliding window (30 req/60s per uid) when
+  it's absent, per the project owner's explicit decision.
+- **Tests:** 61 passing, run inside the real Workers runtime (`workerd`) via
+  `@cloudflare/vitest-plugin` (the current package — during setup,
+  `@cloudflare/vitest-pool-workers`'s `/config` export no longer existed in
+  the installed version; current Cloudflare docs point at
+  `@cloudflare/vitest-plugin`'s `cloudflareTest` instead, so that's what's
+  wired up). Covers CORS, auth (a locally-generated JWKS/JWT, never the real
+  Google endpoint), rate limiting (both paths), all three handlers'
+  validation/success/failure paths, and the router's status-code/dispatch
+  logic. `npm run typecheck` clean.
+
+**Flutter-side integration (this repo):**
+- `lib/utils/worker_config.dart` — `kWorkerBaseUrl`, a `--dart-define`-
+  configurable base URL (defaults to `wrangler dev`'s local address).
+- `lib/services/ai_worker_service.dart` — `AiWorkerService.translate()`,
+  the only endpoint with a Flutter caller so far. Throws one
+  `AiWorkerException` type on any failure (network/non-200/bad shape) —
+  deliberately not split into notFound/networkError buckets the way
+  `DictionaryApiService` is, since `/translate` has no meaningful "not
+  found" case.
+- `lib/services/auth_service.dart` — gained `getIdToken()`, used to
+  authenticate every Worker call.
+- `lib/services/vocab_word_service.dart` (new) — `findByWord` (duplicate
+  check), `createWord` (new word, builds the write map directly with
+  `FieldValue.serverTimestamp()` rather than reusing `VocabWord.toMap()`,
+  which emits a concrete client-side `Timestamp` that wouldn't satisfy
+  `firestore.rules`' `updatedAt == request.time`), `appendMeaning` (runs as
+  a Firestore transaction, not a plain read-then-write, so two teachers
+  editing the same word can't silently clobber each other).
+- `lib/services/topics_service.dart` (new) + `lib/models/topic.dart` (new)
+  — `fetchAll()`/`createOrGetTopic()` for the `topics` master list.
+- `lib/utils/topic_slug.dart` (new) — Dart port of
+  `tools/vocab_import/lib/seedDecision.js`'s `topicSlug()`, kept
+  byte-for-byte identical (tested against the same cases as that file's
+  Node test) so a guru-created topic's `docId` can never collide with or
+  diverge from what the import pipeline would have chosen.
+- `lib/utils/cefr_levels.dart` (new) — `kCefrLevels` extracted from
+  `vocab_browser_screen.dart` (was a private list there) so the new Tambah
+  Kosakata form uses the exact same six levels, not a second hand-copied list.
+- `lib/providers/ai_worker_providers.dart`, `lib/providers/
+  vocab_management_providers.dart`, `lib/providers/
+  lazy_translation_providers.dart` (all new) — service providers,
+  `topicsListProvider`, `vocabWordLookupProvider` (family, the duplicate
+  check), `TambahKosakataController` (`createNewWord`/`appendMeaning` drive
+  its `AsyncValue<void> state`; `generateTranslation`/`addNewTopic` are
+  lighter per-row supporting actions that deliberately don't touch it), and
+  `lazyTranslationProvider` (family, cached per `(word, pos)` for the rest
+  of the session — exactly the in-memory caching `DATA_MODEL.md` §2 point 4
+  asks for, with no extra caching code).
+- `lib/screens/teacher/vocab_management/tambah_kosakata_screen.dart` (new)
+  — replaces `VocabManagementPlaceholder` (deleted) as the real "Kosakata"
+  destination body. Word field with blur-triggered duplicate check; if
+  found, a compact "Tambah makna baru ke kata ini" flow (POS + generated
+  translation only); otherwise the full new-word form (CEFR level, topic
+  multi-select + add-new-topic, one-or-more meaning rows each with a
+  "Buat Terjemahan" button that calls the Worker, primary-meaning labeling).
+  Errors are always friendly text, never a raw Firestore/Worker error.
+- `lib/screens/student/vocab_browser/word_detail_screen.dart` — the
+  existing `_MeaningBlock` now renders a new `_LazyTranslationText` widget
+  whenever `meaning.translation == null`, per `DATA_MODEL.md` §2 point 4:
+  calls the Worker via `lazyTranslationProvider`, shows a small spinner
+  while in flight, the result on success, and a dim "—" on failure — never
+  written back to Firestore, never an error screen.
+- `firestore.rules` — added `isGuru()` (the same `get()`-on-`users`-doc
+  pattern `DATA_MODEL.md` §5 already documents for `targetWordSets`, reused
+  here) and guru write rules for `vocabWords` (`create` for a new word,
+  `update` for either the append-meaning shape or — added now since
+  `DATA_MODEL.md` §2 documents both shapes as one pair, though unused until
+  Milestone 8 — the topics-only Edit Kata shape) and `topics` (`create`
+  only). No per-element array validation anywhere, per `CLAUDE.md` §6's
+  explicit rule against rules that would need it.
+
+**Tests added (Flutter side):** `test/utils/topic_slug_test.dart`,
+`test/services/ai_worker_service_test.dart`,
+`test/screens/tambah_kosakata_screen_test.dart` (new-word render/duplicate-
+detect/generate-then-submit/submit-failure/add-meaning-row/append-meaning
+flows, all against fake services — no real Firestore/Firebase Auth
+touched), `test/screens/word_detail_lazy_translation_test.dart` (loading/
+success/failure states, via a controllable fake `AiWorkerService`).
+`test/screens/word_detail_screen_test.dart` updated (an
+`_AlwaysFailingAiWorkerService` override added to every case, so the
+existing fixture's null-translation meaning settles deterministically
+rather than incidentally depending on Firebase-not-initialized). `test/
+screens/destination_placeholders_test.dart` and `test/app_routing_test.dart`
+updated for the placeholder's removal. **Full suite: 174/174 passing.**
+
+**Known, disclosed test-coverage limitation:** `VocabWordService`/
+`TopicsService`'s actual Firestore calls (as opposed to the pure logic
+around them) aren't covered by an automated test — this project has no
+Firestore fake/emulator test harness (the existing precedent,
+`VocabBundleService.fetchDelta`, has the same gap and is tested the same
+way: by subclassing to control just that method). Adding one (e.g.
+`fake_cloud_firestore`) would be a new dependency requiring the
+confirm-first step `CLAUDE.md` §6 asks for, not decided as part of this
+milestone. This gap is no longer purely theoretical, though — §5h's
+manual E2E pass exercised the real Firestore calls directly and they
+worked, which is the closest thing to coverage this specific gap has.
+`firestore.rules`' new guru-write rules were never mechanically validated
+either (no Java available in this environment to run the Firestore
+emulator), but **are now deployed and confirmed working against the real
+project** by the successful writes in §5h.
+
+## 5h. Manual End-to-End Verification (Milestone 5) — Including a Real CORS Bug Found & Fixed
+
+The project owner deployed `vocably-ai-worker/` for real (`https://
+vocably-ai-worker.refahilyaa.workers.dev`), deployed the updated
+`firestore.rules` and the leftover Milestone-4 Firestore index, and ran
+Flutter against both with `flutter run -d chrome --web-port=5555
+--dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`.
+
+**A real bug surfaced during this pass — not a false alarm, and not
+something the automated Worker tests could have caught** (they don't
+exercise the deployed config, only the code): clicking "Buat
+Terjemahan" failed with a browser CORS error
+(`No 'Access-Control-Allow-Origin' header is present`). Investigated
+against the actual deployed configuration rather than assumed — root
+cause and fix:
+
+- **Root cause:** `wrangler.jsonc` originally kept `http://localhost:5555`
+  in a separate `env.development` block, on the assumption that local
+  Flutter dev would always talk to a *locally-running* `wrangler dev`
+  Worker. In practice, local Flutter dev pointed straight at the
+  **deployed** Worker via `--dart-define=WORKER_BASE_URL`, and a plain
+  `wrangler deploy` only ever reads the top-level `vars` — never
+  `env.development`'s. So the live deployment's `ALLOWED_ORIGINS`
+  genuinely never included `localhost:5555`, and `src/cors.ts` (unchanged,
+  and correct) correctly rejected it. Not a matching-logic bug — a
+  deployed-configuration/workflow mismatch.
+- **Fix:** `http://localhost:5555` merged into the single top-level
+  `vars.ALLOWED_ORIGINS` in `wrangler.jsonc`, alongside the two
+  production Firebase Hosting origins (still three fixed, explicit
+  strings — no wildcard, so this doesn't open the Worker to arbitrary
+  origins). The now-redundant `env.development` block removed;
+  `package.json`'s `dev` script simplified from `wrangler dev --env
+  development` to `wrangler dev`; `README.md` updated accordingly.
+  Verified: the relevant Worker CORS tests, the full Worker suite
+  (61/61), and `npm run typecheck` (clean) all still passed after the fix.
+- **Not deployed by Claude** — the project owner deployed this fix
+  themselves after the code-level fix was made.
+
+**Full manual E2E checklist, all confirmed working by the project owner
+against the real deployed Worker and live Firestore:**
+
+- [x] Guru login → "Kosakata" destination → Tambah Kosakata screen loads.
+- [x] Topic list loads (from the live `topics` collection).
+- [x] Duplicate-word detection (typing an existing word and blurring the
+      field surfaces the "Kata ini sudah ada" notice).
+- [x] CEFR level selection.
+- [x] Selecting an existing topic.
+- [x] Creating a brand-new topic.
+- [x] The CORS bug above, found and fixed.
+- [x] Lazy translation exercised against a real `vocabWords` document
+      with one meaning's `translation: null` (a dedicated temporary test
+      document, per the procedure worked out together — not a real
+      Oxford word, no edit to real data).
+- [x] The translation was successfully generated and displayed on Word
+      Detail.
+- [x] Confirmed the lazy translation is **not** persisted to Firestore
+      (display-only, per `DATA_MODEL.md` §2 point 4 — matches the
+      implementation, which never writes it back).
+- [x] The temporary test document was removed afterward.
+- [x] No test data left behind in `vocabWords` after cleanup.
+
+**Not covered by this pass** (still only automated-test-verified, or not
+yet re-checked at all — see §7): the vocab browse screen's pagination/
+filtering re-verification and the Word Detail POS-alias words (`can`,
+`billion`, `one`, `oh`, `this`) carried over from Milestone 4; the
+`firestore.rules` negative path (confirming a signed-in **siswa** is
+actually denied a `vocabWords`/`topics` write attempt) wasn't part of
+this checklist either — only the guru-positive paths were exercised.
+
 ## 6. Firebase / Firestore State
 
 - **Project:** `vocably-idn-en`, Firestore Native mode, `asia-southeast1`.
-- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2), `vocabWords`/`topics` — read-only for any authenticated user, `allow write: if false` for both (Milestone 4 Stage 2, deployed).
-- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3). A missing composite index initially made the browse screen unable to read this data correctly (§5b) — fixed in code; the index config exists but still needs a manual `firebase deploy --only firestore:indexes` (§7). Everything else (`learningProgress`, `learningSessions`, `targetWordSets`, `placementTestResults`, `researchAssessmentResults`) remains unmodeled, deny-all by the catch-all rule.
+- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2); `vocabWords`/`topics` — read-only for any authenticated user, plus guru-only write rules added in Milestone 5 (§5g) for both.
+- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3).
+- **`cefrLevel` + `updatedAt` composite index (§5b/§11.3):** **confirmed deployed and live** — verified directly against the project via `firebase firestore:indexes`, which returned exactly this index (plus Firestore's automatic `__name__` tiebreaker field), matching `firestore.indexes.json`. (This corrects an earlier snapshot of this file, which still listed the deploy as outstanding — the live project had already moved past that by the time this was checked.)
+- **`vocabWords`/`topics` guru-write rules (§5g):** **deployed and confirmed working** — the project owner's manual E2E pass (§5h) successfully created a word, appended a meaning, and created a topic as guru through the real app, which only works if these rules are live. The rules' negative path (a signed-in siswa being denied) was not explicitly exercised in that pass.
+- Everything else (`learningProgress`, `learningSessions`, `targetWordSets`, `placementTestResults`, `researchAssessmentResults`) remains unmodeled, deny-all by the catch-all rule.
 
 ## 7. Manual Actions Required
 
-These are the only things this session could not safely do itself:
+**Done since the last snapshot of this file** (kept here, struck through
+in spirit, for the record — not deleted, since a future session should
+know these happened and roughly when):
 
-1. **Deploy the Firestore composite index** this session added to `firestore.indexes.json` (§5b): from the repo root, `firebase deploy --only firestore:indexes`. The browse screen already works without this (graceful fallback to bundle-only data), but the live Firestore-freshness top-up won't actually run until the index is deployed and finishes building.
-2. **Manually re-verify the browse screen** (`flutter run -d chrome`) — confirm pagination (§5e: "Halaman X dari Y", Previous/Next, resets on level/mode/filter change) and that A1/A2/B1 × Abjad/Tema all still load correctly end-to-end. Verified via automated tests only so far this session.
-3. **Manually re-check Word Detail** for words like "can" (modal), "billion" (number), "one", "oh", "this" now that the extended alias table and the loading/retryable/unavailable UI split are in place (§5c/§5d) — verified via unit/widget tests only so far.
-4. **Review the 10 same-POS collisions** in `tools/vocab_import/output/import_report.json` (`samePosCollisions`) — not blocking, but worth a look since the schema can only keep one sense per POS.
-5. **Optionally spot-check translation quality** beyond what this session sampled — `tools/vocab_import/output/canonical_vocab_translated.json` has all 4,952 documents; the "equal"/noun case (§5) is the one known imperfect example found so far.
-6. Decide whether/when to `git add`/commit/push this session's changes — not done automatically, per your standing instruction.
+- ~~Deploy the Firestore composite index~~ — confirmed live (§6).
+- ~~Deploy the updated `firestore.rules`~~ — confirmed live and working via real writes (§5h/§6).
+- ~~Set up and deploy `vocably-ai-worker/` for real~~ — deployed to `https://vocably-ai-worker.refahilyaa.workers.dev`; a real CORS config bug was found and fixed in the process (§5h).
+- ~~Manually re-verify Tambah Kosakata end-to-end~~ — done, full checklist in §5h, including the lazy-translation display and its non-persistence.
+
+**Still genuinely outstanding:**
+
+1. **Confirm whether Cloudflare's native Rate Limiting binding is available on your Workers plan** (§5g) — **still unconfirmed either way; the Worker is still running on the in-memory fallback.** If you confirm it's available, uncomment the `unsafe.bindings` block in `vocably-ai-worker/wrangler.jsonc` (no code change needed elsewhere) and redeploy. Do not treat this as done until you've actually checked your plan's dashboard/docs.
+2. **Optionally exercise the `firestore.rules` negative path** — confirm a signed-in siswa attempting to create/update `vocabWords` or create a `topics` doc is actually denied. Not part of §5h's checklist (only guru-positive paths were exercised there).
+3. **Manually re-verify the browse screen** (`flutter run -d chrome`) — confirm pagination (§5e: "Halaman X dari Y", Previous/Next, resets on level/mode/filter change) and that A1/A2/B1 × Abjad/Tema all still load correctly end-to-end. Carried over from Milestone 4 — still only automated-test-verified. Not a Milestone 5 blocker.
+4. **Manually re-check Word Detail** for words like "can" (modal), "billion" (number), "one", "oh", "this" now that the extended alias table and the loading/retryable/unavailable UI split are in place (§5c/§5d) — verified via unit/widget tests only so far. Carried over from Milestone 4 — not a Milestone 5 blocker.
+5. **Review the 10 same-POS collisions** in `tools/vocab_import/output/import_report.json` (`samePosCollisions`) — not blocking, but worth a look since the schema can only keep one sense per POS.
+6. **Optionally spot-check translation quality** beyond what this session sampled — `tools/vocab_import/output/canonical_vocab_translated.json` has all 4,952 documents; the "equal"/noun case (§5) is the one known imperfect example found so far.
+7. Decide whether/when to `git add`/commit/push the current working tree in **both** repos — not done automatically, per your standing instruction. See §10 for exactly what's pending in each.
 
 ## 8. Important Architectural Decisions (this session)
 
@@ -356,40 +583,45 @@ These are the only things this session could not safely do itself:
 - **`DictionaryEntry.definitionsForPos` alias table** (`modal`/`auxiliary`→`verb`, `number`→`numeral`/`noun`, `exclamation`→`interjection`, `determiner`→`pronoun`/`adjective`) reconciles Vocably/Oxford's POS taxonomy against DictionaryAPI's Wiktionary-derived tags — confirmed empirically against the live API twice (§5c, §5d), not guessed. `article` deliberately left unmapped (no evidence-based equivalent found). Extend this table, not the matching logic's shape, if another mismatch is found later.
 - **Word Detail's dictionary content is now a 4-state sealed type** (`_DictionaryLoading`/`_DictionaryFound`/`_DictionaryUnavailable`/`_DictionaryRetryable`, `word_detail_screen.dart`) instead of a flat nullable list — loading, a permanent content gap, and a transient/retryable failure are visually distinct, with a working retry action for the last one. Follow this same distinction (don't collapse states back into one) if this screen changes again.
 - **Vocabulary browse is paginated (50/page, §5e)** — always filter/sort first via `applyVocabBrowseFilter`, then paginate via `paginate()`. Never paginate before filtering.
-- All Milestone 1–3 decisions from the previous snapshot (Riverpod-only, no routing package, no `custom_lint`, rules-enforced role assignment, etc.) remain unchanged and still apply — not re-litigated this session.
+- **Milestone 5 decisions (project owner, this session):** Worker as a separate sibling repo (`vocably-ai-worker/`); reuse the existing Dinoiki OpenAI-compatible endpoint/model rather than switching providers; `wrangler dev` for local Worker development (not a dev-flag on the deployed Worker); an in-memory rate-limit fallback (not a paid plan) if the native Cloudflare binding turns out unavailable on Free; Tambah Kosakata only this milestone, no inert Edit Kata tab — see §5g.
+- **`VocabWordService.createWord`/`appendMeaning` build their Firestore write maps directly, not via `VocabWord.toMap()`** — that method emits a concrete client `Timestamp`, which can't satisfy `firestore.rules`' `updatedAt == request.time`; a client write needs an actual `FieldValue.serverTimestamp()` sentinel (same pattern `AppUser.newStudentData()` already uses for `users.createdAt`). Follow this same distinction if another client-side Firestore writer is added later.
+- **`topicSlug()` (Dart) must stay byte-for-byte identical to `tools/vocab_import/lib/seedDecision.js`'s version** — both compute the same `topics` collection's `docId`. If one changes, change the other and re-verify both test suites.
+- **`vocably-ai-worker/`'s CORS allowlist is a single flat list (`wrangler.jsonc`'s top-level `vars.ALLOWED_ORIGINS`), not split across a `vars`/`env.development` divide** (§5h) — the earlier per-environment split assumed local Flutter dev always talks to a locally-running `wrangler dev` Worker, but the real workflow points the local client straight at the deployed Worker via `--dart-define=WORKER_BASE_URL`, which only ever reads the top-level `vars`. If Worker environment-specific config is reintroduced later, keep this lesson in mind — verify what a plain `wrangler deploy` actually reads before assuming a dev-only origin is safely isolated.
+- All Milestone 1–4 decisions from the previous snapshot (Riverpod-only, no routing package, no `custom_lint`, rules-enforced role assignment, `definitionsForPos` alias table, paginate-after-filter, etc.) remain unchanged and still apply — not re-litigated this session.
 
 ## 9. Verification Status
 
-- `flutter analyze`: **no issues** (final run this session, after all fixes, including the §5f pagination-bar layout fix).
-- `flutter test`: **154/154 passing** (153 from the committed Milestone 4 work, +1 new overflow regression test from §5f). Includes the real-bundle-data test fix, `loadLevelWithDelta` regression tests, `definitionsForPos` tests, the rewritten Word Detail loading/retryable/unavailable tests, the pagination tests across `vocab_browse_filter_test.dart`/`vocab_browser_providers_test.dart`/`vocab_browser_screen_test.dart`, and the §5f pagination-bar overflow regression test.
-- `tools/vocab_import` pure-logic tests (`node --test`): **43/43 passing** (added one test for the `posList` backfill-on-update behavior).
-- Stage 1 (merge): run for real against the actual Oxford CSVs — 0 malformed rows, 4,952 documents.
-- Stage 2 (translate): run for real to completion — 5,936/5,936 meanings translated, spot-checked for quality.
-- Stage 3 (seed): **run for real by the project owner** — 4,952 documents confirmed live in Firestore.
-- Stage 4 (bundle generation): run for real — all 5 non-empty levels written and verified to parse cleanly via the actual `VocabBundleEntry` model (0/4,952 parse failures).
-- **Post-seed bug found and fixed** (§5b): missing Firestore composite index made every level fail to load; fixed via the index config + a graceful-degradation code change.
-- **English-definition gaps investigated twice** (§5c, §5d): one more real alias gap found and fixed (`number`→also `noun`), one real UI bug fixed (loading/permanent/retryable states no longer collapsed into one message), remaining gaps confirmed as genuine DictionaryAPI content limitations with concrete evidence, not guesses.
-- **Pagination added** (§5e): 50 items/page, filter-then-paginate order preserved, resets on level/mode/topic/pos change, memoized to avoid re-filtering the full list on every page click.
-- **Pagination bar overflow fixed** (§5f) after real-Chrome manual testing surfaced it — verified both that the new regression test fails pre-fix and passes post-fix.
-- All of the above verified via automated tests only — **not yet re-verified by a human against the real running app** (§7), except the pagination overflow itself, which the project owner already reproduced manually in real Chrome before requesting §5f (still worth a quick re-check that the fixed layout looks right, not just non-overflowing).
+- `flutter analyze`: **no issues**.
+- `flutter test`: **174/174 passing** (154 from the committed Milestone 4 work + pagination-bar fix, +20 new Milestone 5 tests across `topic_slug_test.dart`, `ai_worker_service_test.dart`, `tambah_kosakata_screen_test.dart`, and `word_detail_lazy_translation_test.dart`, minus the 1 retired `VocabManagementPlaceholder` placeholder test).
+- `tools/vocab_import` pure-logic tests (`node --test`): **43/43 passing** (untouched this session).
+- **`vocably-ai-worker/` (separate repo) tests:** `npm test` (Vitest, real `workerd` runtime via `@cloudflare/vitest-plugin`) — **61/61 passing**. `npm run typecheck` — clean.
+- Stage 1–4 (Milestone 4 data pipeline): unchanged, still real/complete — see §5 for detail.
+- **Post-seed bug found and fixed** (§5b), **English-definition gaps investigated twice** (§5c/§5d), **pagination added** (§5e) **and its overflow fixed** (§5f) — all as previously recorded, unchanged this session.
+- **Milestone 5 implemented, deployed, and manually verified end-to-end** (§5g/§5h): Worker (all 3 endpoints to their documented contracts, auth/CORS/rate-limiting infrastructure), Flutter integration (services/providers/screens), `firestore.rules` guru write access. A real CORS configuration bug was found during the manual pass and fixed (§5h) — re-verified after the fix: Worker suite 61/61, `npm run typecheck` clean. **What manual verification actually covered vs. didn't** is spelled out precisely in §5h — don't assume everything is checked; in particular, Rate Limiting plan availability is explicitly still unconfirmed (§7).
 
 ## 10. Current Git State
 
-- **Branch:** `main`, in sync with `origin/main`.
-- Milestone 4 (translation rename, doc updates, `tools/vocab_import/`, real `assets/vocab/*.json` bundles, Firestore-index fix, English-definition fixes, pagination, this file) is **committed and pushed** (`24cd651 Complete Milestone 4 vocabulary module`).
-- **Working tree as of §5f:** modified but **uncommitted** — `lib/screens/student/vocab_browser/vocab_browser_screen.dart`, `lib/theme/theme.dart`, `test/screens/vocab_browser_screen_test.dart` (the pagination-bar overflow fix), plus this file. Commit/push remains the project owner's action per standing instruction.
+- **Flutter repo (`vocably/`) — branch `main`, in sync with `origin/main`.** Milestone 4 + the pagination-bar fix are **committed and pushed** (`bab8170 Fix vocabulary pagination layout`, on top of `24cd651 Complete Milestone 4 vocabulary module`).
+- **Flutter repo working tree: modified but uncommitted.** All of Milestone 5's new/changed files (§5g), this file's updates, plus a small unrelated `.gitignore` addition (`.dev.vars` — not something this session added; noted here rather than silently left unexplained, see §12 note on reviewing untracked/unexplained changes before committing). No `lib/`/`test/` changes since the last snapshot beyond what §5g already documents — the CORS bug (§5h) was entirely a `vocably-ai-worker/` fix, nothing on the Flutter side. Commit/push remains the project owner's action per standing instruction.
+- **`vocably-ai-worker/` (sibling repo, `c:\Users\isaan\projects\flutter\vocably-ai-worker`): now has its own first commit** (`915289b Initialize Vocably AI Worker`, made by the project owner — not this session). **Working tree on top of that commit is modified but uncommitted**: the CORS fix (§5h) — `wrangler.jsonc`, `package.json`, `README.md`. Entirely separate git history from the Flutter repo (separate `.git`, no remote configured yet as far as this session can see).
 
 ## 11. Next Recommended Step
 
-1. Manually re-verify the pagination bar in real Chrome at the ~390px width where the overflow was originally seen (§5f) — confirm it no longer overflows/clips and looks proportionate.
-2. Run `firebase deploy --only firestore:indexes` (§7) so the delta-freshness query actually works, not just degrades gracefully.
-3. Manually re-test the browse screen (`flutter run -d chrome`) against the real seeded data — pagination, filtering, and Word Detail's definition states — confirm end-to-end, not just via automated tests.
-4. Only after that, Milestone 5 (Cloudflare Worker + guru "Tambah Kosakata") is next in sequence — **not started, not to be started without explicit instruction.**
+**Milestone 5 is complete** — implemented, deployed, and manually
+verified end-to-end (§5g/§5h). Remaining items are genuinely optional
+polish/confirmation, not blockers (§7): confirming Rate Limiting plan
+availability, the rules' negative path, and two Milestone-4-era
+re-verification items (browse screen, POS-alias words).
+
+1. Decide on git history for both repos (§10) — commit/push each independently whenever ready. Worth a look at the stray `.gitignore` change (§10) before committing, to confirm it's intentional.
+2. Optionally work through §7's remaining (non-blocking) items.
+3. **Per `CLAUDE.md` §7's documented milestone order, Milestone 6 is "Student dashboard + Riwayat + Placement/Pre-Post-Test scaffolds"** — that's next in sequence, **not started, not to be started without explicit instruction.** (Storyfier core — the 3-phase learning flow — is Milestone 7, after that; if the intended order has actually changed, that needs an explicit decision/discussion, not a silent reordering here.)
 
 ## 12. Handoff Instructions for a New AI Session
 
 1. Read this file first for orientation, then `CLAUDE.md` in full (its own header requires this every session).
 2. Read `SPEC.md`, `DATA_MODEL.md`, `DESIGN_REFERENCE.md` as needed.
-3. **Inspect the live repository** before changing anything — `git log`, `git status`, actual file contents, and (for the import pipeline) `tools/vocab_import/output/*.json` and `translate_full_run.log` for the real current data-population state. This file drifts; the repository doesn't.
-4. Check whether the Stage 2 translation run (§5) has finished and whether Stage 3/4 have been run since this snapshot was written — §7's manual actions may already be done.
+3. **Inspect the live repository** before changing anything — `git log`, `git status`, actual file contents, and (for the import pipeline) `tools/vocab_import/output/*.json` and `translate_full_run.log` for the real current data-population state. This file drifts; the repository doesn't. **Also check the sibling `vocably-ai-worker/` repo** (`c:\Users\isaan\projects\flutter\vocably-ai-worker`, separate `git log`/`git status`) — it's a separate codebase from Milestone 5 onward (§5g) and this file's view of it can go stale independently of the Flutter repo's.
+4. Check whether §7's manual actions (Firestore index/rules deploys, Worker setup/deploy) have already been done since this snapshot was written.
 5. Preserve §8's decisions unless the project owner explicitly reopens discussion on one of them.
+6. **Before committing anything, `git status`/`git diff` for anything not attributable to a documented change in this file** (e.g. §10's note on a `.gitignore` line neither this session nor the previous one added) — surface it to the project owner rather than assuming it's fine to commit or silently reverting it.

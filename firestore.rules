@@ -21,6 +21,16 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    // Milestone 5 (DATA_MODEL.md §5's already-documented pattern, reused
+    // here for vocabWords/topics): role-gates guru-only writes via a
+    // get() on the caller's own users/{uid} doc — not a second write
+    // permission, so this doesn't need vocabWords/topics to grant `read`
+    // on `users` themselves (get()/exists() bypass read rules, §1).
+    function isGuru() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'guru';
+    }
+
     function isValidStudentCreate() {
       let data = request.resource.data;
       return data.role == 'siswa'
@@ -79,25 +89,74 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Milestone 4 Stage 2 (DATA_MODEL.md §2): bank kosakata master data.
-    // Read-only for every signed-in user — no role check, since nothing in
-    // the docs restricts read to siswa specifically, and guru will need
-    // the same read access for its own future browse/edit UI. Write stays
-    // fully denied for now: the only documented writers are the dev import
-    // script (Admin SDK, bypasses these rules entirely) and guru via the
-    // Milestone 5 "Tambah Kosakata"/"Edit Kata" feature, not built yet.
+    // Milestone 4 Stage 2 / Milestone 5 (DATA_MODEL.md §2): bank kosakata
+    // master data. Read-only for every signed-in user — no role check on
+    // read, since nothing in the docs restricts it to siswa specifically.
+    //
+    // Write: guru only, via `set()` from the client (no `create()` on the
+    // client SDK — DATA_MODEL.md §2's note on why `create`/`update` here
+    // is what actually distinguishes a brand-new docId from an existing
+    // one, not application code). Two entirely separate shapes are
+    // allowed, matching the two guru flows §2 documents — no per-element
+    // array validation anywhere (`CLAUDE.md` §6's explicit rule against
+    // that; only outer-field shape is checked):
+    //   (a) `create` — a brand-new word ("Tambah Kosakata", Milestone 5).
+    //   (b) `update` — either append a new meaning (`meanings`/`posList`,
+    //       Milestone 5) or edit `topics` (Milestone 8's "Edit Kata" —
+    //       the rule is added now since DATA_MODEL.md §2 documents both
+    //       update shapes together as one pair; no client calls the
+    //       topics-only shape until that milestone builds the UI for it).
     match /vocabWords/{wordId} {
       allow read: if request.auth != null;
-      allow write: if false;
+
+      allow create: if isGuru()
+        && wordId == request.resource.data.word
+        && request.resource.data.source == 'guru'
+        && request.resource.data.addedByTeacherId == request.auth.uid
+        && request.resource.data.meanings is list
+        && request.resource.data.meanings.size() > 0
+        && request.resource.data.posList is list
+        && request.resource.data.cefrLevel is string
+        && request.resource.data.topics is list
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.keys().hasOnly([
+             'word', 'meanings', 'posList', 'cefrLevel', 'topics',
+             'source', 'addedByTeacherId', 'createdAt', 'updatedAt'
+           ]);
+
+      allow update: if isGuru()
+        && request.resource.data.updatedAt == request.time
+        && (
+          // (a) Edit Kata (Milestone 8): topics only.
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['topics', 'updatedAt'])
+            && request.resource.data.topics is list)
+          ||
+          // (b) Append a new meaning (Milestone 5).
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meanings', 'posList', 'updatedAt'])
+            && request.resource.data.meanings is list
+            && request.resource.data.meanings.size() > 0
+            && request.resource.data.posList is list)
+        );
+
+      allow delete: if false;
     }
 
-    // Milestone 4 Stage 2 (DATA_MODEL.md §2b): canonical topic list.
-    // Same treatment as vocabWords above — read-only for any signed-in
-    // user, write deferred to Milestone 5 (only guru/csvImport ever write
-    // here, per §2b).
+    // Milestone 4 Stage 2 / Milestone 5 (DATA_MODEL.md §2b): canonical
+    // topic list. Read-only for any signed-in user; guru may create a new
+    // topic (the "tambah topik baru" flow, §2b) — never update/delete
+    // one, since nothing in the docs calls for renaming/removing topics.
     match /topics/{topicId} {
       allow read: if request.auth != null;
-      allow write: if false;
+
+      allow create: if isGuru()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly(['name', 'createdBy', 'createdAt']);
+
+      allow update, delete: if false;
     }
 
     match /{document=**} {

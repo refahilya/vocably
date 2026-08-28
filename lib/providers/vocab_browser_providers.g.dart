@@ -42,7 +42,7 @@ final class VocabBrowserFilterProvider
 }
 
 String _$vocabBrowserFilterHash() =>
-    r'cb4b3514aaeed727a726c64275b0ea36d3d39ac6';
+    r'b0ba17eb04a189a4c2a00fad456e1fa060dc40e8';
 
 abstract class _$VocabBrowserFilter extends $Notifier<VocabBrowserFilterState> {
   VocabBrowserFilterState build();

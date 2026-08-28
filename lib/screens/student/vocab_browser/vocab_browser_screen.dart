@@ -6,12 +6,11 @@ import '../../../providers/learning_cart_providers.dart';
 import '../../../providers/vocab_browser_providers.dart';
 import '../../../providers/vocab_bundle_providers.dart';
 import '../../../theme/theme.dart';
+import '../../../utils/cefr_levels.dart';
 import '../../../utils/normalize_word.dart';
 import '../../../utils/vocab_browse_filter.dart';
 import 'learning_cart_screen.dart';
 import 'word_detail_screen.dart';
-
-const _cefrLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
 /// Milestone 4 Stage 5 — student vocabulary browse/explore screen
 /// (`SPEC.md` §3.3, `DESIGN_REFERENCE.md` §5.7). Reached today only via
@@ -115,7 +114,7 @@ class _LevelSelector extends ConsumerWidget {
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
       children: [
-        for (final level in _cefrLevels)
+        for (final level in kCefrLevels)
           ChoiceChip(
             label: Text(level),
             selected: level == selected,

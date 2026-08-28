@@ -10,7 +10,7 @@ import 'package:vocably/screens/auth/login_screen.dart';
 import 'package:vocably/screens/student/dashboard/dashboard_placeholder.dart';
 import 'package:vocably/screens/student/history/history_placeholder.dart';
 import 'package:vocably/screens/teacher/target_words/target_words_placeholder.dart';
-import 'package:vocably/screens/teacher/vocab_management/vocab_management_placeholder.dart';
+import 'package:vocably/screens/teacher/vocab_management/tambah_kosakata_screen.dart';
 import 'package:vocably/utils/role.dart';
 import 'package:vocably/widgets/app_nav_shell.dart';
 
@@ -72,7 +72,7 @@ void main() {
       expect(find.byType(DashboardPlaceholder), findsOneWidget);
       expect(find.byType(HistoryPlaceholder), findsNothing);
       expect(find.byType(TargetWordsPlaceholder), findsNothing);
-      expect(find.byType(VocabManagementPlaceholder), findsNothing);
+      expect(find.byType(TambahKosakataScreen), findsNothing);
     });
   });
 
@@ -88,7 +88,7 @@ void main() {
 
       // Target Kata is the first destination, so its body (only) is built.
       expect(find.byType(TargetWordsPlaceholder), findsOneWidget);
-      expect(find.byType(VocabManagementPlaceholder), findsNothing);
+      expect(find.byType(TambahKosakataScreen), findsNothing);
       expect(find.byType(DashboardPlaceholder), findsNothing);
       expect(find.byType(HistoryPlaceholder), findsNothing);
     });

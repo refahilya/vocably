@@ -35,6 +35,13 @@ class AuthService {
 
   Future<void> signOut() => _auth.signOut();
 
+  /// The signed-in user's Firebase ID token, or `null` if signed out.
+  /// Used to authenticate calls to the Cloudflare Worker AI proxy
+  /// (`AiWorkerService`) — `DATA_MODEL.md` §10.1: every Worker endpoint
+  /// verifies this token manually (no Firebase Admin SDK in the Workers
+  /// runtime).
+  Future<String?> getIdToken() => _auth.currentUser?.getIdToken() ?? Future.value(null);
+
   /// Deletes the currently signed-in user.
   ///
   /// Used only to roll back a sign-up attempt whose Firestore profile

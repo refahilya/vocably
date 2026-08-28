@@ -8,7 +8,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/student/dashboard/dashboard_placeholder.dart';
 import 'screens/student/history/history_placeholder.dart';
 import 'screens/teacher/target_words/target_words_placeholder.dart';
-import 'screens/teacher/vocab_management/vocab_management_placeholder.dart';
+import 'screens/teacher/vocab_management/tambah_kosakata_screen.dart';
 import 'theme/theme.dart';
 import 'utils/role.dart';
 import 'widgets/app_nav_shell.dart';
@@ -76,7 +76,8 @@ List<AppNavDestination> _studentDestinations(AppUser profile) {
 }
 
 /// Destinations for a signed-in `guru`: Target Kata (Milestone 8) and
-/// Kosakata (vocabulary management, Milestone 5 & 8) — see `CLAUDE.md` §7.
+/// Kosakata (vocabulary management — Tambah Kosakata, Milestone 5; Edit
+/// Kata, Milestone 8 — see `CLAUDE.md` §7).
 List<AppNavDestination> _teacherDestinations(AppUser profile) {
   return [
     AppNavDestination(
@@ -84,10 +85,10 @@ List<AppNavDestination> _teacherDestinations(AppUser profile) {
       icon: Icons.track_changes,
       body: TargetWordsPlaceholder(profile: profile),
     ),
-    const AppNavDestination(
+    AppNavDestination(
       label: 'Kosakata',
       icon: Icons.menu_book,
-      body: VocabManagementPlaceholder(),
+      body: TambahKosakataScreen(profile: profile),
     ),
   ];
 }
