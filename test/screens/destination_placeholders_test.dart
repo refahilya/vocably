@@ -4,11 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:vocably/models/app_user.dart';
 import 'package:vocably/providers/auth_providers.dart';
-import 'package:vocably/screens/student/dashboard/dashboard_placeholder.dart';
-import 'package:vocably/screens/student/history/history_placeholder.dart';
 import 'package:vocably/screens/teacher/target_words/target_words_placeholder.dart';
 import 'package:vocably/services/auth_service.dart';
 import 'package:vocably/utils/role.dart';
+
+/// **Milestone 6 note:** `DashboardPlaceholder`/`HistoryPlaceholder` were
+/// replaced by real screens (`DashboardScreen`/`HistoryScreen`) — their
+/// tests moved to `test/screens/dashboard_screen_test.dart` and
+/// `test/screens/history_screen_test.dart` respectively, since those
+/// screens need Firestore-service fakes this harness doesn't set up.
+/// `TargetWordsPlaceholder` (guru's "Target Kata", Milestone 8) is still a
+/// real placeholder, so its coverage stays here.
 
 /// Records whether `signOut()` was called, without ever touching Firebase
 /// — the other `AuthService` methods are never invoked by these widgets,
@@ -21,14 +27,6 @@ class _FakeAuthService extends AuthService {
     signOutCalled = true;
   }
 }
-
-final _studentProfile = AppUser(
-  uid: 'student-1',
-  email: 'siswa@example.com',
-  name: 'Siswa Uji',
-  role: Role.siswa,
-  createdAt: DateTime(2026, 1, 1),
-);
 
 final _teacherProfile = AppUser(
   uid: 'teacher-1',
@@ -65,51 +63,6 @@ Future<void> _pumpDestination(
 }
 
 void main() {
-  group('DashboardPlaceholder (Belajar)', () {
-    testWidgets('shows destination name, profile name, and no nested Scaffold/AppBar', (
-      tester,
-    ) async {
-      await _pumpDestination(
-        tester,
-        DashboardPlaceholder(profile: _studentProfile),
-      );
-
-      expect(find.text('Belajar'), findsOneWidget);
-      expect(find.text('Selamat datang, Siswa Uji'), findsOneWidget);
-      expect(find.byType(Scaffold), findsOneWidget);
-      expect(find.byType(AppBar), findsOneWidget);
-    });
-
-    testWidgets('Keluar button calls the existing authServiceProvider.signOut()', (
-      tester,
-    ) async {
-      final fakeAuth = _FakeAuthService();
-      await _pumpDestination(
-        tester,
-        DashboardPlaceholder(profile: _studentProfile),
-        authService: fakeAuth,
-      );
-
-      await tester.tap(find.text('Keluar'));
-      await tester.pump();
-
-      expect(fakeAuth.signOutCalled, isTrue);
-    });
-  });
-
-  group('HistoryPlaceholder (Riwayat)', () {
-    testWidgets('shows destination name, no logout button, no nested Scaffold/AppBar', (
-      tester,
-    ) async {
-      await _pumpDestination(tester, const HistoryPlaceholder());
-
-      expect(find.text('Riwayat'), findsOneWidget);
-      expect(find.text('Keluar'), findsNothing);
-      expect(find.byType(Scaffold), findsOneWidget);
-      expect(find.byType(AppBar), findsOneWidget);
-    });
-  });
-
   group('TargetWordsPlaceholder (Target Kata)', () {
     testWidgets('shows destination name, profile name, and no nested Scaffold/AppBar', (
       tester,

@@ -159,6 +159,58 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Milestone 6 (`DATA_MODEL.md` §5): "Target Kata Hari Ini" read path.
+    // Read-only for any signed-in user (a target set can name a specific
+    // student or `kAllStudents` — filtering "is this set actually mine"
+    // happens in the query/client, not in the rule, same as `vocabWords`).
+    // Write stays denied here: the guru-facing "Set Target Kata" feature
+    // (Milestone 8) hasn't been built yet, so there is no tested field
+    // shape to validate a create/update against — adding one now would be
+    // guessing at a shape `CLAUDE.md` §6 says to confirm first, not derive
+    // from an unbuilt screen.
+    match /targetWordSets/{setId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Milestone 6 (`DATA_MODEL.md` §3/§4): Riwayat read paths. Both
+    // collections are owned per-document by `studentId` — read is
+    // restricted to that student, unlike `vocabWords`/`topics`/
+    // `targetWordSets` above (there's no reason a *different* student
+    // should ever read another's progress/session history). Write stays
+    // denied: nothing produces this data until Milestone 7 builds the
+    // actual 3-phase flow, and `DATA_MODEL.md` §3's mastery
+    // transition rules (no `mastered` → `difficult`) need to be written
+    // and tested alongside that real writer, not guessed at now.
+    match /learningProgress/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
+      allow write: if false;
+    }
+
+    match /learningSessions/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
+      allow write: if false;
+    }
+
+    // Milestone 6 scaffolds these two read paths for forward-compatibility
+    // even though nothing in this milestone reads or writes them yet (no
+    // placement-test/pre-post-test screen shows past results) —
+    // `CLAUDE.md` §10's TBD status covers the scoring/instrument, not
+    // whether a student may ever read their own past attempts. Write is
+    // denied for the same reason as above: the scoring method
+    // (`placementTestResults`) and research instrument
+    // (`researchAssessmentResults`) are both still undecided
+    // (`CLAUDE.md` §10) — no field shape exists yet to validate against.
+    match /placementTestResults/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
+      allow write: if false;
+    }
+
+    match /researchAssessmentResults/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

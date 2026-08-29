@@ -41,6 +41,10 @@ dependencies:
   riverpod_annotation: ^4.0.3
   http: ^1.6.0
   flutter_tts: ^4.2.5
+  # Milestone 6: Riwayat "per sesi" cards need `d/M/yyyy HH:mm` formatting
+  # (DESIGN_REFERENCE.md §3.3) — approved by the project owner rather than
+  # hand-rolling date formatting (CLAUDE.md §6).
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

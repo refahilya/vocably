@@ -59,4 +59,13 @@ class UserService {
       ),
     );
   }
+
+  /// Flips `users/{uid}.placementTestPrompted` to `true` (`SPEC.md` §3.1,
+  /// `DATA_MODEL.md` §1) — called exactly once, the moment the one-time
+  /// automatic placement-test offer is shown, regardless of which choice
+  /// the student makes. `firestore.rules`' siswa self-update whitelist
+  /// already allows this field (Milestone 2); no rules change needed.
+  Future<void> markPlacementTestPrompted(String uid) {
+    return _users.doc(uid).update({'placementTestPrompted': true});
+  }
 }

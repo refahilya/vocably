@@ -5,8 +5,9 @@ import 'models/app_user.dart';
 import 'providers/auth_providers.dart';
 import 'screens/auth/complete_registration_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/student/dashboard/dashboard_placeholder.dart';
-import 'screens/student/history/history_placeholder.dart';
+import 'screens/student/dashboard/dashboard_screen.dart';
+import 'screens/student/history/history_screen.dart';
+import 'screens/student/placement_test/placement_test_offer_screen.dart';
 import 'screens/teacher/target_words/target_words_placeholder.dart';
 import 'screens/teacher/vocab_management/tambah_kosakata_screen.dart';
 import 'theme/theme.dart';
@@ -30,11 +31,12 @@ class VocablyApp extends StatelessWidget {
 
 /// Root routing: switches on [appAuthStatusProvider].
 ///
-/// Once signed in, the destination bodies inside [AppNavShell] are still
-/// placeholders — real dashboards land in Milestones 5/6/8 (see
-/// `CLAUDE.md` §7). Deliberately no routing package — plain
-/// Navigator.push is used for the login/sign-up toggle, per project
-/// decision.
+/// Siswa destinations (Belajar/Riwayat, Milestone 6) and guru's Kosakata
+/// (Milestone 5) are real screens now; guru's Target Kata stays a
+/// placeholder until Milestone 8 (see `CLAUDE.md` §7). Deliberately no
+/// routing package — plain Navigator.push is used for the login/sign-up
+/// toggle and for screens pushed on top of a nav-shell destination, per
+/// project decision.
 class _RootRouter extends ConsumerWidget {
   const _RootRouter();
 
@@ -47,6 +49,15 @@ class _RootRouter extends ConsumerWidget {
       AppAuthSignedOut() => const LoginScreen(),
       AppAuthNeedsProfile(:final uid, :final email) =>
         CompleteRegistrationScreen(uid: uid, email: email),
+      // Milestone 6 (`SPEC.md` §3.1): the one-time automatic placement-test
+      // offer is shown in place of the nav shell for a signed-in student
+      // whose `placementTestPrompted` isn't `true` yet — never for guru.
+      // `!= true` (rather than `== false`) also catches a hypothetical
+      // `null` the same way, since a real siswa document always has this
+      // field explicitly `false` from `AppUser.newStudentData()`.
+      AppAuthSignedIn(:final profile)
+          when profile.isStudent && profile.placementTestPrompted != true =>
+        PlacementTestOfferScreen(profile: profile),
       AppAuthSignedIn(:final profile) => AppNavShell(
         destinations: profile.role == Role.guru
             ? _teacherDestinations(profile)
@@ -65,12 +76,12 @@ List<AppNavDestination> _studentDestinations(AppUser profile) {
     AppNavDestination(
       label: 'Belajar',
       icon: Icons.school,
-      body: DashboardPlaceholder(profile: profile),
+      body: DashboardScreen(profile: profile),
     ),
-    const AppNavDestination(
+    AppNavDestination(
       label: 'Riwayat',
       icon: Icons.history,
-      body: HistoryPlaceholder(),
+      body: HistoryScreen(profile: profile),
     ),
   ];
 }
