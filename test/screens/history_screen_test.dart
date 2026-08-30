@@ -149,11 +149,18 @@ void main() {
       expect(find.text('run'), findsNothing);
       expect(find.text('Pelajari Kembali'), findsOneWidget);
 
-      // Milestone 7 wires this up — present but inert.
+      // Milestone 7: tapping it starts a re-learn flow with exactly the
+      // words currently shown by the `difficult` filter (Decision 2 — no
+      // per-word checkbox selection).
       final relearnButton = tester.widget<FilledButton>(
         find.ancestor(of: find.text('Pelajari Kembali'), matching: find.byType(FilledButton)),
       );
-      expect(relearnButton.onPressed, isNull);
+      expect(relearnButton.onPressed, isNotNull);
+
+      await tester.tap(find.text('Pelajari Kembali'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Baca Cerita'), findsOneWidget);
     });
 
     testWidgets('filtering to difficult with none found shows the positive empty state', (

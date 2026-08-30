@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../models/learning_session.dart';
 import '../../../models/vocab_bundle_entry.dart';
+import '../../../providers/auth_providers.dart';
 import '../../../providers/learning_cart_providers.dart';
+import '../../../providers/learning_session_controller.dart';
 import '../../../theme/theme.dart';
+import '../learning_flow/story_reading_screen.dart';
 
 /// "Keranjang Pelajari" view (`SPEC.md` §3.4) — lists the words currently
 /// selected to learn next, with a remove (x) action per word.
 ///
-/// The CTA to actually start the 3-phase flow ("Belajar Kata Ini dengan
-/// Cerita", `DESIGN_REFERENCE.md` §5.7) is shown for visual completeness
-/// but intentionally **disabled** (`onPressed: null`) — that flow is
-/// Milestone 7 (Storyfier core), explicitly out of scope for Milestone 4.
-/// Wiring it up is a later stage's job, not a redesign of this screen.
+/// The CTA starts the 3-phase flow (`sourceType: keranjangPelajari`,
+/// `DATA_MODEL.md` §4) — Milestone 7. The cart itself is **not** cleared
+/// here; per the project owner's Milestone 7 Decision 4, it's cleared
+/// only once the flow's first story generation actually succeeds
+/// (`LearningFlowController.generateStory`), so a failed first generate
+/// leaves the cart intact for the student to just retry.
 class LearningCartScreen extends ConsumerWidget {
   const LearningCartScreen({super.key});
 
@@ -42,11 +47,24 @@ class LearningCartScreen extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: FilledButton(
-            // TODO(Milestone 7): wire this to the real 3-phase Storyfier
-            // flow (SPEC.md §5, sourceType "keranjangPelajari") once it
-            // exists — this cart's current words become that session's
-            // wordIds. Left disabled on purpose for Milestone 4.
-            onPressed: null,
+            onPressed: items.isEmpty
+                ? null
+                : () {
+                    ref
+                        .read(learningFlowControllerProvider.notifier)
+                        .startFlow(
+                          // `currentUserProfileProvider` is already
+                          // resolved and non-null here — this screen is
+                          // only ever reachable while `AppAuthSignedIn`
+                          // (`app.dart`), which requires exactly that.
+                          studentId: ref.read(currentUserProfileProvider).value!.uid,
+                          wordIds: [for (final entry in items) entry.word],
+                          sourceType: LearningSessionSourceType.keranjangPelajari,
+                        );
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const StoryReadingScreen()),
+                    );
+                  },
             child: Text(
               items.isEmpty
                   ? 'Belajar Kata Ini dengan Cerita'

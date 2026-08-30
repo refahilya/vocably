@@ -42,4 +42,53 @@ void main() {
     expect(progress.masteryStatus, isNull);
     expect(progress.firstLearnedAt, isNull);
   });
+
+  group('Milestone 7 write-side helpers', () {
+    test('docId is exactly {studentId}_{wordId}', () {
+      expect(
+        LearningProgress.docId(studentId: 'student-1', wordId: 'run'),
+        'student-1_run',
+      );
+      // Multi-word phrases keep their internal space, same as
+      // normalizeWord()'s own convention.
+      expect(
+        LearningProgress.docId(studentId: 'student-1', wordId: 'wake up'),
+        'student-1_wake up',
+      );
+    });
+
+    test('newLearnedData always starts sudahDipelajari with the given masteryStatus', () {
+      final data = LearningProgress.newLearnedData(
+        studentId: 'student-1',
+        wordId: 'run',
+        masteryStatus: MasteryStatus.difficult,
+        lastSessionId: 'session-1',
+      );
+
+      expect(data['studentId'], 'student-1');
+      expect(data['wordId'], 'run');
+      expect(data['learnedStatus'], LearnedStatus.sudahDipelajari);
+      expect(data['masteryStatus'], MasteryStatus.difficult);
+      expect(data['lastSessionId'], 'session-1');
+      expect(data.containsKey('firstLearnedAt'), isTrue);
+      expect(data.containsKey('lastUpdatedAt'), isTrue);
+    });
+
+    test('touchData without masteryStatus only refreshes bookkeeping fields', () {
+      final data = LearningProgress.touchData(lastSessionId: 'session-2');
+
+      expect(data.keys.toSet(), {'lastUpdatedAt', 'lastSessionId'});
+      expect(data['lastSessionId'], 'session-2');
+    });
+
+    test('touchData with masteryStatus includes the upgrade', () {
+      final data = LearningProgress.touchData(
+        lastSessionId: 'session-2',
+        masteryStatus: MasteryStatus.mastered,
+      );
+
+      expect(data.keys.toSet(), {'lastUpdatedAt', 'lastSessionId', 'masteryStatus'});
+      expect(data['masteryStatus'], MasteryStatus.mastered);
+    });
+  });
 }

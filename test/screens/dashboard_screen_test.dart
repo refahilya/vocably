@@ -147,6 +147,51 @@ void main() {
 
       expect(find.byType(TargetWordListScreen), findsOneWidget);
     });
+
+    testWidgets(
+      'Milestone 7: the list\'s CTA starts the flow (sourceType targetGuru) and opens Fase 1',
+      (tester) async {
+        final targetWordSetService = _FakeTargetWordSetService()
+          ..sets = [
+            TargetWordSet(
+              id: 'set-1',
+              teacherId: 'teacher-1',
+              wordIds: const ['run'],
+              cefrLevel: 'A1',
+              startAt: DateTime(2020, 1, 1),
+              endAt: DateTime(2099, 12, 31),
+              targetStudentIds: const ['__all__'],
+              createdAt: DateTime(2020, 1, 1),
+            ),
+          ];
+        final bundleService = _FakeVocabBundleService()
+          ..byLevel = {
+            'A1': [
+              VocabBundleEntry(
+                word: 'run',
+                meanings: const [VocabMeaning(pos: 'verb', translation: 'lari')],
+                cefrLevel: 'A1',
+                topics: const [],
+              ),
+            ],
+          };
+
+        await _pumpDashboard(
+          tester,
+          profile: _studentProfile,
+          targetWordSetService: targetWordSetService,
+          vocabBundleService: bundleService,
+        );
+
+        await tester.tap(find.text('Target Kata Hari Ini'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('📖 Belajar Kata Ini dengan Cerita'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Baca Cerita'), findsOneWidget);
+      },
+    );
   });
 
   group('DashboardScreen — Level card', () {

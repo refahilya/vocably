@@ -29,9 +29,18 @@ import '../../../utils/normalize_word.dart';
 /// (e.g. `audioplayers`) that isn't on the approved dependency list
 /// (`CLAUDE.md` §6) — flagged for a decision, not added silently.
 class WordDetailScreen extends ConsumerWidget {
-  const WordDetailScreen({super.key, required this.entry});
+  const WordDetailScreen({super.key, required this.entry, this.hideCartAction = false});
 
   final VocabBundleEntry entry;
+
+  /// Milestone 7 Phase 2 Stage 7: `true` when this word is already one of
+  /// the active Learning Flow's target words (opened by tapping a
+  /// highlighted word in `story_reading_screen.dart`) — the "+ Pelajari"
+  /// cart toggle makes no sense there, since the word is already committed
+  /// to the in-progress session, not a candidate for the cart. Defaults to
+  /// `false` so every other caller (normal vocabulary browsing) is
+  /// unaffected.
+  final bool hideCartAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -52,6 +61,7 @@ class WordDetailScreen extends ConsumerWidget {
               entry: entry,
               lookupAsync: lookupAsync,
               inCart: inCart,
+              hideCartAction: hideCartAction,
               onToggleCart: () =>
                   ref.read(learningCartProvider.notifier).toggle(entry),
             ),
@@ -141,12 +151,14 @@ class _HeaderCard extends ConsumerWidget {
     required this.lookupAsync,
     required this.inCart,
     required this.onToggleCart,
+    this.hideCartAction = false,
   });
 
   final VocabBundleEntry entry;
   final AsyncValue<DictionaryLookupResult> lookupAsync;
   final bool inCart;
   final VoidCallback onToggleCart;
+  final bool hideCartAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -209,14 +221,15 @@ class _HeaderCard extends ConsumerWidget {
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(inCart ? Icons.check_circle : Icons.add_circle_outline),
-            color: inCart ? AppColors.success : AppColors.primary,
-            tooltip: inCart
-                ? 'Hapus dari Keranjang Pelajari'
-                : 'Tambah ke Keranjang Pelajari',
-            onPressed: onToggleCart,
-          ),
+          if (!hideCartAction)
+            IconButton(
+              icon: Icon(inCart ? Icons.check_circle : Icons.add_circle_outline),
+              color: inCart ? AppColors.success : AppColors.primary,
+              tooltip: inCart
+                  ? 'Hapus dari Keranjang Pelajari'
+                  : 'Tambah ke Keranjang Pelajari',
+              onPressed: onToggleCart,
+            ),
         ],
       ),
     );

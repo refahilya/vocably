@@ -68,4 +68,51 @@ class LearningProgress {
       lastSessionId: data['lastSessionId'] as String,
     );
   }
+
+  /// `docId` for the `learningProgress/{studentId}_{wordId}` document
+  /// (`DATA_MODEL.md` §3) — the one and only place this format is
+  /// computed, so every writer/reader agrees on it.
+  static String docId({required String studentId, required String wordId}) =>
+      '${studentId}_$wordId';
+
+  /// The write map for a **brand-new** progress doc — a word's very first
+  /// time being learned (`DATA_MODEL.md` §3 rule 1: default
+  /// `masteryStatus: difficult`, `learnedStatus: sudahDipelajari`
+  /// immediately, no in-between state). [masteryStatus] is passed in
+  /// (rather than hardcoded) so the single source of truth for "what does
+  /// a first-time learn default to" stays `utils/mastery_rules.dart`'s
+  /// `initialMasteryStatus()`, not duplicated here.
+  static Map<String, dynamic> newLearnedData({
+    required String studentId,
+    required String wordId,
+    required String masteryStatus,
+    required String lastSessionId,
+  }) {
+    return {
+      'studentId': studentId,
+      'wordId': wordId,
+      'learnedStatus': LearnedStatus.sudahDipelajari,
+      'masteryStatus': masteryStatus,
+      'firstLearnedAt': FieldValue.serverTimestamp(),
+      'lastUpdatedAt': FieldValue.serverTimestamp(),
+      'lastSessionId': lastSessionId,
+    };
+  }
+
+  /// The write map for touching an **existing** progress doc again —
+  /// either just bookkeeping (`lastUpdatedAt`/`lastSessionId` refreshed,
+  /// `masteryStatus` unchanged) or an actual mastery upgrade
+  /// (`masteryStatus` included). `learnedStatus`/`firstLearnedAt` are
+  /// never part of this map — once a word is learned, those two fields
+  /// never change again.
+  static Map<String, dynamic> touchData({
+    required String lastSessionId,
+    String? masteryStatus,
+  }) {
+    return {
+      'lastUpdatedAt': FieldValue.serverTimestamp(),
+      'lastSessionId': lastSessionId,
+      'masteryStatus': ?masteryStatus,
+    };
+  }
 }

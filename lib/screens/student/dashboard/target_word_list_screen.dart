@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../models/learning_session.dart';
 import '../../../models/vocab_bundle_entry.dart';
 import '../../../providers/dashboard_providers.dart';
+import '../../../providers/learning_session_controller.dart';
 import '../../../theme/theme.dart';
+import '../learning_flow/story_reading_screen.dart';
 import '../vocab_browser/word_detail_screen.dart';
 
 /// "Target Kata Hari Ini" → tap → this list (`DESIGN_REFERENCE.md` §5.1:
 /// "Tap → daftar kata target (list, bukan grid chip, karena urutannya
 /// ditentukan guru)").
 ///
-/// **The CTA is deliberately present but inert** — "Belajar Kata Ini
-/// dengan Cerita" starts the 3-phase flow, which is Milestone 7. Keeping
-/// the button visible (disabled, with an explanatory caption) rather than
-/// omitting it keeps the screen honest about what's coming without
-/// implying the feature works today.
+/// The CTA starts the 3-phase flow (`sourceType: targetGuru`,
+/// `DATA_MODEL.md` §4) — Milestone 7.
 class TargetWordListScreen extends ConsumerWidget {
   const TargetWordListScreen({super.key, required this.studentId});
 
@@ -45,19 +45,20 @@ class TargetWordListScreen extends ConsumerWidget {
             ),
           ),
         ),
-        data: (entries) => _TargetWordListBody(entries: entries),
+        data: (entries) => _TargetWordListBody(studentId: studentId, entries: entries),
       ),
     );
   }
 }
 
-class _TargetWordListBody extends StatelessWidget {
-  const _TargetWordListBody({required this.entries});
+class _TargetWordListBody extends ConsumerWidget {
+  const _TargetWordListBody({required this.studentId, required this.entries});
 
+  final String studentId;
   final List<VocabBundleEntry> entries;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (entries.isEmpty) {
       // DESIGN_REFERENCE.md §5.8: "Guru belum men-set target kata".
       return const Center(
@@ -98,15 +99,20 @@ class _TargetWordListBody extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  // Milestone 7 (Storyfier core) wires this up.
-                  onPressed: null,
+                  onPressed: () {
+                    ref
+                        .read(learningFlowControllerProvider.notifier)
+                        .startFlow(
+                          studentId: studentId,
+                          wordIds: [for (final entry in entries) entry.word],
+                          sourceType: LearningSessionSourceType.targetGuru,
+                        );
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const StoryReadingScreen()),
+                    );
+                  },
                   child: const Text('📖 Belajar Kata Ini dengan Cerita'),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              const Text(
-                'Segera hadir di Milestone berikutnya.',
-                style: AppTextStyles.caption,
               ),
             ],
           ),

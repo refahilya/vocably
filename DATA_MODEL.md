@@ -478,6 +478,18 @@ bukan redesain arsitektur.
 Satu dokumen per sesi belajar 3-fase. Ini sumber data untuk Riwayat
 Pembelajaran tab "per sesi" (SPEC §3.6).
 
+> **`docId` (klarifikasi Milestone 7):** dokumen ini **tidak** punya
+> aturan docId deterministik seperti `learningProgress`'s
+> `{studentId}_{wordId}` (§3) — setiap sesi baru dibuat dengan
+> auto-generated id (`.add()`), karena tidak ada kombinasi field yang
+> secara alami unik per sesi (satu siswa bisa punya banyak sesi untuk
+> kata target yang sama, kapan saja). **Tidak ada perilaku "resume"** —
+> tiap kali salah satu dari tiga entry point (§5 di bawah) memulai alur
+> 3 fase, selalu dibuat dokumen baru; sesi yang ditinggal di tengah jalan
+> (lihat catatan TBD di bawah) tetap tersimpan apa adanya di fase
+> terakhirnya, tidak pernah dilanjutkan ulang lewat query apa pun
+> (keputusan eksplisit pemilik proyek, Milestone 7).
+
 | Field | Tipe | Keterangan |
 |---|---|---|
 | `studentId` | string | |
@@ -567,14 +579,17 @@ Pembelajaran tab "per sesi" (SPEC §3.6).
 > dan asal `wordIds` (kata berlabel `difficult` yang dipilih siswa dari
 > Riwayat).
 
-> **TBD — sesi yang ditinggal/tidak selesai (belum diputuskan).** Sebuah
-> dokumen bisa tertinggal selamanya di `currentPhase = "membaca"` (atau fase
-> lain) kalau siswa keluar di tengah jalan. Belum diputuskan: apakah sesi
-> semacam ini harus bisa dilanjutkan (resume), harus tetap muncul di Riwayat
-> tab "per sesi" sebagai belum selesai, atau ditangani dengan cara lain.
-> **Jangan mengasumsikan atau mengimplementasikan salah satu perilaku ini**
-> sebelum didiskusikan eksplisit — ini perlu diputuskan sebelum Milestone 7
-> (fitur 3 fase) dikerjakan.
+> **Sesi yang ditinggal/tidak selesai — diputuskan di Milestone 7 (dulu
+> TBD di v6).** Sebuah dokumen bisa tertinggal selamanya di `currentPhase
+> = "membaca"` (atau fase lain) kalau siswa keluar di tengah jalan.
+> **Keputusan final (pemilik proyek):** **tidak ada perilaku resume sama
+> sekali** — entry point mana pun selalu membuat dokumen sesi baru,
+> tidak pernah mencari/melanjutkan sesi lama yang belum selesai. Sesi
+> yang tertinggal tetap tersimpan apa adanya di fase terakhirnya, dan
+> tetap muncul di Riwayat tab "per sesi" **tanpa** penanda visual
+> "belum selesai" terpisah — dirender sama seperti sesi yang sudah
+> selesai. Konsekuensinya: **tidak ada query/index baru** untuk mencari
+> sesi tak-selesai milik seorang siswa.
 
 > **Perhitungan mastery dari sesi ini:** `clozeTestResult` dan
 > `cowriteWordsUsedCorrectly` yang dipakai untuk menghitung `masteryStatus`

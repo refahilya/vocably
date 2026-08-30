@@ -40,6 +40,22 @@ class CowriteTurn {
       usedSuggestion: data['usedSuggestion'] as bool,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'sender': sender,
+      'text': text,
+      'feedback': feedback,
+      'usedSuggestion': usedSuggestion,
+    };
+  }
+}
+
+/// `learningSessions.cowriteTranscript`/`sender` values (`DATA_MODEL.md`
+/// §4).
+abstract final class CowriteSender {
+  static const String siswa = 'siswa';
+  static const String ai = 'ai';
 }
 
 /// A `learningSessions/{docId}` document (`DATA_MODEL.md` §4) — one
@@ -179,5 +195,56 @@ class LearningSession {
         'this document: ${data.keys.toList()}. Underlying error: $error',
       );
     }
+  }
+
+  /// The write map for a session's **first** Firestore write — the moment
+  /// Fase 1's first successful `/generate-story` call returns
+  /// (`DATA_MODEL.md` §4: "Dokumen `learningSessions` mulai dibuat/di-
+  /// upsert sejak cerita pertama berhasil di-generate"). `currentPhase`
+  /// always starts at [LearningSessionPhase.membaca];
+  /// `clozeTestResult`/`cowriteTranscript`/`cowriteWordsUsedCorrectly`
+  /// start empty (nothing from later phases exists yet); `completedAt`
+  /// starts `null`. Uses `FieldValue.serverTimestamp()` for `startedAt`,
+  /// the same pattern `AppUser.newStudentData()` uses for `createdAt` —
+  /// not a concrete client [Timestamp].
+  static Map<String, dynamic> newSessionData({
+    required String studentId,
+    required List<String> wordIds,
+    required String sourceType,
+    required String storyTitle,
+    required String storyContent,
+    required String? storyTranslation,
+  }) {
+    return {
+      'studentId': studentId,
+      'wordIds': wordIds,
+      'sourceType': sourceType,
+      'currentPhase': LearningSessionPhase.membaca,
+      'storyTitle': storyTitle,
+      'storyContent': storyContent,
+      'storyTranslation': storyTranslation,
+      'clozeTestResult': <String, bool>{},
+      'cowriteTranscript': <Map<String, dynamic>>[],
+      'cowriteWordsUsedCorrectly': <String>[],
+      'startedAt': FieldValue.serverTimestamp(),
+      'completedAt': null,
+    };
+  }
+
+  /// The write map for a **regenerate** while still in
+  /// [LearningSessionPhase.membaca] — overwrites only the story fields
+  /// (`DATA_MODEL.md` §4: "tiap kali siswa menekan Generate ulang... field
+  /// storyTitle/storyContent/storyTranslation ditimpa langsung"). Never
+  /// touches `wordIds`/`sourceType`/`currentPhase`/any later-phase field.
+  static Map<String, dynamic> storyUpdateData({
+    required String storyTitle,
+    required String storyContent,
+    required String? storyTranslation,
+  }) {
+    return {
+      'storyTitle': storyTitle,
+      'storyContent': storyContent,
+      'storyTranslation': storyTranslation,
+    };
   }
 }

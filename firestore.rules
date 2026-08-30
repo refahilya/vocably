@@ -177,19 +177,182 @@ service cloud.firestore {
     // collections are owned per-document by `studentId` — read is
     // restricted to that student, unlike `vocabWords`/`topics`/
     // `targetWordSets` above (there's no reason a *different* student
-    // should ever read another's progress/session history). Write stays
-    // denied: nothing produces this data until Milestone 7 builds the
-    // actual 3-phase flow, and `DATA_MODEL.md` §3's mastery
-    // transition rules (no `mastered` → `difficult`) need to be written
-    // and tested alongside that real writer, not guessed at now.
+    // should ever read another's progress/session history).
+    //
+    // Milestone 7: real write rules, matching
+    // `LearningProgressService`/`LearningSessionService`'s actual write
+    // shapes exactly (`DATA_MODEL.md` §3/§4). No per-element array/map
+    // iteration anywhere (`CLAUDE.md` §6) — every check below is a
+    // whole-field type/size/equality check, never a per-entry one.
     match /learningProgress/{docId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
-      allow write: if false;
+      // Milestone 7 Phase 2 Stage 5 fix: ownership is checked via the
+      // `docId`'s own `{studentId}_` prefix, not `resource.data.studentId`.
+      // The latter dereferences `resource.data`, and `resource` is `null`
+      // when the target document doesn't exist yet — which is exactly the
+      // case every time a student learns a word for the very first time
+      // (`LearningProgressService.recordClozeCompletion`'s read-then-
+      // create-if-absent transaction always reads the doc before knowing
+      // whether it exists). Dereferencing `.data` on a `null` `resource`
+      // throws during rule evaluation, and Firestore denies the whole
+      // request as `permission-denied` rather than treating it as "not
+      // found" — this was blocking Fase 2→3 completion for every
+      // first-time word (Milestone 7 Phase 2 diagnostic report, Bug 2).
+      //
+      // `docId.split('_')[0]` always yields exactly the `studentId`
+      // segment, regardless of what `wordId` contains — a Firebase Auth
+      // uid never itself contains `_`, so the first split segment is
+      // always the whole uid, and everything after the first `_` is the
+      // rest of the docId (the create rule below is what actually
+      // enforces `docId == studentId + '_' + wordId` in the first place).
+      // For any document that was ever validly created this is exactly
+      // equivalent to `resource.data.studentId == request.auth.uid` — not
+      // a weaker check, just one that also works before the document
+      // exists, and one that never touches `resource` at all.
+      //
+      // Milestone 7 Phase 2 Stage 6 fix: that docId-only condition broke
+      // `LearningProgressService.fetchForStudent`'s `.where('studentId',
+      // isEqualTo: ...)` query (Riwayat "Per Kata") — Firestore can only
+      // allow a `list`/query request when it can *statically* prove every
+      // possible result satisfies the rule by matching the rule's
+      // condition against the query's own `where()` clause, and it can
+      // only do that for a condition on `resource.data`, never one
+      // derived from `docId`. The two access patterns need different,
+      // OR'd conditions: the first branch below is what makes the
+      // single-document `get()`/transaction case above work (never
+      // touches `resource`); the second is the original `resource.data`
+      // condition, restored so Firestore can once again statically verify
+      // it against `fetchForStudent`'s query. `||` short-circuits, so a
+      // legitimate owner's single-document read never evaluates the
+      // second branch (avoiding the original null-`resource` failure),
+      // while the query path is satisfied by the second branch exactly as
+      // it was before Stage 5. Neither branch is broader than "this is my
+      // own document" — this is not a weaker rule, just two equivalent
+      // expressions of the same ownership check, each usable by a
+      // different Firestore operation.
+      allow read: if request.auth != null
+        && (
+          docId.split('_')[0] == request.auth.uid
+          || resource.data.studentId == request.auth.uid
+        );
+
+      // `docId` must be exactly `{studentId}_{wordId}` (`DATA_MODEL.md`
+      // §3) — checked here, not trusted from the client, so a doc can
+      // never be created under a mismatched id.
+      //
+      // `masteryStatus` always starts `difficult` on `create`
+      // (`LearningProgressService.recordClozeCompletion`'s
+      // `newLearnedData` — `DATA_MODEL.md` §3 rule 1: a word is never
+      // created already `mastered`, that only ever happens via a later
+      // `update`).
+      allow create: if isOwner(request.resource.data.studentId)
+        && docId == request.resource.data.studentId + '_' + request.resource.data.wordId
+        && request.resource.data.wordId is string
+        && request.resource.data.wordId.size() > 0
+        && request.resource.data.learnedStatus == 'sudahDipelajari'
+        && request.resource.data.masteryStatus == 'difficult'
+        && request.resource.data.firstLearnedAt == request.time
+        && request.resource.data.lastUpdatedAt == request.time
+        && request.resource.data.lastSessionId is string
+        && request.resource.data.lastSessionId.size() > 0
+        && request.resource.data.keys().hasOnly([
+             'studentId', 'wordId', 'learnedStatus', 'masteryStatus',
+             'firstLearnedAt', 'lastUpdatedAt', 'lastSessionId'
+           ]);
+
+      // `studentId`/`wordId`/`learnedStatus`/`firstLearnedAt` are
+      // immutable once created — only `lastUpdatedAt`/`lastSessionId`
+      // (bookkeeping, every touch) and `masteryStatus` (only on an
+      // actual upgrade) may ever change. The last clause is
+      // `DATA_MODEL.md` §3 rule 3's permanence rule, enforced here as
+      // well as in `utils/mastery_rules.dart`: once `mastered`, a write
+      // that tries to set anything else is rejected outright.
+      allow update: if isOwner(resource.data.studentId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['lastUpdatedAt', 'lastSessionId', 'masteryStatus'])
+        && request.resource.data.lastUpdatedAt == request.time
+        && request.resource.data.lastSessionId is string
+        && request.resource.data.lastSessionId.size() > 0
+        && request.resource.data.masteryStatus in ['difficult', 'mastered']
+        && !(resource.data.masteryStatus == 'mastered'
+             && request.resource.data.masteryStatus != 'mastered');
+
+      allow delete: if false;
     }
 
     match /learningSessions/{docId} {
       allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
-      allow write: if false;
+
+      // First write of a session — Fase 1's first successful generate
+      // (`DATA_MODEL.md` §4). Always starts at `currentPhase: membaca`
+      // with every later-phase field at its empty/`null` default —
+      // nothing can ever create a session that starts mid-flow.
+      allow create: if isOwner(request.resource.data.studentId)
+        && request.resource.data.wordIds is list
+        && request.resource.data.wordIds.size() > 0
+        && request.resource.data.sourceType in
+             ['keranjangPelajari', 'targetGuru', 'pelajariUlangDifficult']
+        && request.resource.data.currentPhase == 'membaca'
+        && request.resource.data.storyTitle is string
+        && request.resource.data.storyContent is string
+        && request.resource.data.storyContent.size() > 0
+        && request.resource.data.clozeTestResult == {}
+        && request.resource.data.cowriteTranscript == []
+        && request.resource.data.cowriteWordsUsedCorrectly == []
+        && request.resource.data.startedAt == request.time
+        && request.resource.data.completedAt == null
+        && request.resource.data.keys().hasOnly([
+             'studentId', 'wordIds', 'sourceType', 'currentPhase', 'storyTitle',
+             'storyContent', 'storyTranslation', 'clozeTestResult',
+             'cowriteTranscript', 'cowriteWordsUsedCorrectly', 'startedAt', 'completedAt'
+           ]);
+
+      // Five, and only five, update shapes exist — one per write this
+      // app's services actually perform. `studentId`/`wordIds`/
+      // `sourceType`/`startedAt` are never in any of them, i.e.
+      // immutable for the life of the document.
+      allow update: if isOwner(resource.data.studentId) && (
+        // (a) Fase 1 "Generate ulang" — only while still `membaca`
+        // (`DATA_MODEL.md` §4: story fields "ditimpa langsung" only
+        // during that phase).
+        (resource.data.currentPhase == 'membaca'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['storyTitle', 'storyContent', 'storyTranslation'])
+          && request.resource.data.storyContent is string
+          && request.resource.data.storyContent.size() > 0)
+        ||
+        // (b) Fase 1 → Fase 2 "Selanjutnya" — locks the story by moving
+        // the phase forward only; no story field changes here.
+        (resource.data.currentPhase == 'membaca'
+          && request.resource.data.currentPhase == 'clozeTest'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentPhase']))
+        ||
+        // (c) Fase 2 → Fase 3 — final `clozeTestResult` + phase together
+        // (`DATA_MODEL.md` §4: write the whole map at once).
+        (resource.data.currentPhase == 'clozeTest'
+          && request.resource.data.currentPhase == 'coWrite'
+          && request.resource.data.clozeTestResult is map
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['clozeTestResult', 'currentPhase']))
+        ||
+        // (d) Fase 3 — transcript saved after every turn, phase
+        // unchanged.
+        (resource.data.currentPhase == 'coWrite'
+          && request.resource.data.cowriteTranscript is list
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['cowriteTranscript']))
+        ||
+        // (e) Fase 3 → `selesai` — the session's final write.
+        (resource.data.currentPhase == 'coWrite'
+          && request.resource.data.currentPhase == 'selesai'
+          && request.resource.data.cowriteTranscript is list
+          && request.resource.data.cowriteWordsUsedCorrectly is list
+          && request.resource.data.completedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'cowriteTranscript', 'cowriteWordsUsedCorrectly', 'currentPhase', 'completedAt'
+             ]))
+      );
+
+      allow delete: if false;
     }
 
     // Milestone 6 scaffolds these two read paths for forward-compatibility

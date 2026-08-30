@@ -42,6 +42,20 @@ several pre-existing ones) while still reporting "All tests passed!"
 with a clean exit code — `--concurrency=1` reliably runs the complete
 suite instead. See §5i and §9 for the full finding and its evidence.
 
+**Milestone 7 (Storyfier core — 3-phase learning flow) is now
+implemented** (§5j) — the full read→cloze→co-write flow, reachable from
+all three documented entry points (Target Kata Hari Ini, Keranjang
+Pelajari, Pelajari Kembali), writing real `learningSessions`/
+`learningProgress` data and reflected back in Riwayat. Implemented per
+four decisions the project owner made explicit before implementation
+(no resume behavior; "Pelajari Kembali" uses the whole `difficult`-filtered
+list, no checkbox selection; `learningProgress` written immediately after
+cloze submission, upgraded after co-write; the learning cart clears only
+once the first generate succeeds). **Automated-test-verified only** —
+`firestore.rules`'s new write rules are written but not deployed, and
+nothing in this milestone has been manually clicked through in a real
+browser against the real Worker yet. See §5j/§7/§9.
+
 ## 2. Milestone History
 
 | # | Milestone | Status |
@@ -50,9 +64,9 @@ suite instead. See §5i and §9 for the full finding and its evidence.
 | 2 | Auth: sign up, login, role-based routing | **Complete, pushed** |
 | 3 | Design system / theme layer + responsive nav shell | **Complete, pushed** |
 | 4 | Vocab module: `vocabWords`, CSV import, CEFR bundles, browse, DictionaryAPI, TTS | **Complete, pushed** (real data seeded, a post-seed Firestore-index bug found and fixed — see §5b; pagination-bar overflow fix — see §5f) |
-| 5 | Cloudflare Worker + guru "Tambah Kosakata" | **Complete — implemented, deployed, and manually verified end-to-end (§5g/§5h). Uncommitted in both repos — see §10.** |
-| 6 | Student dashboard + Riwayat + Placement/Pre-Post-Test scaffolds | **Implemented (§5i) — automated tests passing, `flutter analyze` clean. NOT yet deployed (`firestore.rules`/`firestore.indexes.json` changes pending) or manually verified in a real browser. Uncommitted — see §10.** |
-| 7 | Storyfier core (3-phase learning flow) | Not started |
+| 5 | Cloudflare Worker + guru "Tambah Kosakata" | **Complete — implemented, deployed, and manually verified end-to-end (§5g/§5h). Committed (`25b4de0`) — see §10.** |
+| 6 | Student dashboard + Riwayat + Placement/Pre-Post-Test scaffolds | **Implemented (§5i) — automated tests passing, `flutter analyze` clean. Committed (`c5c6c66`) — see §10. Deploying `firestore.rules`/`firestore.indexes.json` and a real browser click-through are still outstanding (§7).** |
+| 7 | Storyfier core (3-phase learning flow) | **Implemented (§5j) — automated tests passing, `flutter analyze` clean. NOT yet deployed (`firestore.rules` write rules pending) or manually verified in a real browser against the real Worker. Uncommitted — see §10.** |
 | 8 | Guru: Set Target Kata + Edit Kata | Not started |
 
 ### Milestone 4 stage detail
@@ -93,13 +107,18 @@ lib/
   models/
     app_user.dart, vocab_word.dart, vocab_bundle_entry.dart, dictionary_entry.dart,
     topic.dart,                                           # Milestone 5
-    target_word_set.dart, learning_progress.dart, learning_session.dart  # Milestone 6
+    target_word_set.dart, learning_progress.dart, learning_session.dart  # Milestone 6; gained
+                                                            # write-side helpers in Milestone 7
   services/
     firebase_service.dart, auth_service.dart, user_service.dart,
     vocab_bundle_service.dart, dictionary_api_service.dart, tts_service.dart,
-    ai_worker_service.dart, vocab_word_service.dart, topics_service.dart,  # Milestone 5
+    ai_worker_service.dart, vocab_word_service.dart, topics_service.dart,  # Milestone 5;
+                                                            # ai_worker_service.dart gained
+                                                            # generateStory()/cowriteTurn() in
+                                                            # Milestone 7
     target_word_set_service.dart, learning_progress_service.dart,
-    learning_session_service.dart                          # Milestone 6 — all read-only
+    learning_session_service.dart                          # Milestone 6, read-only; the latter
+                                                            # two gained write methods in Milestone 7
   providers/
     auth_providers(+.g), sign_up_controller(+.g), login_controller(+.g),
     complete_registration_controller(+.g), vocab_bundle_providers(+.g),
@@ -108,24 +127,33 @@ lib/
     ai_worker_providers(+.g), vocab_management_providers(+.g),
     lazy_translation_providers(+.g),                       # Milestone 5
     dashboard_providers(+.g), history_providers(+.g),
-    placement_test_providers(+.g)                          # Milestone 6
+    placement_test_providers(+.g),                         # Milestone 6
+    learning_session_controller(+.g), word_lookup_providers(+.g)  # Milestone 7
   screens/
     auth/login_screen.dart, sign_up_screen.dart, complete_registration_screen.dart
     student/
-      dashboard/dashboard_screen.dart, target_word_list_screen.dart   # Milestone 6 — replaces the old placeholder
-      history/history_screen.dart, session_detail_screen.dart          # Milestone 6 — replaces the old placeholder
+      dashboard/dashboard_screen.dart, target_word_list_screen.dart   # Milestone 6; CTA wired
+                                                            # up in Milestone 7
+      history/history_screen.dart, session_detail_screen.dart          # Milestone 6; "Pelajari
+                                                            # Kembali" wired up in Milestone 7
       placement_test/placement_test_offer_screen.dart,
         placement_test_placeholder_screen.dart              # Milestone 6, scaffold only
       research_assessment/research_assessment_placeholder_screen.dart  # Milestone 6, scaffold only
+      learning_flow/story_reading_screen.dart, cloze_test_screen.dart,
+        cowrite_screen.dart                                 # Milestone 7 — Fase 1/2/3
       vocab_browser/vocab_browser_screen.dart, learning_cart_screen.dart, word_detail_screen.dart
+                                                            # learning_cart_screen.dart's CTA
+                                                            # wired up in Milestone 7
     teacher/
       target_words/target_words_placeholder.dart
       vocab_management/tambah_kosakata_screen.dart   # Milestone 5 — replaces the old placeholder
   theme/theme.dart
   utils/role.dart, normalize_word.dart, vocab_browse_filter.dart, vocab_bundle_constants.dart,
     cefr_levels.dart, topic_slug.dart, worker_config.dart,  # Milestone 5
-    target_word_constants.dart, story_markers.dart, session_date_format.dart  # Milestone 6
-  widgets/app_nav_shell.dart, mastery_badge.dart              # mastery_badge.dart: Milestone 6
+    target_word_constants.dart, story_markers.dart, session_date_format.dart,  # Milestone 6
+    mastery_rules.dart, cloze_blanks.dart                   # Milestone 7
+  widgets/app_nav_shell.dart, mastery_badge.dart,             # mastery_badge.dart: Milestone 6
+    stepper_header.dart                                     # Milestone 7
 
 tools/vocab_import/            # separate Node.js tool, not part of the Flutter app — see §5
   bin/merge.js, translate.js, seed_firestore.js, generate_bundles.js
@@ -724,15 +752,199 @@ place).
 screens; confirming the placement-test offer's real Firestore write
 actually satisfies the (unchanged) rules against the live project.
 
+## 5j. Milestone 7 — Storyfier Core (3-Phase Learning Flow)
+
+Implemented per a project-owner-approved analysis + plan, with four
+decisions made explicit before implementation began:
+
+1. **No resume behavior.** Every entry into the flow always creates a
+   brand-new `learningSessions` document via `LearningSessionService.
+   createSession` — never a query that looks for an existing incomplete
+   one. An abandoned/incomplete session simply stays at its last
+   persisted phase forever; Riwayat "Per Sesi" shows it exactly like a
+   finished one, no separate incomplete-state UI. No new query, no new
+   index.
+2. **"Pelajari Kembali" relearns every word currently shown by the
+   `difficult` filter** in Riwayat's "Per Kata" tab — no per-word
+   checkbox selection was added.
+3. **`learningProgress` is written in two steps**, not once at the end:
+   immediately after cloze-test submission (`LearningProgressService.
+   recordClozeCompletion` — every session word becomes `learnedStatus:
+   sudahDipelajari` with a default `masteryStatus: difficult` the first
+   time it's ever learned), then again after co-write completes
+   (`recordCowriteCompletion` — upgrades to `mastered` only for words
+   correct in cloze **and** used independently in co-write). This is what
+   makes `DATA_MODEL.md` §3 rule 1's own stated purpose (a session
+   abandoned before Fase 3 still records something) actually true.
+4. **The learning cart clears only once the flow's first `/generate-story`
+   call actually succeeds** (`LearningFlowController.generateStory`) — a
+   failed first generate leaves the cart untouched.
+
+**Scope implemented — the full flow, end-to-end, all three entry points:**
+- **Fase 1 — Baca Cerita** (`story_reading_screen.dart`): title input →
+  `AiWorkerService.generateStory()` → highlighted story (reusing
+  `utils/story_markers.dart`'s parser and the exact `RichText`/`TextSpan`
+  highlight pattern `session_detail_screen.dart` already established) →
+  tap a highlighted word → dictionary lookup (`resolveWordAcrossLevelsProvider`,
+  new — the same "scan every CEFR level" pattern `historyWordEntriesProvider`
+  already used, factored out for reuse). Regenerate overwrites the
+  displayed story and the Firestore doc's story fields; "Selanjutnya"
+  locks the phase forward with no story-field rewrite (the fields are
+  already current from the last generate).
+- **Fase 2 — Cloze Test** (`cloze_test_screen.dart`, `utils/cloze_blanks.dart`):
+  blanks derived purely from `story_markers.dart`'s parsed output — no
+  AI call, one blank per target word (first occurrence only, per
+  `DATA_MODEL.md` §4). Submit reveals live-recomputed grading colors;
+  answers can still be changed afterward (`SPEC.md` §5.2's "iteratif"),
+  recoloring immediately. "Selanjutnya" grades from whatever's currently
+  selected, writes the final `clozeTestResult`, and immediately runs
+  Decision 3's first `learningProgress` write.
+- **Fase 3 — Co-write** (`cowrite_screen.dart`): chat-style turns against
+  `AiWorkerService.cowriteTurn()`. Target-word pills show "used"
+  (any turn, correct) vs. not; the conversation auto-stops once every
+  target word is used and shows a "✓ Selesai" banner. Two tracked word
+  sets: every correctly-used word (drives the pills + stop condition) and
+  the "mandiri" subset used correctly **without** having requested "saran
+  menulis" on that turn (drives `cowriteWordsUsedCorrectly` and the
+  eventual mastery upgrade) — a turn is disqualified the moment "Saran
+  menulis" is tapped for it, regardless of whether the sent text matches
+  the suggestion verbatim, per `DATA_MODEL.md` §10.2's "mandiri" wording.
+  The transcript is saved to Firestore after **every** turn (not only at
+  the end), so Decision 1's "stays at its last persisted state" actually
+  means something for an abandoned Fase 3. "✓ Selesai" writes the
+  session's final fields and runs Decision 3's second `learningProgress`
+  write.
+- **A documented, deliberate interpretation of an underspecified Worker
+  interaction:** `vocably-ai-worker/src/handlers/cowriteTurn.ts`'s
+  contract grades "the student's most recent turn" and returns the AI's
+  next turn — a single call that doesn't have a clean shape for "give me
+  a suggestion before I've written anything." `LearningFlowController.
+  requestSuggestion` resolves this by re-sending the unchanged transcript
+  with `requestSuggestion: true` and keeping only the response's
+  `suggestion` field — the `aiTurn`/`feedback`/`wordsUsedCorrectly` that
+  come back alongside it (which would just re-describe the already-
+  processed previous turn) are discarded, not appended again. This is an
+  implementation decision made to resolve a genuine contract ambiguity
+  sensibly, not a change to the Worker's actual request/response contract
+  itself (both fields, both endpoints, are otherwise used exactly as
+  `DATA_MODEL.md` §10.2 documents).
+- **All three entry points wired up, their previously-inert CTAs now
+  live:** `LearningCartScreen` (`sourceType: keranjangPelajari`),
+  `TargetWordListScreen` (`sourceType: targetGuru`), and Riwayat's
+  `_PerKataTab`'s "Pelajari Kembali" (`sourceType: pelajariUlangDifficult`,
+  Decision 2). Each "Segera hadir di Milestone berikutnya" caption is
+  gone from exactly these three buttons — nothing else in Milestone 6's
+  UI was touched.
+- **New pure utilities**, both fully unit-tested and free of any
+  Firestore/Riverpod dependency: `utils/mastery_rules.dart`
+  (`initialMasteryStatus()`/`upgradedMasteryStatus()` — the entire
+  `DATA_MODEL.md` §3 state machine in one place) and `utils/cloze_blanks.dart`
+  (`buildClozeSegments()`/`gradeClozeAnswers()`, built on top of
+  `story_markers.dart`, never a new marker-parsing implementation).
+- **New `lib/providers/learning_session_controller.dart`** —
+  `LearningFlowController`, a `@Riverpod(keepAlive: true)` notifier (same
+  cross-screen-survival reasoning as `LearningCart`) holding one
+  in-progress flow's entire state (`studentId`, deduped `wordIds`,
+  `sourceType`, `sessionId`, story fields, cloze answers/result, co-write
+  transcript/word-tracking) and orchestrating every Firestore write at
+  exactly the point `DATA_MODEL.md` §3/§4 and the four decisions above
+  specify. Deliberately takes `studentId` as an explicit parameter to
+  `startFlow` (passed by each entry-point screen) rather than reading
+  Firebase Auth state internally — keeps the whole flow drivable/testable
+  with a plain string, with zero Firebase Auth involved in its own tests.
+- **`AiWorkerService` gained `generateStory()`/`cowriteTurn()`** — the
+  Worker side of both was already fully implemented and tested (Milestone
+  5); only the Flutter-side callers were missing. Same
+  `AiWorkerException`-on-any-failure pattern `translate()` already
+  established; a shared `_postJson` helper was factored out of the three
+  now-near-identical request/response/error-handling bodies.
+- **`LearningSession`/`LearningProgress` gained write-side helpers**
+  (`newSessionData`/`storyUpdateData`, `docId`/`newLearnedData`/
+  `touchData`) and **`LearningSessionService`/`LearningProgressService`
+  gained real write methods** — `createSession`/`overwriteStory`/
+  `advanceToClozeTest`/`recordClozeResult`/`saveCowriteTranscript`/
+  `completeSession`, and `recordClozeCompletion`/`recordCowriteCompletion`
+  respectively. The latter two run one Firestore transaction **per word**
+  (not one transaction spanning the whole word list) so that the
+  no-downgrade mastery check is atomic per document without contention
+  across unrelated words — the same read-then-decide-then-write shape
+  `VocabWordService.appendMeaning` already established for a similar
+  correctness requirement (Milestone 5).
+- **`firestore.rules`** — real write rules for `learningSessions`/
+  `learningProgress`, replacing their Milestone 6 `allow write: if false`
+  placeholders. Five distinct `learningSessions` update shapes (one per
+  actual write this session performs) and a `learningProgress` update
+  rule that structurally rejects any attempt to change `masteryStatus`
+  away from `mastered` — matching `LearningProgressService`'s real write
+  shapes exactly, not guessed at in advance. No per-element array/map
+  iteration anywhere (`CLAUDE.md` §6). **No new composite index** — every
+  write is a single-document `set()`/`update()`, never a query.
+- **No Worker-side changes** — both endpoints (`/generate-story`,
+  `/cowrite-turn`) were already fully implemented and tested in
+  `vocably-ai-worker/` since Milestone 5; this milestone was purely the
+  first Flutter-side consumer of them. Re-verified unchanged: `npm test`
+  61/61, `npm run typecheck` clean.
+- **No new dependency** — both new Worker calls reuse the `http` package
+  already brought in for `AiWorkerService.translate()`.
+
+**Tests added:** `test/utils/mastery_rules_test.dart` (7 — every
+combination of first-learn/upgrade/permanent-mastered),
+`test/utils/cloze_blanks_test.dart` (7 — segment derivation including the
+repeated-word case, grading including unanswered blanks),
+`test/services/ai_worker_service_test.dart` (+7 — `generateStory`/
+`cowriteTurn` success/structured-error/malformed-response/network-failure),
+`test/models/learning_session_test.dart` (+3 — the new write-side
+helpers), `test/models/learning_progress_test.dart` (+4 — `docId`/
+`newLearnedData`/`touchData`),
+`test/providers/learning_session_controller_test.dart` (14, new — the
+whole flow end-to-end against fake `AiWorkerService`/
+`LearningSessionService`/`LearningProgressService`, including the cart-
+clear-only-on-first-success case, the suggestion-disqualifies-the-turn
+case, and the full cloze→co-write→completion mastery-write path),
+`test/providers/word_lookup_providers_test.dart` (2, new),
+`test/screens/story_reading_screen_test.dart` (3, new — generate success/
+failure/regenerate; a precise inline-span tap-to-dictionary widget test
+was judged too fragile to be worth the coverage and was replaced by the
+direct `resolveWordAcrossLevelsProvider` test instead),
+`test/screens/cloze_test_screen_test.dart` (3, new),
+`test/screens/cowrite_screen_test.dart` (4, new — including the full
+"Selesai" → session/progress-write → pop-to-origin path),
+`test/screens/dashboard_screen_test.dart` (+1),
+`test/screens/history_screen_test.dart` (existing "Pelajari Kembali" test
+extended to assert navigation, not just that the button exists),
+`test/screens/learning_cart_screen_test.dart` (existing disabled-CTA test
+kept, +1 new test for the enabled/tapped path). **Full suite: 288/288
+passing** (232 previous + 56 new — reconciled exactly against this list).
+
+**A real test-authoring pitfall found and fixed during this pass, not a
+production bug:** the first version of `learning_cart_screen_test.dart`'s
+new CTA test read `currentUserProfileProvider` (overridden with
+`Stream.value(...)`) inside the button's tap handler without ever having
+subscribed to it first — `Stream.value`'s single event lands on a
+microtask, not synchronously, so the very first `ref.read()` of a
+freshly-created stream provider can still see no value yet. Fixed in the
+test (`container.listen(...)` + an extra `pump()` before interacting) —
+**not a bug in `LearningCartScreen` itself**, since in the real app
+`appAuthStatusProvider` keeps `currentUserProfileProvider` permanently
+subscribed and resolved from the moment a student is signed in, long
+before this screen ever renders.
+
+**Not yet done (see §7):** deploying `firestore.rules`'s new write rules;
+any manual browser click-through of the flow against the real deployed
+Worker; confirming a real end-to-end session actually satisfies the new
+rules and produces correct `learningProgress`/Riwayat data against the
+live project.
+
 ## 6. Firebase / Firestore State
 
 - **Project:** `vocably-idn-en`, Firestore Native mode, `asia-southeast1`.
-- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2); `vocabWords`/`topics` — read-only for any authenticated user, plus guru-only write rules added in Milestone 5 (§5g) for both; `targetWordSets`/`learningProgress`/`learningSessions`/`placementTestResults`/`researchAssessmentResults` — read-only rules added in Milestone 6 (§5i), all writes explicitly denied for now.
-- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3). `targetWordSets`/`learningProgress`/`learningSessions`/`placementTestResults`/`researchAssessmentResults` have **no real documents at all** — nothing in the app has ever written to any of them (Milestone 6 only reads; the respective writers are Milestones 7/8 and TBD).
+- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2); `vocabWords`/`topics` — read-only for any authenticated user, plus guru-only write rules added in Milestone 5 (§5g) for both; `targetWordSets`/`placementTestResults`/`researchAssessmentResults` — read-only rules added in Milestone 6 (§5i), all writes explicitly denied still (Milestone 8/TBD respectively); `learningProgress`/`learningSessions` — read rules from Milestone 6, **real write rules added in Milestone 7** (§5j).
+- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3). `targetWordSets`/`placementTestResults`/`researchAssessmentResults` have **no real documents at all** — nothing in the app writes them yet (Milestone 8/TBD). `learningProgress`/`learningSessions` now have a real Flutter-side writer (§5j) but **no real documents yet either** — nothing has been deployed/manually exercised against the live project.
 - **`cefrLevel` + `updatedAt` composite index (§5b/§11.3):** **confirmed deployed and live** — verified directly against the project via `firebase firestore:indexes`, which returned exactly this index (plus Firestore's automatic `__name__` tiebreaker field), matching `firestore.indexes.json`. (This corrects an earlier snapshot of this file, which still listed the deploy as outstanding — the live project had already moved past that by the time this was checked.)
-- **`targetWordSets` composite index (`targetStudentIds` array-contains + `endAt` ASC, §5i):** added to `firestore.indexes.json` this session, matching `DATA_MODEL.md` §5's documented query exactly — **not yet deployed**, see §7. `learningProgress`/`learningSessions` deliberately don't need a new index — see §5i's note on why those two collections' queries were designed to avoid one.
+- **`targetWordSets` composite index (`targetStudentIds` array-contains + `endAt` ASC, §5i):** added to `firestore.indexes.json` this session, matching `DATA_MODEL.md` §5's documented query exactly — **not yet deployed**, see §7. `learningProgress`/`learningSessions` deliberately don't need a new index — see §5i's note on why those two collections' queries were designed to avoid one, reaffirmed by Milestone 7's Decision 1 (no resume query).
 - **`vocabWords`/`topics` guru-write rules (§5g):** **deployed and confirmed working** — the project owner's manual E2E pass (§5h) successfully created a word, appended a meaning, and created a topic as guru through the real app, which only works if these rules are live. The rules' negative path (a signed-in siswa being denied) was not explicitly exercised in that pass.
-- **Milestone 6's new read rules (§5i):** written, internally consistent with the models/services that read them, but **not yet deployed and not yet exercised against the real project** — nothing has manually verified that a signed-in student can actually read (or is actually denied writing to) any of these five collections through the live app yet. See §7.
+- **Milestone 6's read rules** (`targetWordSets`/`placementTestResults`/`researchAssessmentResults`, and the read half of `learningProgress`/`learningSessions`): written, internally consistent with the models/services that read them, but **not yet deployed and not yet exercised against the real project**. See §7.
+- **Milestone 7's `learningProgress`/`learningSessions` write rules (§5j):** written to match `LearningProgressService`/`LearningSessionService`'s actual write shapes exactly, syntactically self-consistent by inspection, but **not deployed and not validated against any Firestore emulator** — this environment has no Java runtime to run one (a pre-existing, previously-disclosed limitation, not new to this milestone). Do not treat these rules as proven correct until deployed and exercised for real — see §7.
 
 ## 7. Manual Actions Required
 
@@ -747,16 +959,16 @@ know these happened and roughly when):
 
 **Still genuinely outstanding:**
 
-1. **Deploy Milestone 6's `firestore.rules`/`firestore.indexes.json` changes** (§5i/§6) — `firebase deploy --only firestore:rules,firestore:indexes`. Nothing in Milestone 6 has been exercised against the real project yet; the Dashboard/Riwayat screens will work against the live Firestore project's existing (Milestone 5) rules for anything they don't touch, but the new `targetWordSets`/`learningProgress`/`learningSessions`/`placementTestResults`/`researchAssessmentResults` reads will fail with `permission-denied` until this deploy happens.
-2. **Manually click through Milestone 6 end-to-end** (`flutter run -d chrome`) — no automated test can replace a real signed-in student walking through: the placement-test offer appearing exactly once, the Level card's pills/ring/C2-muting, Target Kata's empty state (guaranteed, since no `targetWordSets` document exists yet), Riwayat's both tabs' empty states (guaranteed, same reason), and the Pre-Test/Post-Test entry points. See §7's temporary-test-data note below for exercising the *non*-empty states.
-3. **To see the "Target Kata Hari Ini"/Riwayat populated states** (not just their empty states), you'll need temporary test documents — same pattern as Milestone 5's lazy-translation test document. A minimal `targetWordSets` doc: `teacherId` (any existing guru uid), `wordIds` (array of real, already-seeded `vocabWords` docIds, e.g. `["run"]`), `cefrLevel` (matching those words' actual level, e.g. `"A1"`), `startAt`/`endAt` (Timestamps bracketing now — e.g. yesterday/`kNoEndDate`-style far future), `targetStudentIds: ["__all__"]`, `createdAt` (Timestamp, now). A minimal `learningProgress` doc (`docId = "{yourTestUid}_run"`): `studentId`, `wordId: "run"`, `learnedStatus: "sudahDipelajari"`, `masteryStatus: "difficult"` (or `"mastered"`), `firstLearnedAt`/`lastUpdatedAt` (Timestamps), `lastSessionId: "test-session"`. A minimal `learningSessions` doc: `studentId`, `wordIds: ["run"]`, `sourceType: "keranjangPelajari"`, `currentPhase: "selesai"`, `storyTitle`, `storyContent: "I [[run|ran]] today."`, `storyTranslation` (optional), `clozeTestResult: {"run": true}`, `cowriteTranscript: []`, `cowriteWordsUsedCorrectly: ["run"]`, `startedAt`/`completedAt` (Timestamps). Remove all three afterward — same cleanup discipline as Milestone 5's test document.
+1. **Deploy `firestore.rules`/`firestore.indexes.json`** (Milestone 6's read rules + `targetWordSets` index, §5i/§6, **and** Milestone 7's `learningProgress`/`learningSessions` write rules, §5j) — `firebase deploy --only firestore:rules,firestore:indexes`. Until this happens, every Milestone 7 write attempt will fail with `permission-denied`, and Milestone 6's `targetWordSets`/`placementTestResults`/`researchAssessmentResults` reads will too.
+2. **Manually click through Milestone 7 end-to-end** (`flutter run -d chrome --web-port=5555 --dart-define=WORKER_BASE_URL=...`, against the real deployed Worker) — no automated test can replace a real signed-in student: generating a real story from all three entry points, the real `/generate-story`/`/cowrite-turn` round-trip quality (prompt/response quality, marker validation, retry-once behavior), cloze grading, the co-write auto-stop timing, and confirming the resulting `learningSessions`/`learningProgress` documents actually land correctly and satisfy the new rules — then confirming Riwayat reflects them. This is the single biggest remaining gap: automated tests cover every branch of the logic against fakes, but nothing has proven the real Worker/Firestore round-trip works.
+3. **Manually click through Milestone 6 end-to-end** (dashboard, Riwayat both tabs, the one-time placement-test offer, the placeholder screens) — still outstanding from the prior snapshot, now naturally exercisable together with item 2 above since Milestone 7 is what actually populates Riwayat's non-empty states for the first time (no more need for the old temporary-test-document recipe, though it's still valid if you want to test Riwayat in isolation before Milestone 7).
 4. **Confirm whether Cloudflare's native Rate Limiting binding is available on your Workers plan** (§5g) — **still unconfirmed either way; the Worker is still running on the in-memory fallback.** If you confirm it's available, uncomment the `unsafe.bindings` block in `vocably-ai-worker/wrangler.jsonc` (no code change needed elsewhere) and redeploy. Do not treat this as done until you've actually checked your plan's dashboard/docs.
-5. **Optionally exercise the `firestore.rules` negative path** — confirm a signed-in siswa attempting to create/update `vocabWords` or create a `topics` doc is actually denied (Milestone 5), and (new, Milestone 6) that a signed-in student can't read another student's `learningProgress`/`learningSessions`/`placementTestResults`/`researchAssessmentResults` documents. Not part of any automated pass — no Firestore emulator in this environment.
+5. **Optionally exercise the `firestore.rules` negative path** — confirm a signed-in siswa attempting to create/update `vocabWords` or create a `topics` doc is actually denied (Milestone 5); that a signed-in student can't read another student's `learningProgress`/`learningSessions`/`placementTestResults`/`researchAssessmentResults` documents (Milestone 6); and (new, Milestone 7) that a `learningProgress` write attempting to downgrade an already-`mastered` word, or a `learningSessions` write attempting an out-of-order phase transition, is actually rejected. Not part of any automated pass — no Firestore emulator in this environment (no Java runtime available).
 6. **Manually re-verify the browse screen** (`flutter run -d chrome`) — confirm pagination (§5e: "Halaman X dari Y", Previous/Next, resets on level/mode/filter change) and that A1/A2/B1 × Abjad/Tema all still load correctly end-to-end. Carried over from Milestone 4 — still only automated-test-verified. Not a blocker for any milestone since.
 7. **Manually re-check Word Detail** for words like "can" (modal), "billion" (number), "one", "oh", "this" now that the extended alias table and the loading/retryable/unavailable UI split are in place (§5c/§5d) — verified via unit/widget tests only so far. Carried over from Milestone 4 — not a blocker for any milestone since.
 8. **Review the 10 same-POS collisions** in `tools/vocab_import/output/import_report.json` (`samePosCollisions`) — not blocking, but worth a look since the schema can only keep one sense per POS.
 9. **Optionally spot-check translation quality** beyond what this session sampled — `tools/vocab_import/output/canonical_vocab_translated.json` has all 4,952 documents; the "equal"/noun case (§5) is the one known imperfect example found so far.
-10. **Going forward, run `flutter test --concurrency=1`, not plain `flutter test`** (§5i/§9) — the default-concurrency run on this machine has been confirmed (three separate runs) to silently skip a large, non-deterministic subset of test files while still exiting successfully. `--concurrency=1` is slower (~40–50s vs. ~10–20s here) but is the only mode confirmed to actually run and report on every test file.
+10. **Going forward, run `flutter test --concurrency=1`, not plain `flutter test`** (§5i/§9) — the default-concurrency run on this machine has been confirmed (three separate runs) to silently skip a large, non-deterministic subset of test files while still exiting successfully. `--concurrency=1` is slower but is the only mode confirmed to actually run and report on every test file.
 11. Decide whether/when to `git add`/commit/push the current working tree in **both** repos — not done automatically, per your standing instruction. See §10 for exactly what's pending in each.
 
 ## 8. Important Architectural Decisions (this session)
@@ -779,38 +991,41 @@ know these happened and roughly when):
 - **`learningProgress`/`learningSessions` are queried with single-field equality only (`studentId ==`), sorted/filtered in the provider layer** — not the `studentId` + `masteryStatus`/`orderBy(startedAt desc)` composite queries `DATA_MODEL.md` §8 sketches. Deliberately avoids needing a new composite index for two collections nothing writes to before Milestone 7, learning from the real Milestone 4 incident where an undeployed documented index took down a whole feature once real data existed. `targetWordSets`' query, by contrast, **is** implemented exactly as `DATA_MODEL.md` §5 already specifies, composite index included — see §5i for the full reasoning on why these two collections were treated differently.
 - **A real `flutter test` environment defect was found this session**: default concurrency silently drops a non-deterministic subset of test files (new and pre-existing) while still reporting success. Always use `--concurrency=1` for a trustworthy full-suite run in this environment — see §5i/§9/§12.
 - All Milestone 1–5 decisions from the previous snapshot (Riverpod-only, no routing package, no `custom_lint`, rules-enforced role assignment, `definitionsForPos` alias table, paginate-after-filter, Milestone 5's Worker/rate-limiting/CORS decisions, etc.) remain unchanged and still apply — not re-litigated this session.
+- **Milestone 7 decisions (project owner, this session — see §5j for full detail):** no resume behavior for abandoned sessions; "Pelajari Kembali" relearns the whole `difficult`-filtered list, no checkbox selection; `learningProgress` written in two steps (cloze-submit default-`difficult`, co-write-completion mastery upgrade), each via a per-word Firestore transaction; the learning cart clears only once the first generate succeeds.
+- **`LearningFlowController` takes `studentId` as an explicit parameter, not read from Firebase Auth internally** — keeps the entire 3-phase flow's state machine testable with a plain string. Follow this same pattern (explicit params over reading auth state inside a notifier) for any future controller with non-trivial logic worth unit-testing in isolation.
+- **A `Stream`-backed Riverpod provider's `.value` can still be `null` immediately after an override, even a `Stream.value(...)` one** — its single event lands on a microtask, not synchronously. Any test that overrides a stream provider and then immediately reads `.value` in the same synchronous flow (e.g. inside a tap handler invoked right after `pumpWidget`) needs to either `container.listen(...)` it first or add an extra `pump()` before interacting. Found and fixed in `learning_cart_screen_test.dart` (§5j) — not a production bug, since the real app keeps `currentUserProfileProvider` permanently hot from sign-in onward, but worth remembering for any future test with a similar shape.
 
 ## 9. Verification Status
 
 - `flutter analyze`: **no issues**.
-- `flutter test`: **225/225 passing — but only reliably observed via `flutter test --concurrency=1`** (verified three consecutive full runs at this concurrency, each covering all 32 test files with zero failures). **The default-concurrency invocation is not trustworthy on this machine** — it silently skipped a different, non-deterministic subset of test files (12–13 of 32) across repeated runs while still printing "All tests passed!"; see §5i for the full finding, including the exact file-diffing method used to confirm it. The 225 total reconciles exactly against arithmetic from the prior 174-test snapshot plus this session's additions/removals (see §5i's "Tests added" list) — cross-checked, not just trusted at face value.
+- `flutter test`: **288/288 passing — but only reliably observed via `flutter test --concurrency=1`** (this environment's default-concurrency invocation remains untrustworthy, per the standing finding in §5i/§12 — always use `--concurrency=1`). The 288 total reconciles exactly against arithmetic from the prior 232-test snapshot plus this session's additions (§5j's "Tests added" list: 56 new tests) — cross-checked, not just trusted at face value.
 - `tools/vocab_import` pure-logic tests (`node --test`): **43/43 passing** (untouched this session).
 - **`vocably-ai-worker/` (separate repo) tests:** `npm test` (Vitest, real `workerd` runtime via `@cloudflare/vitest-plugin`) — **61/61 passing** (unchanged this session — no Worker code touched). `npm run typecheck` — clean.
 - Stage 1–4 (Milestone 4 data pipeline): unchanged, still real/complete — see §5 for detail.
 - **Post-seed bug found and fixed** (§5b), **English-definition gaps investigated twice** (§5c/§5d), **pagination added** (§5e) **and its overflow fixed** (§5f) — all as previously recorded, unchanged this session.
 - **Milestone 5 implemented, deployed, and manually verified end-to-end** (§5g/§5h): Worker (all 3 endpoints to their documented contracts, auth/CORS/rate-limiting infrastructure), Flutter integration (services/providers/screens), `firestore.rules` guru write access. A real CORS configuration bug was found during the manual pass and fixed (§5h) — re-verified after the fix: Worker suite 61/61, `npm run typecheck` clean. **What manual verification actually covered vs. didn't** is spelled out precisely in §5h — don't assume everything is checked; in particular, Rate Limiting plan availability is explicitly still unconfirmed (§7).
-- **Milestone 6 implemented and automated-test-verified only** (§5i) — `firestore.rules`/`firestore.indexes.json` changes are written but **not deployed**, and **no manual browser verification has happened yet**. Do not treat Milestone 6 as done the way Milestone 5 is; §7 lists exactly what's still needed, including temporary test-data instructions for exercising the non-empty dashboard/Riwayat states.
+- **Milestone 6 implemented and automated-test-verified only** (§5i) — `firestore.rules`/`firestore.indexes.json` changes are written but **not deployed**, and **no manual browser verification has happened yet**.
+- **Milestone 7 implemented and automated-test-verified only** (§5j) — the full 3-phase flow, all three entry points, mastery rules, and Firestore write rules are written and pass every automated test against fake services, but **the real `/generate-story`/`/cowrite-turn` round-trip, the real Firestore write rules, and the real Riwayat reflection have not been exercised even once against the live project.** Do not treat Milestone 7 as done the way Milestone 5 is; §7 lists exactly what's still needed.
 
 ## 10. Current Git State
 
-- **Flutter repo (`vocably/`) — branch `main`, in sync with `origin/main`.** Milestone 4 + the pagination-bar fix are **committed and pushed** (`bab8170 Fix vocabulary pagination layout`, on top of `24cd651 Complete Milestone 4 vocabulary module`).
-- **Flutter repo working tree: modified but uncommitted.** All of Milestone 5's new/changed files (§5g) plus all of Milestone 6's new/changed files (§5i: new models/services/providers/screens/utils, `lib/app.dart`, `lib/services/user_service.dart`, `firestore.rules`, `firestore.indexes.json`, `pubspec.yaml`/`pubspec.lock` for `intl`, and the two deleted placeholder screens), this file's updates, plus a small unrelated `.gitignore` addition (`.dev.vars` — not something this session added; noted here rather than silently left unexplained, see §12 note on reviewing untracked/unexplained changes before committing). The CORS bug (§5h) was entirely a `vocably-ai-worker/` fix, nothing on the Flutter side. Commit/push remains the project owner's action per standing instruction.
-- **`vocably-ai-worker/` (sibling repo, `c:\Users\isaan\projects\flutter\vocably-ai-worker`): now has its own first commit** (`915289b Initialize Vocably AI Worker`, made by the project owner — not this session). **Working tree on top of that commit is modified but uncommitted**: the CORS fix (§5h) — `wrangler.jsonc`, `package.json`, `README.md`. Entirely separate git history from the Flutter repo (separate `.git`, no remote configured yet as far as this session can see).
+- **Flutter repo (`vocably/`) — branch `main`, in sync with `origin/main`.** Milestone 4 + the pagination-bar fix are **committed and pushed** (`bab8170 Fix vocabulary pagination layout`). Milestones 5 and 6 are also now **committed** on top of that (`25b4de0 Complete Milestone 5 AI worker and vocabulary management`, `c5c6c66 Complete Milestone 6 dashboard and history siswa`) — the project owner committed these between sessions; this file's prior snapshot describing them as "uncommitted" is stale.
+- **Flutter repo working tree: modified/untracked (Milestone 7, this session), not yet committed.** New files: `lib/utils/mastery_rules.dart`, `lib/utils/cloze_blanks.dart`, `lib/widgets/stepper_header.dart`, `lib/providers/learning_session_controller.dart(+.g.dart)`, `lib/providers/word_lookup_providers.dart(+.g.dart)`, `lib/screens/student/learning_flow/story_reading_screen.dart`, `cloze_test_screen.dart`, `cowrite_screen.dart`, plus their test files (see §5j). Modified: `lib/services/ai_worker_service.dart`, `lib/models/learning_session.dart`, `lib/models/learning_progress.dart`, `lib/services/learning_session_service.dart`, `lib/services/learning_progress_service.dart`, `lib/screens/student/vocab_browser/learning_cart_screen.dart`, `lib/screens/student/dashboard/target_word_list_screen.dart`, `lib/screens/student/history/history_screen.dart`, `firestore.rules`, this file, and the existing test files extended in §5j. Commit/push remains the project owner's action per standing instruction — nothing was committed this session.
+- **`vocably-ai-worker/` (sibling repo):** untouched this session — no Worker code changes were needed for Milestone 7 (§5j).
 
 ## 11. Next Recommended Step
 
-**Milestone 5 is complete** — implemented, deployed, and manually
-verified end-to-end (§5g/§5h). **Milestone 6 is implemented and
-automated-test-verified, but NOT yet deployed or manually verified**
-(§5i/§7/§9) — deploying the new rules/indexes and a real browser
-click-through are the two concrete remaining steps before it can be
-called complete the way Milestone 5 is.
+**Milestones 5 and 6 are committed** (§10). **Milestone 7 is implemented
+and automated-test-verified, but NOT yet deployed or manually verified**
+(§5j/§7/§9) — deploying the new Firestore write rules and a real browser
+click-through against the real Worker are the two concrete remaining
+steps before it can be called complete the way Milestone 5 is.
 
-1. **Deploy Milestone 6's `firestore.rules`/`firestore.indexes.json`** (§7 item 1).
-2. **Manually click through Milestone 6** — dashboard, Riwayat (both tabs), the one-time placement-test offer, the placeholder screens — using §7 item 3's temporary test-data recipe to see the non-empty states.
-3. Decide on git history for both repos (§10) — commit/push each independently whenever ready. Worth a look at the stray `.gitignore` change (§10) before committing, to confirm it's intentional.
+1. **Deploy `firestore.rules`/`firestore.indexes.json`** (§7 item 1) — this now covers both Milestone 6's remaining read-side deploy and Milestone 7's new write rules.
+2. **Manually click through Milestone 7 end-to-end** against the real deployed Worker (§7 item 2) — all three entry points, all three phases, and confirm Riwayat reflects the result afterward.
+3. Decide on git history — commit/push Milestone 7's changes whenever ready (§10).
 4. Optionally work through §7's remaining (non-blocking) items — Rate Limiting plan confirmation, rules negative-path checks, two Milestone-4-era re-verification items.
-5. **Per `CLAUDE.md` §7's documented milestone order, Storyfier core (the 3-phase learning flow) is Milestone 7** — that's next in sequence once Milestone 6 is confirmed deployed/verified, **not started, not to be started without explicit instruction.**
+5. **Per `CLAUDE.md` §7's documented milestone order, guru's "Set Target Kata" + "Edit Kata" is Milestone 8** — that's next in sequence once Milestone 7 is confirmed deployed/verified, **not started, not to be started without explicit instruction.**
 
 ## 12. Handoff Instructions for a New AI Session
 

@@ -165,4 +165,58 @@ void main() {
       );
     });
   });
+
+  group('Milestone 7 write-side helpers', () {
+    test('newSessionData starts at membaca with every later-phase field empty/null', () {
+      final data = LearningSession.newSessionData(
+        studentId: 'student-1',
+        wordIds: ['run', 'souvenir'],
+        sourceType: LearningSessionSourceType.keranjangPelajari,
+        storyTitle: 'Liburan',
+        storyContent: 'I [[run|ran]] and bought a [[souvenir|souvenir]].',
+        storyTranslation: 'Saya berlari dan membeli oleh-oleh.',
+      );
+
+      expect(data['studentId'], 'student-1');
+      expect(data['wordIds'], ['run', 'souvenir']);
+      expect(data['sourceType'], LearningSessionSourceType.keranjangPelajari);
+      expect(data['currentPhase'], LearningSessionPhase.membaca);
+      expect(data['clozeTestResult'], isEmpty);
+      expect(data['cowriteTranscript'], isEmpty);
+      expect(data['cowriteWordsUsedCorrectly'], isEmpty);
+      expect(data['completedAt'], isNull);
+      // startedAt is a FieldValue.serverTimestamp() sentinel, not a plain
+      // value — just confirm the key exists.
+      expect(data.containsKey('startedAt'), isTrue);
+    });
+
+    test('storyUpdateData only ever touches the three story fields', () {
+      final data = LearningSession.storyUpdateData(
+        storyTitle: 'Judul baru',
+        storyContent: 'A new [[run|ran]] story.',
+        storyTranslation: null,
+      );
+
+      expect(data.keys.toSet(), {'storyTitle', 'storyContent', 'storyTranslation'});
+      expect(data['storyTitle'], 'Judul baru');
+      expect(data['storyContent'], 'A new [[run|ran]] story.');
+      expect(data['storyTranslation'], isNull);
+    });
+
+    test('CowriteTurn.toMap round-trips through CowriteTurn.fromMap', () {
+      const turn = CowriteTurn(
+        sender: CowriteSender.siswa,
+        text: 'I ran fast.',
+        feedback: 'Nice sentence!',
+        usedSuggestion: true,
+      );
+
+      final roundTripped = CowriteTurn.fromMap(turn.toMap());
+
+      expect(roundTripped.sender, turn.sender);
+      expect(roundTripped.text, turn.text);
+      expect(roundTripped.feedback, turn.feedback);
+      expect(roundTripped.usedSuggestion, turn.usedSuggestion);
+    });
+  });
 }

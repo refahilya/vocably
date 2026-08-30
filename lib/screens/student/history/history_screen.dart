@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/app_user.dart';
 import '../../../models/learning_session.dart';
 import '../../../providers/history_providers.dart';
+import '../../../providers/learning_session_controller.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/session_date_format.dart';
 import '../../../widgets/mastery_badge.dart';
+import '../learning_flow/story_reading_screen.dart';
 import 'session_detail_screen.dart';
 
 /// Real Riwayat destination (`SPEC.md` §3.6, `DESIGN_REFERENCE.md` §3.3)
@@ -154,7 +156,11 @@ class _PerKataTab extends ConsumerWidget {
                           ? 'Tidak ada kata yang perlu diulang'
                           : 'Tidak ada kata dengan label ini.',
                     )
-                  : _PerKataList(entries: filtered, showRelearnAction: filter == HistoryMasteryFilter.difficult),
+                  : _PerKataList(
+                      studentId: studentId,
+                      entries: filtered,
+                      showRelearnAction: filter == HistoryMasteryFilter.difficult,
+                    ),
             ),
           ],
         );
@@ -163,14 +169,19 @@ class _PerKataTab extends ConsumerWidget {
   }
 }
 
-class _PerKataList extends StatelessWidget {
-  const _PerKataList({required this.entries, required this.showRelearnAction});
+class _PerKataList extends ConsumerWidget {
+  const _PerKataList({
+    required this.studentId,
+    required this.entries,
+    required this.showRelearnAction,
+  });
 
+  final String studentId;
   final List<HistoryWordEntry> entries;
   final bool showRelearnAction;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
         Expanded(
@@ -188,25 +199,30 @@ class _PerKataList extends StatelessWidget {
             },
           ),
         ),
+        // "Pelajari Kembali" (`SPEC.md` §3.6) relearns **every** word
+        // currently shown under the `difficult` filter — per the project
+        // owner's Milestone 7 Decision 2, no per-word checkbox selection
+        // was added; the mastery filter itself is the selection.
         if (showRelearnAction)
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    // Milestone 7 (Storyfier core, re-learn entry point) wires this up.
-                    onPressed: null,
-                    child: const Text('Pelajari Kembali'),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                const Text(
-                  'Segera hadir di Milestone berikutnya.',
-                  style: AppTextStyles.caption,
-                ),
-              ],
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  ref
+                      .read(learningFlowControllerProvider.notifier)
+                      .startFlow(
+                        studentId: studentId,
+                        wordIds: [for (final item in entries) item.progress.wordId],
+                        sourceType: LearningSessionSourceType.pelajariUlangDifficult,
+                      );
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const StoryReadingScreen()));
+                },
+                child: const Text('Pelajari Kembali'),
+              ),
             ),
           ),
       ],

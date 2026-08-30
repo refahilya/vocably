@@ -217,4 +217,60 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'Stage 7: normal Word Detail (default hideCartAction) still shows the '
+    '"+ Pelajari" cart toggle, exactly as before',
+    (tester) async {
+      final fakeClient = MockClient((request) async {
+        return http.Response(jsonEncode({'title': 'No Definitions Found'}), 404);
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dictionaryApiServiceProvider.overrideWithValue(
+              DictionaryApiService(client: fakeClient),
+            ),
+            aiWorkerServiceProvider.overrideWithValue(_AlwaysFailingAiWorkerService()),
+          ],
+          child: MaterialApp(home: WordDetailScreen(entry: entry)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Tambah ke Keranjang Pelajari'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Stage 7: Word Detail opened from Learning Flow (hideCartAction: true) '
+    'hides the "+ Pelajari" cart toggle',
+    (tester) async {
+      final fakeClient = MockClient((request) async {
+        return http.Response(jsonEncode({'title': 'No Definitions Found'}), 404);
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dictionaryApiServiceProvider.overrideWithValue(
+              DictionaryApiService(client: fakeClient),
+            ),
+            aiWorkerServiceProvider.overrideWithValue(_AlwaysFailingAiWorkerService()),
+          ],
+          child: MaterialApp(
+            home: WordDetailScreen(entry: entry, hideCartAction: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Tambah ke Keranjang Pelajari'), findsNothing);
+      expect(find.byTooltip('Hapus dari Keranjang Pelajari'), findsNothing);
+      // Everything else about the screen is unaffected.
+      expect(find.text('ADDRESS'), findsOneWidget);
+      expect(find.text('alamat'), findsOneWidget);
+    },
+  );
 }
