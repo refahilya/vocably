@@ -437,6 +437,21 @@ persis** — yang membedakan cuma asal daftar kata targetnya:
 - Respons Worker menyertakan penilaian terstruktur (kata mana yang dipakai
   dengan benar, dan apakah ada kesalahan) — bukan cuma teks feedback — supaya
   perhitungan mastery tidak perlu menebak-nebak dari kalimat feedback.
+- **Giliran yang hanya berisi satu kata target saja (bukan kalimat)** tidak
+  dihitung sebagai "dipakai dengan benar" — mengetik "breakfast" sendirian
+  tidak boleh membuat kata itu tercatat terpakai. Ini bukan pemeriksaan tata
+  bahasa umum: kalimat pendek yang tetap berisi lebih dari satu kata (mis.
+  "the baby") tidak terkena aturan ini dan tetap dihitung selama benar.
+- **Kalau siswa sudah menyelesaikan lebih dari 3 giliran tanpa memakai
+  semua kata target, AI boleh memakai tepat satu kata target yang tersisa
+  di giliran AI berikutnya**, supaya percakapan tetap bisa berjalan menuju
+  selesai. Kelayakan ini ditentukan sepenuhnya oleh AI/Worker sendiri, tidak
+  oleh instruksi eksplisit dari client — lihat kontrak `aiUsedWords` di
+  `DATA_MODEL.md` §10.2. **Kata yang dipakai AI lewat mekanisme ini tidak
+  pernah dihitung sebagai "dipakai mandiri" oleh siswa** — tidak
+  berpengaruh ke mastery (bagian 6); efeknya hanya membuat kata itu
+  tercatat "terpakai" di atas, sehingga percakapan bisa berhenti otomatis
+  seperti biasa.
 - Hasil fase ini juga dipakai untuk update mastery status (bagian 6).
 
 ## 6. State Machine: Status Kata

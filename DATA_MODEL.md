@@ -883,17 +883,38 @@ flag apakah giliran ini memakai fitur "saran menulis".
 | `hasError` | boolean | **terstruktur** — `true` kalau giliran siswa sebelumnya mengandung kesalahan |
 | `wordsUsedCorrectly` | array\<string\> | **terstruktur** — kata target (bentuk dasar) yang dipakai siswa dengan benar di giliran tersebut |
 | `suggestion` | string \| null | isi "saran menulis", hanya diisi kalau client memintanya |
+| `aiUsedWords` | array\<string\> | **terstruktur** (Milestone 7 Phase 2 Stage 8) — kata target sisa (bentuk dasar) yang dipakai AI sendiri di `aiTurn` giliran ini, lewat mekanisme fallback di bawah; array kosong di kondisi normal |
 
-> **Kenapa `hasError` dan `wordsUsedCorrectly` harus terstruktur:** aturan
-> mastery di §3 bergantung pada "dipakai mandiri tanpa kesalahan". Kalau
-> satu-satunya keluaran adalah teks feedback bebas, client harus menebak
-> maknanya dengan parsing string — tidak mungkin andal. Dua field ini yang
-> langsung mengisi `learningSessions.cowriteWordsUsedCorrectly`.
+> **Kenapa `wordsUsedCorrectly` harus terstruktur:** aturan mastery di §3
+> bergantung pada "dipakai mandiri tanpa kesalahan". Kalau satu-satunya
+> keluaran adalah teks feedback bebas, client harus menebak maknanya
+> dengan parsing string — tidak mungkin andal. `wordsUsedCorrectly`
+> (setelah difilter aturan "mandiri" di bawah) yang langsung mengisi
+> `learningSessions.cowriteWordsUsedCorrectly`.
+>
+> **Catatan tentang `hasError`:** field ini divalidasi di client
+> (`AiWorkerService.cowriteTurn()`, tipe wajib `boolean`) tapi **saat ini
+> tidak dibaca oleh logic apa pun** di client — bukan `hasError` yang
+> mengisi `cowriteWordsUsedCorrectly`, hanya `wordsUsedCorrectly`. Ini
+> kesenjangan implementasi yang diketahui, bukan desain yang disengaja;
+> jangan berasumsi `hasError` punya efek apa pun di client sampai ada
+> keputusan eksplisit untuk memakainya atau menghapusnya dari kontrak.
 >
 > **Aturan "mandiri" ditegakkan di client, bukan Worker:** kalau giliran itu
 > memakai "saran menulis", client **tidak memasukkan** kata dari
 > `wordsUsedCorrectly` ke `cowriteWordsUsedCorrectly`, dan mencatat
 > `usedSuggestion: true` di transcript (§4).
+>
+> **`aiUsedWords` (Milestone 7 Phase 2 Stage 8 — fallback giliran):** kalau
+> siswa sudah menyelesaikan lebih dari 3 giliran tanpa memakai semua kata
+> target, Worker **boleh** memakai tepat satu kata target sisa di
+> `aiTurn`-nya sendiri — kelayakannya dihitung sepenuhnya di dalam prompt
+> Worker (menghitung entri `"siswa"` di transcript yang sudah dikirim
+> setiap panggilan), tanpa field request baru. Client menggabungkan kata
+> di `aiUsedWords` ke daftar kata-terpakai sesi yang menggerakkan tampilan
+> "kata terpakai" dan kondisi berhenti otomatis Fase 3, tapi **tidak
+> pernah** ke `cowriteWordsUsedCorrectly` — kata yang dipakai AI sendiri
+> tidak boleh pernah terhitung sebagai penguasaan mandiri siswa.
 
 #### `POST /translate` — terjemahan makna (§2)
 
