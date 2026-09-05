@@ -89,9 +89,14 @@ class _DashboardCard extends StatelessWidget {
                 children: [
                   Icon(icon, color: AppColors.primary),
                   const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -130,7 +135,9 @@ class _TargetWordCard extends ConsumerWidget {
       icon: Icons.track_changes,
       title: 'Target Kata Hari Ini',
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => TargetWordListScreen(studentId: studentId)),
+        MaterialPageRoute(
+          builder: (_) => TargetWordListScreen(studentId: studentId),
+        ),
       ),
       child: Text(subtitle, style: AppTextStyles.body),
     );
@@ -171,9 +178,13 @@ class _LevelCard extends ConsumerWidget {
                   level: level,
                   isActive: profile.cefrLevel == level,
                   onTap: () {
-                    ref.read(vocabBrowserFilterProvider.notifier).selectLevel(level);
+                    ref
+                        .read(vocabBrowserFilterProvider.notifier)
+                        .selectLevel(level);
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const VocabBrowserScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const VocabBrowserScreen(),
+                      ),
                     );
                   },
                 ),
@@ -184,7 +195,9 @@ class _LevelCard extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: TextButton(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PlacementTestPlaceholderScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const PlacementTestPlaceholderScreen(),
+                ),
               ),
               child: Text(
                 profile.placementTestCompleted == true
@@ -205,7 +218,11 @@ class _LevelCard extends ConsumerWidget {
 /// pudar/disabled ringan") — still tappable either way, leading into
 /// `VocabBrowserScreen`'s own empty-state handling for that level.
 class _LevelPill extends StatelessWidget {
-  const _LevelPill({required this.level, required this.isActive, required this.onTap});
+  const _LevelPill({
+    required this.level,
+    required this.isActive,
+    required this.onTap,
+  });
 
   final String level;
   final bool isActive;
@@ -265,9 +282,19 @@ class _PreTestPostTestSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _AssessmentBanner(assessmentType: 'preTest', label: 'Pre-Test')),
+        Expanded(
+          child: _AssessmentBanner(
+            assessmentType: 'preTest',
+            label: 'Pre-Test',
+          ),
+        ),
         const SizedBox(width: AppSpacing.sm),
-        Expanded(child: _AssessmentBanner(assessmentType: 'postTest', label: 'Post-Test')),
+        Expanded(
+          child: _AssessmentBanner(
+            assessmentType: 'postTest',
+            label: 'Post-Test',
+          ),
+        ),
       ],
     );
   }
@@ -285,7 +312,9 @@ class _AssessmentBanner extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.medium),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ResearchAssessmentPlaceholderScreen(assessmentType: assessmentType),
+          builder: (_) => ResearchAssessmentPlaceholderScreen(
+            assessmentType: assessmentType,
+          ),
         ),
       ),
       child: Container(
@@ -301,7 +330,10 @@ class _AssessmentBanner extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
             const _SegeraBadge(),
@@ -318,14 +350,21 @@ class _SegeraBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
       decoration: BoxDecoration(
         color: AppColors.disabled,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: const Text(
         'Segera',
-        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

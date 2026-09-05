@@ -44,11 +44,69 @@ void main() {
       final future = _set(id: 'future', startAt: DateTime(2027, 1, 1));
       final alsoActive = _set(id: 'also-active', startAt: DateTime(2026, 6, 1));
 
-      expect(filterStillActive([active, future, alsoActive], now), [active, alsoActive]);
+      expect(filterStillActive([active, future, alsoActive], now), [
+        active,
+        alsoActive,
+      ]);
     });
 
     test('empty input returns empty output', () {
       expect(filterStillActive(const [], now), isEmpty);
     });
   });
+
+  group('TargetWordSetService write/read contract', () {
+    test(
+      'createTargetWordSet uses TargetWordSet.newTargetWordSetData format',
+      () {
+        final startAt = DateTime(2026, 9, 1);
+        final endAt = DateTime(2026, 9, 5, 23, 59, 59);
+
+        final data = TargetWordSet.newTargetWordSetData(
+          teacherId: 'teacher-123',
+          wordIds: const ['apple', 'banana'],
+          cefrLevel: 'A1',
+          startAt: startAt,
+          endAt: endAt,
+        );
+
+        expect(data['teacherId'], 'teacher-123');
+        expect(data['wordIds'], ['apple', 'banana']);
+        expect(data['cefrLevel'], 'A1');
+        expect(data['targetStudentIds'], ['__all__']);
+      },
+    );
+
+    test(
+      'fetchForTeacher captures teacherId and returns mapped TargetWordSet list',
+      () async {
+        final fakeService = _CapturingTargetWordSetService(
+          stubSets: [
+            _set(id: 'set-a', startAt: DateTime(2026, 8, 1)),
+            _set(id: 'set-b', startAt: DateTime(2026, 8, 15)),
+          ],
+        );
+
+        final results = await fakeService.fetchForTeacher('teacher-xyz');
+
+        expect(fakeService.requestedTeacherId, 'teacher-xyz');
+        expect(results, hasLength(2));
+        expect(results.map((s) => s.id), ['set-a', 'set-b']);
+        expect(results.every((s) => s.teacherId == 'teacher-1'), isTrue);
+      },
+    );
+  });
+}
+
+class _CapturingTargetWordSetService extends TargetWordSetService {
+  _CapturingTargetWordSetService({required this.stubSets});
+
+  final List<TargetWordSet> stubSets;
+  String? requestedTeacherId;
+
+  @override
+  Future<List<TargetWordSet>> fetchForTeacher(String teacherId) async {
+    requestedTeacherId = teacherId;
+    return stubSets;
+  }
 }

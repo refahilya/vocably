@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../utils/target_word_constants.dart';
+
 /// A `targetWordSets/{docId}` document (`DATA_MODEL.md` §5) — a batch of
 /// words a guru targeted for students over some time range.
 ///
@@ -58,5 +60,26 @@ class TargetWordSet {
       ],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
+  }
+
+  /// The map shape written to `targetWordSets` on create (`DATA_MODEL.md`
+  /// §5). Uses [kAllStudents] for `targetStudentIds` and a
+  /// `FieldValue.serverTimestamp()` sentinel for `createdAt`.
+  static Map<String, dynamic> newTargetWordSetData({
+    required String teacherId,
+    required List<String> wordIds,
+    required String cefrLevel,
+    required DateTime startAt,
+    required DateTime endAt,
+  }) {
+    return {
+      'teacherId': teacherId,
+      'wordIds': wordIds,
+      'cefrLevel': cefrLevel,
+      'startAt': Timestamp.fromDate(startAt),
+      'endAt': Timestamp.fromDate(endAt),
+      'targetStudentIds': [kAllStudents],
+      'createdAt': FieldValue.serverTimestamp(),
+    };
   }
 }

@@ -4,9 +4,10 @@ import '../models/target_word_set.dart';
 import '../utils/target_word_constants.dart';
 import 'firebase_service.dart';
 
-/// Read-only access to `targetWordSets` (`DATA_MODEL.md` §5) for the
-/// student-facing "Target Kata Hari Ini" card. The guru-facing write path
-/// ("Set Target Kata") is Milestone 8 — this service has no write methods.
+/// Read/write access to `targetWordSets` (`DATA_MODEL.md` §5). Reads
+/// serve the student-facing "Target Kata Hari Ini" card (Milestone 6) and
+/// the guru-facing target list (Milestone 8); writes serve the guru
+/// "Set Target Kata" flow (Milestone 8).
 class TargetWordSetService {
   TargetWordSetService([FirebaseService? firebaseService])
     : _firebaseService = firebaseService ?? const FirebaseService();
@@ -15,6 +16,41 @@ class TargetWordSetService {
 
   CollectionReference<Map<String, dynamic>> get _targetWordSets =>
       _firebaseService.firestore.collection('targetWordSets');
+
+  /// Creates a brand-new `targetWordSets` document authored by [teacherId]
+  /// (`DATA_MODEL.md` §5). Uses an auto-generated docId (`.add()`).
+  Future<String> createTargetWordSet({
+    required String teacherId,
+    required List<String> wordIds,
+    required String cefrLevel,
+    required DateTime startAt,
+    required DateTime endAt,
+  }) async {
+    final docRef = await _targetWordSets.add(
+      TargetWordSet.newTargetWordSetData(
+        teacherId: teacherId,
+        wordIds: wordIds,
+        cefrLevel: cefrLevel,
+        startAt: startAt,
+        endAt: endAt,
+      ),
+    );
+    return docRef.id;
+  }
+
+  /// All target word sets created by [teacherId], unsorted (the provider
+  /// layer sorts in memory). Uses single-field equality on `teacherId` to
+  /// avoid requiring an additional composite index.
+  Future<List<TargetWordSet>> fetchForTeacher(String teacherId) async {
+    final snapshot = await _targetWordSets
+        .where('teacherId', isEqualTo: teacherId)
+        .get();
+
+    return [
+      for (final doc in snapshot.docs)
+        TargetWordSet.fromFirestore(doc.id, doc.data()),
+    ];
+  }
 
   /// The target word sets currently active for [studentId] — i.e.
   /// targeted at either [studentId] specifically or [kAllStudents], not

@@ -159,18 +159,31 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Milestone 6 (`DATA_MODEL.md` §5): "Target Kata Hari Ini" read path.
-    // Read-only for any signed-in user (a target set can name a specific
-    // student or `kAllStudents` — filtering "is this set actually mine"
-    // happens in the query/client, not in the rule, same as `vocabWords`).
-    // Write stays denied here: the guru-facing "Set Target Kata" feature
-    // (Milestone 8) hasn't been built yet, so there is no tested field
-    // shape to validate a create/update against — adding one now would be
-    // guessing at a shape `CLAUDE.md` §6 says to confirm first, not derive
-    // from an unbuilt screen.
+    // Milestone 6 / Milestone 8 (`DATA_MODEL.md` §5, `SPEC.md` §4.1):
+    // Read-only for any signed-in user.
+    // Write: guru only, create only — authenticated teacher creating a set
+    // with exact required fields, non-empty wordIds, valid timestamps,
+    // targetStudentIds containing at least kAllStudents, and createdAt == request.time.
+    // Update and delete are explicitly denied per Milestone 8 decision.
     match /targetWordSets/{setId} {
       allow read: if request.auth != null;
-      allow write: if false;
+
+      allow create: if isGuru()
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.wordIds is list
+        && request.resource.data.wordIds.size() > 0
+        && request.resource.data.cefrLevel is string
+        && request.resource.data.startAt is timestamp
+        && request.resource.data.endAt is timestamp
+        && request.resource.data.targetStudentIds is list
+        && request.resource.data.targetStudentIds.size() > 0
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly([
+             'teacherId', 'wordIds', 'cefrLevel', 'startAt', 'endAt',
+             'targetStudentIds', 'createdAt'
+           ]);
+
+      allow update, delete: if false;
     }
 
     // Milestone 6 (`DATA_MODEL.md` §3/§4): Riwayat read paths. Both

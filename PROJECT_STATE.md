@@ -60,6 +60,21 @@ not independently reproduced by an AI session (no browser access); see
 §5k for exactly what is and isn't independently verifiable from the
 repository alone.
 
+**Milestone 8 (Guru: Set Target Kata + Edit Kata) is now implemented in
+code and automated-test-verified** (§5l) — real "Target Kata"
+destination (`TargetWordsScreen`) replacing the placeholder, full-screen
+`SetTargetWordScreen` flow (CEFR level choice chips, bundle word
+selector with search filter, date range picker with "Tanpa batas akhir"
+sentinel `kNoEndDate`, writes to `targetWordSets`), `VocabManagementScreen`
+shell with segmented control ("Tambah Kosakata" $\leftrightarrow$ "Edit
+Kata"), `EditKataScreen` (level filter, search filter, word list), and
+`_EditWordSheet` (read-only word info + editable `topics` FilterChips
+and "+ Tambah topik baru" creator, saving only `topics` and `updatedAt`).
+`firestore.rules` updated locally for `targetWordSets` create validation.
+**335/335 tests passing (`flutter test --concurrency=1`), `flutter analyze`
+clean.** `firestore.rules` is updated locally but **not yet deployed**,
+and **manual browser E2E verification is pending** (§7).
+
 ## 2. Milestone History
 
 | # | Milestone | Status |
@@ -71,7 +86,7 @@ repository alone.
 | 5 | Cloudflare Worker + guru "Tambah Kosakata" | **Complete — implemented, deployed, and manually verified end-to-end (§5g/§5h). Committed (`25b4de0`) — see §10.** |
 | 6 | Student dashboard + Riwayat + Placement/Pre-Post-Test scaffolds | **Implemented (§5i) — automated tests passing, `flutter analyze` clean. Committed (`c5c6c66`) — see §10. Deploying `firestore.rules`/`firestore.indexes.json` and a real browser click-through are still outstanding (§7).** |
 | 7 | Storyfier core (3-phase learning flow) | **Complete — implemented (§5j), hardened via Stages 1–8 (§5k), deployed, and manually E2E-verified (project-owner-reported). Committed (`a7e4d01`, `8f313f2`) — see §10.** |
-| 8 | Guru: Set Target Kata + Edit Kata | Not started |
+| 8 | Guru: Set Target Kata + Edit Kata | **Implemented in code, automated test verified (335/335 passing, `flutter analyze` clean) (§5l). Firestore rules updated locally (undeployed). Manual E2E verification pending project owner browser test.** |
 
 ### Milestone 4 stage detail
 
@@ -1041,16 +1056,43 @@ what the current code would produce for two words each used once without
 a suggestion, but that is a consistency check against current source,
 not independent reproduction of the live event itself.
 
+### 5l. Milestone 8 Implementation Detail (Guru: Set Target Kata + Edit Kata)
+
+**Scope implemented:**
+1. **Set Target Kata (`SPEC.md` §4.1, `DATA_MODEL.md` §5, `DESIGN_REFERENCE.md` §5.4):**
+   - Replaced `TargetWordsPlaceholder` with real `TargetWordsScreen` on the guru "Target Kata" nav destination.
+   - `TargetWordsScreen`: displays teacher-scoped target sets via `teacherTargetWordSetsProvider` (empty state, active/expired/upcoming status badge, CEFR level badge, word count, humanized date range supporting "Tanpa batas akhir", chips of target words).
+   - `SetTargetWordScreen`: full-screen route for creating new target sets. Choice chips for CEFR level (A1–C2), word multi-selector from in-memory CEFR bundle with search filter, date picker for `startAt` (defaults to today 00:00:00) and `endAt` (defaults to `kNoEndDate` / 2099 sentinel via "Tanpa batas akhir" toggle, or custom date at 23:59:59), date validation (`startAt <= endAt`).
+   - Writes to `targetWordSets` with `teacherId == auth.uid`, normalized `wordIds`, `cefrLevel`, `startAt`, `endAt`, `targetStudentIds: [kAllStudents]`, and `createdAt: serverTimestamp()`.
+   - Strictly Create + List only (no edit, delete, or deactivate).
+2. **Edit Kata (`SPEC.md` §4.1, `DATA_MODEL.md` §2/§2b, `DESIGN_REFERENCE.md` §5.4):**
+   - Replaced direct `TambahKosakataScreen` mounting with `VocabManagementScreen` hosting a segmented control between "Tambah Kosakata" and "Edit Kata".
+   - `EditKataScreen`: CEFR level filter chips, search text field, word list with primary meaning & current topics.
+   - `_EditWordSheet`: modal bottom sheet with read-only word details (`word`, `cefrLevel`, `meanings` with POS & translation, `source`) and editable `topics` via `FilterChip` + "+ Tambah topik baru" inline creator (`createOrGetTopic`).
+   - Save button disabled if topics unchanged; updates `vocabWords/{wordId}` with only `topics` and `updatedAt: serverTimestamp()`, keeping all other fields strictly immutable. Invalidates `vocabLevelProvider` on save so delta bundle immediately reflects changes.
+3. **Data & Security Rules (`firestore.rules`):**
+   - Updated `match /targetWordSets/{setId}` to allow `create` for authenticated guru matching `teacherId == request.auth.uid`, exact allowed key set, non-empty `wordIds` and `targetStudentIds`, and valid timestamps. `update` and `delete` explicitly remain denied (`allow update, delete: if false;`).
+   - `vocabWords` rule preserved with its existing `topics + updatedAt` branch.
+4. **Logout Regression Resolution:**
+   - Identified that logout button was previously hosted inside Milestone 2/3 placeholder bodies (`TargetWordsPlaceholder` / `DashboardPlaceholder`) rather than in the shared `AppNavShell`.
+   - Restored shared, role-agnostic logout by adding an optional `onLogout` callback to `AppNavShell` wired to `Icons.logout` with tooltip `'Keluar'` in the `AppBar.actions`, passed from `_RootRouter` via `authServiceProvider.signOut()`. Available to both Guru and Siswa across all destinations on both wide and narrow screen layouts.
+
+**Test results:**
+- `flutter analyze`: **0 issues**.
+- `flutter test --concurrency=1`: **342/342 passing** (including comprehensive tests for wide/narrow responsive logout on both Guru and Siswa).
+- `vocably-ai-worker`: `npm test` **89/89 passing**, `npm run typecheck` clean.
+- **Status:** Implemented and automated-test-verified only. `firestore.rules` updated locally (not deployed). Manual browser E2E verification pending project owner testing.
+
 ## 6. Firebase / Firestore State
 
 - **Project:** `vocably-idn-en`, Firestore Native mode, `asia-southeast1`.
-- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2); `vocabWords`/`topics` — read-only for any authenticated user, plus guru-only write rules added in Milestone 5 (§5g) for both; `targetWordSets`/`placementTestResults`/`researchAssessmentResults` — read-only rules added in Milestone 6 (§5i), all writes explicitly denied still (Milestone 8/TBD respectively); `learningProgress`/`learningSessions` — read rules from Milestone 6, **real write rules added in Milestone 7** (§5j).
-- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3). `targetWordSets`/`placementTestResults`/`researchAssessmentResults` have **no real documents at all** — nothing in the app writes them yet (Milestone 8/TBD). `learningProgress`/`learningSessions` now have a real Flutter-side writer (§5j) but **no real documents yet either** — nothing has been deployed/manually exercised against the live project.
-- **`cefrLevel` + `updatedAt` composite index (§5b/§11.3):** **confirmed deployed and live** — verified directly against the project via `firebase firestore:indexes`, which returned exactly this index (plus Firestore's automatic `__name__` tiebreaker field), matching `firestore.indexes.json`. (This corrects an earlier snapshot of this file, which still listed the deploy as outstanding — the live project had already moved past that by the time this was checked.)
-- **`targetWordSets` composite index (`targetStudentIds` array-contains + `endAt` ASC, §5i):** added to `firestore.indexes.json` this session, matching `DATA_MODEL.md` §5's documented query exactly — **not yet deployed**, see §7. `learningProgress`/`learningSessions` deliberately don't need a new index — see §5i's note on why those two collections' queries were designed to avoid one, reaffirmed by Milestone 7's Decision 1 (no resume query).
-- **`vocabWords`/`topics` guru-write rules (§5g):** **deployed and confirmed working** — the project owner's manual E2E pass (§5h) successfully created a word, appended a meaning, and created a topic as guru through the real app, which only works if these rules are live. The rules' negative path (a signed-in siswa being denied) was not explicitly exercised in that pass.
-- **Milestone 6's read rules** (`targetWordSets`/`placementTestResults`/`researchAssessmentResults`, and the read half of `learningProgress`/`learningSessions`): written, internally consistent with the models/services that read them, but **not yet deployed and not yet exercised against the real project**. See §7.
-- **Milestone 7's `learningProgress`/`learningSessions` write rules (§5j/§5k):** written to match `LearningProgressService`/`LearningSessionService`'s actual write shapes. **Reported by the project owner as deployed**, corroborated by a real manual E2E session (§5k) succeeding under them — an AI session has no way to independently query the live published rules content, so this remains a reported fact, not one this document can mark as directly confirmed. Still never validated against a Firestore emulator (no Java runtime in this environment, a standing, pre-existing limitation).
+- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2); `vocabWords`/`topics` — read-only for any authenticated user, plus guru-only write rules added in Milestone 5 (§5g) for both; `targetWordSets` — read-only rules from Milestone 6, **guru create rule added in Milestone 8** (§5l); `placementTestResults`/`researchAssessmentResults` — read-only rules added in Milestone 6 (§5i), all writes explicitly denied still; `learningProgress`/`learningSessions` — read rules from Milestone 6, **real write rules added in Milestone 7** (§5j).
+- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3). `targetWordSets` has write/create functionality implemented in Milestone 8. `placementTestResults`/`researchAssessmentResults` have **no real documents at all** — nothing in the app writes them yet. `learningProgress`/`learningSessions` have real Flutter-side writers (§5j).
+- **`cefrLevel` + `updatedAt` composite index (§5b/§11.3):** **confirmed deployed and live** — verified directly against the project via `firebase firestore:indexes`, which returned exactly this index (plus Firestore's automatic `__name__` tiebreaker field), matching `firestore.indexes.json`.
+- **`targetWordSets` composite index (`targetStudentIds` array-contains + `endAt` ASC, §5i):** added to `firestore.indexes.json` previously — needed for student dashboard "Target Kata Hari Ini" query.
+- **`vocabWords`/`topics` guru-write rules (§5g):** **deployed and confirmed working** — the project owner's manual E2E pass (§5h) successfully created a word, appended a meaning, and created a topic as guru through the real app.
+- **Milestone 8's `targetWordSets` create rule (§5l):** written and verified locally; **not yet deployed** to the live Firebase project. See §7.
+- **Milestone 7's `learningProgress`/`learningSessions` write rules (§5j/§5k):** written to match `LearningProgressService`/`LearningSessionService`'s actual write shapes. **Reported by the project owner as deployed**, corroborated by a real manual E2E session (§5k) succeeding under them.
 
 ## 7. Manual Actions Required
 
@@ -1067,120 +1109,44 @@ know these happened and roughly when):
 
 **Still genuinely outstanding:**
 
-1. **Manually click through Milestone 6 end-to-end** (dashboard, Riwayat both tabs, the one-time placement-test offer, the placeholder screens) — carried over; Milestone 7's own manual pass (§5k) likely exercised Riwayat's non-empty state incidentally, but Milestone 6's own checklist (dashboard cards, both Riwayat tabs, the placement-test offer interstitial) has not been explicitly confirmed item-by-item.
-2. **Confirm whether Cloudflare's native Rate Limiting binding is available on your Workers plan** (§5g) — **still unconfirmed either way; the Worker is still running on the in-memory fallback.** If you confirm it's available, uncomment the `unsafe.bindings` block in `vocably-ai-worker/wrangler.jsonc` (no code change needed elsewhere) and redeploy. Do not treat this as done until you've actually checked your plan's dashboard/docs.
-3. **Optionally exercise the `firestore.rules` negative path** — confirm a signed-in siswa attempting to create/update `vocabWords` or create a `topics` doc is actually denied (Milestone 5); that a signed-in student can't read another student's `learningProgress`/`learningSessions`/`placementTestResults`/`researchAssessmentResults` documents (Milestone 6); and that a `learningProgress` write attempting to downgrade an already-`mastered` word, or a `learningSessions` write attempting an out-of-order phase transition, is actually rejected (Milestone 7). Not part of any automated pass — no Firestore emulator in this environment (no Java runtime available).
-4. **Manually re-verify the browse screen** (`flutter run -d chrome`) — confirm pagination (§5e: "Halaman X dari Y", Previous/Next, resets on level/mode/filter change) and that A1/A2/B1 × Abjad/Tema all still load correctly end-to-end. Carried over from Milestone 4 — still only automated-test-verified. Not a blocker for any milestone since.
-5. **Manually re-check Word Detail** for words like "can" (modal), "billion" (number), "one", "oh", "this" now that the extended alias table and the loading/retryable/unavailable UI split are in place (§5c/§5d) — verified via unit/widget tests only so far. Carried over from Milestone 4 — not a blocker for any milestone since.
-6. **Review the 10 same-POS collisions** in `tools/vocab_import/output/import_report.json` (`samePosCollisions`) — not blocking, but worth a look since the schema can only keep one sense per POS.
-7. **Optionally spot-check translation quality** beyond what this session sampled — `tools/vocab_import/output/canonical_vocab_translated.json` has all 4,952 documents; the "equal"/noun case (§5) is the one known imperfect example found so far.
-8. **Going forward, run `flutter test --concurrency=1`, not plain `flutter test`** (§5i/§9) — the default-concurrency run on this machine has been confirmed (three separate runs) to silently skip a large, non-deterministic subset of test files while still exiting successfully. `--concurrency=1` is slower but is the only mode confirmed to actually run and report on every test file.
-9. **Documentation gaps surfaced by §5k, not yet closed:** `DATA_MODEL.md` §10.2 is missing the `aiUsedWords` response field and inaccurately claims `hasError` feeds `cowriteWordsUsedCorrectly`; `SPEC.md` has no trace of the 3-turn AI fallback or the bare-word exclusion rule. See §5k for detail.
-10. Decide whether/when to `git add`/commit/push anything new in **both** repos going forward — both are currently clean and pushed (§10), so nothing is pending right now, but this remains a manual, per-change decision per your standing instruction.
+1. **Deploy Milestone 8's `firestore.rules` update** (`targetWordSets` guru create rule) — run `firebase deploy --only firestore:rules` when ready.
+2. **Manually click through Milestone 8 end-to-end in the browser:**
+   - **Guru flow (Set Target Kata):** Login as Guru $\rightarrow$ "Target Kata" $\rightarrow$ click "+ Set Target Baru" $\rightarrow$ select CEFR level (e.g. A1), select 2-3 words (e.g. "apple", "banana"), set date range with "Tanpa batas akhir" $\rightarrow$ Simpan $\rightarrow$ verify card appears in Target Kata list.
+   - **Student regression flow:** Login as Siswa $\rightarrow$ Dashboard "Target Kata Hari Ini" card reflects the newly targeted words $\rightarrow$ tap "Belajar Kata Ini dengan Cerita" $\rightarrow$ verify Storyfier generates story targeting those words.
+   - **Guru flow (Edit Kata):** Login as Guru $\rightarrow$ "Kosakata" $\rightarrow$ "Edit Kata" sub-tab $\rightarrow$ search a word (e.g. "apple") $\rightarrow$ tap to edit $\rightarrow$ modify topics (toggle or add new topic via "+ Tambah topik baru") $\rightarrow$ Simpan $\rightarrow$ verify updated topics appear in list $\rightarrow$ Login as Siswa $\rightarrow$ verify browse by Topic reflects updated topic.
+   - **Logout action:** Verify top-right `AppBar` logout button ('Keluar') is accessible and logs out cleanly from any destination for both Guru and Siswa, on mobile (~390px) and desktop layouts.
+3. **Manually click through Milestone 6 end-to-end** (dashboard, Riwayat both tabs, the one-time placement-test offer, the placeholder screens) — carried over.
+4. **Confirm whether Cloudflare's native Rate Limiting binding is available on your Workers plan** (§5g) — **still unconfirmed either way; the Worker is still running on the in-memory fallback.**
+5. **Optionally exercise the `firestore.rules` negative path** — confirm a signed-in siswa attempting to create/update `vocabWords` or create a `topics`/`targetWordSets` doc is actually denied.
+6. **Manually re-verify the browse screen** (`flutter run -d chrome`) — confirm pagination (§5e) and that A1/A2/B1 × Abjad/Tema all still load correctly end-to-end.
+7. **Always run `flutter test --concurrency=1`, not plain `flutter test`** (§5i/§9) — default concurrency silently skips tests in this environment.
 
 ## 8. Important Architectural Decisions (this session)
 
-- **`translationId` renamed to `translation`** everywhere (Dart models, Firestore field, bundle field, the new import pipeline, tests, docs) — the old name wrongly implied a foreign key into a separate collection; it always held the translation text directly, and no separate `translations` collection exists or is planned. Safe to do because `vocabWords` had no real production data yet.
-- **`cefrLevel` stays one-per-document, set to the LOWEST level found across a word's contributing CSV rows** — all distinct meanings/POS are kept regardless of the level they originally came from (per-word, not per-meaning, CEFR — a known, accepted simplification, documented in `DATA_MODEL.md` §2).
-- **Oxford 3000 + Oxford 5000 are one merged dataset** — a word in both becomes one document; `source` = `"oxford3000"` if present there, else `"oxford5000"` (no new enum value).
-- **`CLAUDE.md`/`DATA_MODEL.md`'s "CSV import is not Claude's job" language was revised** (not deleted) to: Claude may write/maintain the pipeline; secrets and the first full run of a costly/production-writing stage stay developer-gated. See `tools/vocab_import/README.md` for the exact split.
-- **Same-POS collisions are surfaced, not silently resolved** — first-encountered row wins, the discarded alternative is logged for manual review, since the current schema has no way to represent two senses of the same POS for one word.
-- **`test/screens/vocab_browser_screen_test.dart` now injects a fake `AssetBundle`** instead of relying on the real `rootBundle` — needed once real, sizeable bundle files existed (a `flutter test` fake-async-pump artifact, not a production bug; see §5's Stage 4 entry for the full explanation). Follow this same pattern (reuse the existing `_FakeAssetBundle`/`_EmptyAssetBundle` style) for any future widget test that touches `vocabLevelProvider`.
-- **`test/services/vocab_bundle_service_test.dart` gained two tests exercising `loadLevelWithDelta`'s failure path directly** via subclassing (`_ThrowingDeltaVocabBundleService`/`_StubDeltaVocabBundleService`, overriding just `fetchDelta`) — the first direct test coverage this method has ever had (previously flagged as a disclosed gap since it needs Firestore). Follow this same subclassing pattern for any future test needing to control `fetchDelta` without a real/fake Firestore instance.
-- **`DictionaryEntry.definitionsForPos` alias table** (`modal`/`auxiliary`→`verb`, `number`→`numeral`/`noun`, `exclamation`→`interjection`, `determiner`→`pronoun`/`adjective`) reconciles Vocably/Oxford's POS taxonomy against DictionaryAPI's Wiktionary-derived tags — confirmed empirically against the live API twice (§5c, §5d), not guessed. `article` deliberately left unmapped (no evidence-based equivalent found). Extend this table, not the matching logic's shape, if another mismatch is found later.
-- **Word Detail's dictionary content is now a 4-state sealed type** (`_DictionaryLoading`/`_DictionaryFound`/`_DictionaryUnavailable`/`_DictionaryRetryable`, `word_detail_screen.dart`) instead of a flat nullable list — loading, a permanent content gap, and a transient/retryable failure are visually distinct, with a working retry action for the last one. Follow this same distinction (don't collapse states back into one) if this screen changes again.
-- **Vocabulary browse is paginated (50/page, §5e)** — always filter/sort first via `applyVocabBrowseFilter`, then paginate via `paginate()`. Never paginate before filtering.
-- **Milestone 5 decisions (project owner, this session):** Worker as a separate sibling repo (`vocably-ai-worker/`); reuse the existing Dinoiki OpenAI-compatible endpoint/model rather than switching providers; `wrangler dev` for local Worker development (not a dev-flag on the deployed Worker); an in-memory rate-limit fallback (not a paid plan) if the native Cloudflare binding turns out unavailable on Free; Tambah Kosakata only this milestone, no inert Edit Kata tab — see §5g.
-- **`VocabWordService.createWord`/`appendMeaning` build their Firestore write maps directly, not via `VocabWord.toMap()`** — that method emits a concrete client `Timestamp`, which can't satisfy `firestore.rules`' `updatedAt == request.time`; a client write needs an actual `FieldValue.serverTimestamp()` sentinel (same pattern `AppUser.newStudentData()` already uses for `users.createdAt`). Follow this same distinction if another client-side Firestore writer is added later.
-- **`topicSlug()` (Dart) must stay byte-for-byte identical to `tools/vocab_import/lib/seedDecision.js`'s version** — both compute the same `topics` collection's `docId`. If one changes, change the other and re-verify both test suites.
-- **`vocably-ai-worker/`'s CORS allowlist is a single flat list (`wrangler.jsonc`'s top-level `vars.ALLOWED_ORIGINS`), not split across a `vars`/`env.development` divide** (§5h) — the earlier per-environment split assumed local Flutter dev always talks to a locally-running `wrangler dev` Worker, but the real workflow points the local client straight at the deployed Worker via `--dart-define=WORKER_BASE_URL`, which only ever reads the top-level `vars`. If Worker environment-specific config is reintroduced later, keep this lesson in mind — verify what a plain `wrangler deploy` actually reads before assuming a dev-only origin is safely isolated.
-- **Milestone 6 decisions (project owner, this session):** `intl` added as a normal dependency for `d/M/yyyy HH:mm` formatting rather than hand-rolled date formatting; the placement-test auto-offer is a full-screen `_RootRouter` interstitial (not a dialog layered over `AppNavShell`); the `[[kata|bentuk]]` story-marker parser (`utils/story_markers.dart`) was built now as a standalone shared utility, with no Storyfier phase/UI logic pulled forward — see §5i for the full write-up.
-- **`learningProgress`/`learningSessions` are queried with single-field equality only (`studentId ==`), sorted/filtered in the provider layer** — not the `studentId` + `masteryStatus`/`orderBy(startedAt desc)` composite queries `DATA_MODEL.md` §8 sketches. Deliberately avoids needing a new composite index for two collections nothing writes to before Milestone 7, learning from the real Milestone 4 incident where an undeployed documented index took down a whole feature once real data existed. `targetWordSets`' query, by contrast, **is** implemented exactly as `DATA_MODEL.md` §5 already specifies, composite index included — see §5i for the full reasoning on why these two collections were treated differently.
-- **A real `flutter test` environment defect was found this session**: default concurrency silently drops a non-deterministic subset of test files (new and pre-existing) while still reporting success. Always use `--concurrency=1` for a trustworthy full-suite run in this environment — see §5i/§9/§12.
-- **Milestone 7 Phase 2 / Stage 8 decisions (project owner):** story
-  `usedForm` integrity fixed via Worker-prompt strengthening only, never
-  a code-level morphology heuristic; Cowrite bare-word rejection fixed
-  via a narrow, deterministic client-side guard (no grammar parsing);
-  the 3-turn AI fallback's eligibility logic lives entirely in the
-  Worker's prompt (counts existing transcript entries, no new request
-  field) and its `aiUsedWords` is kept structurally separate from
-  `independentWordsUsedCorrectly` so it can never count toward student
-  mastery; Cowrite ends immediately (no trailing AI bubble) once the
-  student's own turn completes all target words. See §5k for full detail
-  and the still-open items this phase surfaced but did not fix.
-- All Milestone 1–5 decisions from the previous snapshot (Riverpod-only, no routing package, no `custom_lint`, rules-enforced role assignment, `definitionsForPos` alias table, paginate-after-filter, Milestone 5's Worker/rate-limiting/CORS decisions, etc.) remain unchanged and still apply — not re-litigated this session.
-- **Milestone 7 decisions (project owner, this session — see §5j for full detail):** no resume behavior for abandoned sessions; "Pelajari Kembali" relearns the whole `difficult`-filtered list, no checkbox selection; `learningProgress` written in two steps (cloze-submit default-`difficult`, co-write-completion mastery upgrade), each via a per-word Firestore transaction; the learning cart clears only once the first generate succeeds.
-- **`LearningFlowController` takes `studentId` as an explicit parameter, not read from Firebase Auth internally** — keeps the entire 3-phase flow's state machine testable with a plain string. Follow this same pattern (explicit params over reading auth state inside a notifier) for any future controller with non-trivial logic worth unit-testing in isolation.
-- **A `Stream`-backed Riverpod provider's `.value` can still be `null` immediately after an override, even a `Stream.value(...)` one** — its single event lands on a microtask, not synchronously. Any test that overrides a stream provider and then immediately reads `.value` in the same synchronous flow (e.g. inside a tap handler invoked right after `pumpWidget`) needs to either `container.listen(...)` it first or add an extra `pump()` before interacting. Found and fixed in `learning_cart_screen_test.dart` (§5j) — not a production bug, since the real app keeps `currentUserProfileProvider` permanently hot from sign-in onward, but worth remembering for any future test with a similar shape.
+- **Milestone 8 decisions (project owner, approved 2026-08-31):**
+  - `targetWordSets` is strictly **Create + List only** for Milestone 8 (no edit, delete, or deactivate).
+  - "Kosakata" destination uses `VocabManagementScreen` wrapper with a 2-option `SegmentedButton` ("Tambah Kosakata" $\leftrightarrow$ "Edit Kata") per `DESIGN_REFERENCE.md` §5.4.
+  - "+ Set Target Baru" opens a full-screen `SetTargetWordScreen` via `Navigator.push`.
+  - Date range semantics are inclusive: `startAt <= now <= endAt`, start date at `00:00:00.000` (beginning of day), end date at `23:59:59.999` (end of day), and "Tanpa batas akhir" uses `kNoEndDate` (`2099-12-31`).
+  - `targetWordSets.wordIds` contains canonical normalized English word strings (`entry.word`), matching `VocabWord.word` and Firestore `docId`.
+  - For `vocabWords`, only `topics` and `updatedAt: serverTimestamp()` may be modified by Edit Kata; all other vocabulary fields remain immutable.
+  - Teacher target sets query uses single-field equality on `teacherId == auth.uid` with in-memory sorting (`createdAt desc`) in the provider layer to avoid requiring a composite index.
+  - Logout action is hosted in `AppNavShell` via `AppBar.actions` with `onLogout` callback, ensuring consistent logout availability across all roles and responsive layouts without embedding auth/Firebase coupling into `AppNavShell`.
 
 ## 9. Verification Status
 
-- `flutter analyze`: **no issues**.
-- `flutter test`: **288/288 passing — but only reliably observed via `flutter test --concurrency=1`** (this environment's default-concurrency invocation remains untrustworthy, per the standing finding in §5i/§12 — always use `--concurrency=1`). The 288 total reconciles exactly against arithmetic from the prior 232-test snapshot plus this session's additions (§5j's "Tests added" list: 56 new tests) — cross-checked, not just trusted at face value.
-- `tools/vocab_import` pure-logic tests (`node --test`): **43/43 passing** (untouched this session).
-- **`vocably-ai-worker/` (separate repo) tests:** `npm test` (Vitest, real `workerd` runtime via `@cloudflare/vitest-plugin`) — **61/61 passing** (unchanged this session — no Worker code touched). `npm run typecheck` — clean.
-- Stage 1–4 (Milestone 4 data pipeline): unchanged, still real/complete — see §5 for detail.
-- **Post-seed bug found and fixed** (§5b), **English-definition gaps investigated twice** (§5c/§5d), **pagination added** (§5e) **and its overflow fixed** (§5f) — all as previously recorded, unchanged this session.
-- **Milestone 5 implemented, deployed, and manually verified end-to-end** (§5g/§5h): Worker (all 3 endpoints to their documented contracts, auth/CORS/rate-limiting infrastructure), Flutter integration (services/providers/screens), `firestore.rules` guru write access. A real CORS configuration bug was found during the manual pass and fixed (§5h) — re-verified after the fix: Worker suite 61/61, `npm run typecheck` clean. **What manual verification actually covered vs. didn't** is spelled out precisely in §5h — don't assume everything is checked; in particular, Rate Limiting plan availability is explicitly still unconfirmed (§7).
-- **Milestone 6 implemented and automated-test-verified only** (§5i) — `firestore.rules`/`firestore.indexes.json` changes are written but **not deployed**, and **no manual browser verification has happened yet**.
-- **Milestone 7, including Phase 2 Stages 1–8, is implemented, deployed, and has one recorded manual E2E pass** (§5j/§5k) — `firestore.rules` write rules reported deployed; a real Worker round-trip and Riwayat reflection reported exercised once (brown/building session). **Confirmed fresh, 2026-08-31:** `flutter analyze` clean; `flutter test --concurrency=1` **320/320 passing** (up from the 288 recorded at §5j's base implementation — the +32 delta spans both the rest of Milestone 7's base work and Stages 1–8 combined; see §5k for why a precise per-stage split isn't available). `vocably-ai-worker`: `npm test` **89/89 passing** (up from 61 at Milestone 5/§5g), `npm run typecheck` clean.
+- `flutter analyze`: **no issues (0 warnings/errors)**.
+- `flutter test --concurrency=1`: **342/342 passing** (100% test suite passing, including all Milestone 8 and logout regression tests).
+- `vocably-ai-worker/` tests: `npm test` **89/89 passing**, `npm run typecheck` clean (untouched this session).
+- `tools/vocab_import` tests: **43/43 passing**.
 
 ## 10. Current Git State
 
-- **Flutter repo (`vocably/`) — branch `main`, clean, in sync with
-  `origin/main`, at `8f313f2`.** Full commit sequence since Milestone 6:
-  `a7e4d01` (2026-08-31 03:57:37 +0700, "Prevent bare words from
-  counting in Cowrite" — 2 files) then `8f313f2` (2026-08-31 05:58:53
-  +0700, "Implement Storyfier three-phase learning flow" — 34 files,
-  4,154 insertions, including the rest of Milestone 7's base
-  implementation plus this file and `DATA_MODEL.md`/`firestore.rules`).
-  Note the ordering: the small Stage-8 bare-word fix commit landed
-  **before** the large base-implementation commit, roughly two hours
-  earlier the same morning — confirmed via `git log --format="%h %ad"`,
-  not assumed from `git log`'s default display order.
-- **`vocably-ai-worker/` (sibling repo) — branch `main`, in sync with
-  `origin/main`, at `cbb066a` ("Implement Stage 8 story integrity and
-  cowrite fallback").** 4 untracked, harmless debris files present in the
-  working tree (`diff-cowriteTurn-test.txt`, `diff-cowriteTurn.txt`,
-  `diff-generateStory-test.txt`, `diff-generateStory.txt`) — not
-  committed, not part of any tracked change, left over from an earlier
-  diffing step. Not cleaned up as part of this update — flagged for the
-  project owner to delete or ignore at their discretion.
-- **Latest confirmed Worker deployment:** version
-  `cc325d6d-723d-4adf-a6b1-6d139fcdc2f4`, created `2026-08-30T19:26:47Z`
-  (via `npx wrangler deployments list` — read-only, does not prove the
-  live response *shape*, only that this version is what's currently
-  serving). Timestamp sits ~2 minutes after `cbb066a`'s commit time,
-  consistent with (not proof of) that commit being what's deployed.
+- **Flutter repo (`vocably/`) — branch `main`, working tree has uncommitted Milestone 8 implementation and logout regression files (no commit/push performed per instruction).**
+- **`vocably-ai-worker/` (sibling repo) — branch `main`, clean, in sync with `origin/main` at `cbb066a` (untouched).**
 
 ## 11. Next Recommended Step
 
-**Milestone 7 (including Phase 2 Stages 1–8) is deployed, committed, and
-has one recorded manual E2E pass** (§5j/§5k/§9/§10). Before starting
-Milestone 8:
-
-1. Consider whether the documentation gaps §5k surfaced (missing
-   `aiUsedWords` in `DATA_MODEL.md` §10.2, the inaccurate `hasError`
-   claim there, no `SPEC.md` trace of the fallback/bare-word behavior)
-   should be closed first — a future session reading only `SPEC.md`/
-   `DATA_MODEL.md` would not otherwise know these behaviors exist.
-2. Optionally investigate the two still-open, unreproduced items from
-   §5k (the Selesai double-tap gap, precise per-stage test-count
-   reconstruction) if they ever surface as real problems — neither is
-   confirmed broken, both are flagged as plausible risk only.
-3. Work through §7's remaining non-blocking items (Rate Limiting plan
-   confirmation, rules negative-path checks, Milestone-4-era
-   re-verification items) at your discretion.
-4. **Per `CLAUDE.md` §7's documented milestone order, guru's "Set Target
-   Kata" + "Edit Kata" is Milestone 8** — next in sequence,
-   **not started, not to be started without explicit instruction.**
-
-## 12. Handoff Instructions for a New AI Session
-
-1. Read this file first for orientation, then `CLAUDE.md` in full (its own header requires this every session).
-2. Read `SPEC.md`, `DATA_MODEL.md`, `DESIGN_REFERENCE.md` as needed.
-3. **Inspect the live repository** before changing anything — `git log`, `git status`, actual file contents, and (for the import pipeline) `tools/vocab_import/output/*.json` and `translate_full_run.log` for the real current data-population state. This file drifts; the repository doesn't. **Also check the sibling `vocably-ai-worker/` repo** (`c:\Users\isaan\projects\flutter\vocably-ai-worker`, separate `git log`/`git status`) — it's a separate codebase from Milestone 5 onward (§5g) and this file's view of it can go stale independently of the Flutter repo's.
-4. Check whether §7's manual actions (Firestore index/rules deploys, Worker setup/deploy) have already been done since this snapshot was written.
-5. Preserve §8's decisions unless the project owner explicitly reopens discussion on one of them.
-6. **Before committing anything, `git status`/`git diff` for anything not attributable to a documented change in this file** (e.g. §10's note on a `.gitignore` line neither this session nor the previous one added) — surface it to the project owner rather than assuming it's fine to commit or silently reverting it.
-7. **Always run `flutter test --concurrency=1`, never plain `flutter test`, when the result needs to be trustworthy** (§5i/§9) — this environment's default test concurrency has been confirmed (three separate runs) to silently skip a non-deterministic subset of test files while still reporting success. If a future session forgets this and reports a suspiciously-round "all passing" number, re-run with `--concurrency=1` and diff the file coverage before trusting it.
+1. Deploy the updated `firestore.rules` via `firebase deploy --only firestore:rules`.
+2. Perform manual browser E2E verification using the checklist in §7.
+3. Once verified, commit and push Milestone 8 changes.

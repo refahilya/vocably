@@ -313,3 +313,58 @@ abstract class _$TambahKosakataController extends $AsyncNotifier<void> {
     return element.handleCreate(ref, build);
   }
 }
+
+/// Drives the guru "Edit Kata" write flow (`SPEC.md` §4.1, Milestone 8).
+/// Updates only `topics` (and `updatedAt`) for an existing vocabulary word.
+
+@ProviderFor(EditKataController)
+final editKataControllerProvider = EditKataControllerProvider._();
+
+/// Drives the guru "Edit Kata" write flow (`SPEC.md` §4.1, Milestone 8).
+/// Updates only `topics` (and `updatedAt`) for an existing vocabulary word.
+final class EditKataControllerProvider
+    extends $AsyncNotifierProvider<EditKataController, void> {
+  /// Drives the guru "Edit Kata" write flow (`SPEC.md` §4.1, Milestone 8).
+  /// Updates only `topics` (and `updatedAt`) for an existing vocabulary word.
+  EditKataControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'editKataControllerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$editKataControllerHash();
+
+  @$internal
+  @override
+  EditKataController create() => EditKataController();
+}
+
+String _$editKataControllerHash() =>
+    r'11322477e19709cf090cbcf03f18ffb66a24af98';
+
+/// Drives the guru "Edit Kata" write flow (`SPEC.md` §4.1, Milestone 8).
+/// Updates only `topics` (and `updatedAt`) for an existing vocabulary word.
+
+abstract class _$EditKataController extends $AsyncNotifier<void> {
+  FutureOr<void> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<void>, void>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<void>, void>,
+              AsyncValue<void>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}

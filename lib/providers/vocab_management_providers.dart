@@ -37,13 +37,21 @@ Future<VocabWord?> vocabWordLookup(Ref ref, String rawWord) {
 /// plus its (auto-generated, not manually typed — `DESIGN_REFERENCE.md`
 /// §5.4) Indonesian translation preview.
 class MeaningDraft {
-  const MeaningDraft({required this.pos, this.translation, this.isGenerating = false});
+  const MeaningDraft({
+    required this.pos,
+    this.translation,
+    this.isGenerating = false,
+  });
 
   final String pos;
   final String? translation;
   final bool isGenerating;
 
-  MeaningDraft copyWith({String? pos, String? translation, bool? isGenerating}) {
+  MeaningDraft copyWith({
+    String? pos,
+    String? translation,
+    bool? isGenerating,
+  }) {
     return MeaningDraft(
       pos: pos ?? this.pos,
       translation: translation ?? this.translation,
@@ -104,7 +112,10 @@ class TambahKosakataController extends _$TambahKosakataController {
       final vocabWordService = ref.read(vocabWordServiceProvider);
       await vocabWordService.appendMeaning(
         normalizedWord: normalizedWord,
-        newMeaning: VocabMeaning(pos: meaning.pos, translation: meaning.translation),
+        newMeaning: VocabMeaning(
+          pos: meaning.pos,
+          translation: meaning.translation,
+        ),
       );
     });
   }
@@ -113,14 +124,52 @@ class TambahKosakataController extends _$TambahKosakataController {
   /// (`/translate`) — throws [AiWorkerException] on failure, left for the
   /// calling widget to catch and show inline (this deliberately doesn't
   /// touch [state], see the class doc comment).
-  Future<String> generateTranslation({required String word, required String pos}) {
-    return ref.read(aiWorkerServiceProvider).translate(word: normalizeWord(word), pos: pos);
+  Future<String> generateTranslation({
+    required String word,
+    required String pos,
+  }) {
+    return ref
+        .read(aiWorkerServiceProvider)
+        .translate(word: normalizeWord(word), pos: pos);
   }
 
   /// Creates a new topic (or returns the existing one, if [name] already
   /// matches one) for the topic multi-select — see [TopicsService.
   /// createOrGetTopic]. Also deliberately doesn't touch [state].
   Future<Topic> addNewTopic({required String name, required String teacherId}) {
-    return ref.read(topicsServiceProvider).createOrGetTopic(name: name, teacherId: teacherId);
+    return ref
+        .read(topicsServiceProvider)
+        .createOrGetTopic(name: name, teacherId: teacherId);
+  }
+}
+
+/// Drives the guru "Edit Kata" write flow (`SPEC.md` §4.1, Milestone 8).
+/// Updates only `topics` (and `updatedAt`) for an existing vocabulary word.
+@riverpod
+class EditKataController extends _$EditKataController {
+  @override
+  FutureOr<void> build() {}
+
+  /// Updates the topics of an existing word (`SPEC.md` §4.1).
+  Future<void> updateWordTopics({
+    required String normalizedWord,
+    required List<String> topics,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final service = ref.read(vocabWordServiceProvider);
+      await service.updateTopics(
+        normalizedWord: normalizedWord,
+        topics: topics,
+      );
+    });
+  }
+
+  /// Creates a new topic (or returns existing) for the topic selector in
+  /// Edit Kata. Deliberately does not touch [state].
+  Future<Topic> addNewTopic({required String name, required String teacherId}) {
+    return ref
+        .read(topicsServiceProvider)
+        .createOrGetTopic(name: name, teacherId: teacherId);
   }
 }

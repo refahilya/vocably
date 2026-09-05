@@ -8,8 +8,8 @@ import 'screens/auth/login_screen.dart';
 import 'screens/student/dashboard/dashboard_screen.dart';
 import 'screens/student/history/history_screen.dart';
 import 'screens/student/placement_test/placement_test_offer_screen.dart';
-import 'screens/teacher/target_words/target_words_placeholder.dart';
-import 'screens/teacher/vocab_management/tambah_kosakata_screen.dart';
+import 'screens/teacher/target_words/target_words_screen.dart';
+import 'screens/teacher/vocab_management/vocab_management_screen.dart';
 import 'theme/theme.dart';
 import 'utils/role.dart';
 import 'widgets/app_nav_shell.dart';
@@ -31,12 +31,11 @@ class VocablyApp extends StatelessWidget {
 
 /// Root routing: switches on [appAuthStatusProvider].
 ///
-/// Siswa destinations (Belajar/Riwayat, Milestone 6) and guru's Kosakata
-/// (Milestone 5) are real screens now; guru's Target Kata stays a
-/// placeholder until Milestone 8 (see `CLAUDE.md` §7). Deliberately no
-/// routing package — plain Navigator.push is used for the login/sign-up
-/// toggle and for screens pushed on top of a nav-shell destination, per
-/// project decision.
+/// Siswa destinations (Belajar/Riwayat, Milestone 6) and guru destinations
+/// (Target Kata/Kosakata, Milestone 8) are all real screens now (see
+/// `CLAUDE.md` §7). Deliberately no routing package — plain Navigator.push
+/// is used for the login/sign-up toggle and for screens pushed on top of a
+/// nav-shell destination, per project decision.
 class _RootRouter extends ConsumerWidget {
   const _RootRouter();
 
@@ -62,6 +61,7 @@ class _RootRouter extends ConsumerWidget {
         destinations: profile.role == Role.guru
             ? _teacherDestinations(profile)
             : _studentDestinations(profile),
+        onLogout: () => ref.read(authServiceProvider).signOut(),
       ),
     };
   }
@@ -87,19 +87,19 @@ List<AppNavDestination> _studentDestinations(AppUser profile) {
 }
 
 /// Destinations for a signed-in `guru`: Target Kata (Milestone 8) and
-/// Kosakata (vocabulary management — Tambah Kosakata, Milestone 5; Edit
-/// Kata, Milestone 8 — see `CLAUDE.md` §7).
+/// Kosakata (vocabulary management — Tambah Kosakata & Edit Kata,
+/// Milestone 8 — see `CLAUDE.md` §7).
 List<AppNavDestination> _teacherDestinations(AppUser profile) {
   return [
     AppNavDestination(
       label: 'Target Kata',
       icon: Icons.track_changes,
-      body: TargetWordsPlaceholder(profile: profile),
+      body: TargetWordsScreen(profile: profile),
     ),
     AppNavDestination(
       label: 'Kosakata',
       icon: Icons.menu_book,
-      body: TambahKosakataScreen(profile: profile),
+      body: VocabManagementScreen(profile: profile),
     ),
   ];
 }

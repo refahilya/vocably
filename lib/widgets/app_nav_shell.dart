@@ -30,18 +30,23 @@ class AppNavDestination {
 /// no Firebase/Riverpod/auth/role knowledge at all; a caller supplies
 /// whatever [destinations] apply to the signed-in user.
 class AppNavShell extends StatefulWidget {
-  const AppNavShell({super.key, required this.destinations, this.initialIndex = 0})
-    : assert(
-        destinations.length > 0,
-        'AppNavShell requires at least one destination',
-      ),
-      assert(
-        initialIndex >= 0 && initialIndex < destinations.length,
-        'initialIndex must be a valid index into destinations',
-      );
+  const AppNavShell({
+    super.key,
+    required this.destinations,
+    this.initialIndex = 0,
+    this.onLogout,
+  }) : assert(
+         destinations.length > 0,
+         'AppNavShell requires at least one destination',
+       ),
+       assert(
+         initialIndex >= 0 && initialIndex < destinations.length,
+         'initialIndex must be a valid index into destinations',
+       );
 
   final List<AppNavDestination> destinations;
   final int initialIndex;
+  final VoidCallback? onLogout;
 
   /// Width at which the shell switches from the narrow top-tab layout to
   /// the wide `NavigationRail` layout. An implementation choice (no exact
@@ -64,14 +69,18 @@ class _AppNavShellState extends State<AppNavShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= AppNavShell.wideBreakpoint;
+    final isWide =
+        MediaQuery.sizeOf(context).width >= AppNavShell.wideBreakpoint;
     // Defensive clamp, not just belt-and-suspenders with the constructor
     // asserts above: asserts are stripped from release builds entirely, and
     // _selectedIndex lives in State, so it can in principle outlive a
     // rebuild that hands this widget a shorter `destinations` list than the
     // one _selectedIndex was chosen against. Indexing with the raw field
     // would then throw RangeError with no assert left to have caught it.
-    final selectedIndex = _selectedIndex.clamp(0, widget.destinations.length - 1);
+    final selectedIndex = _selectedIndex.clamp(
+      0,
+      widget.destinations.length - 1,
+    );
     // Only the selected destination is ever built — switching destinations
     // simply swaps which widget occupies this spot. No IndexedStack: none
     // of the current (placeholder) destinations have state worth keeping
@@ -81,6 +90,14 @@ class _AppNavShellState extends State<AppNavShell> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vocably'),
+        actions: [
+          if (widget.onLogout != null)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Keluar',
+              onPressed: widget.onLogout,
+            ),
+        ],
         bottom: isWide
             ? null
             : PreferredSize(

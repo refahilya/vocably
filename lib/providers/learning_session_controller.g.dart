@@ -75,7 +75,7 @@ final class LearningFlowControllerProvider
 }
 
 String _$learningFlowControllerHash() =>
-    r'40525e5f815eb472c20fb7e382e7f66db8f773d7';
+    r'e05b3daa3606b8e284dbbe6906e79e46c59c9a22';
 
 /// Drives one Storyfier flow end-to-end (`SPEC.md` §5): Fase 1 generate/
 /// regenerate, Fase 2 grading, Fase 3 chat — writing to

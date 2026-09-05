@@ -97,4 +97,19 @@ class VocabWordService {
       });
     });
   }
+
+  /// Updates the `topics` list of an existing `vocabWords` document
+  /// (`DATA_MODEL.md` §2/§2b, `SPEC.md` §4.1 "Edit Kata"), refreshing
+  /// `updatedAt` with `FieldValue.serverTimestamp()` in the same write.
+  /// Modifies only `topics` and `updatedAt`, matching `firestore.rules`'
+  /// `affectedKeys().hasOnly(['topics', 'updatedAt'])`.
+  Future<void> updateTopics({
+    required String normalizedWord,
+    required List<String> topics,
+  }) {
+    return _vocabWords.doc(normalizedWord).update({
+      'topics': topics,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }
