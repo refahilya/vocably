@@ -80,9 +80,15 @@ Future<ProviderContainer> _pumpStoryReading(
 }) async {
   final container = ProviderContainer(
     overrides: [
-      aiWorkerServiceProvider.overrideWithValue(aiWorkerService ?? _FakeAiWorkerService()),
-      learningSessionServiceProvider.overrideWithValue(_FakeLearningSessionService()),
-      vocabBundleServiceProvider.overrideWithValue(bundleService ?? _FakeVocabBundleService()),
+      aiWorkerServiceProvider.overrideWithValue(
+        aiWorkerService ?? _FakeAiWorkerService(),
+      ),
+      learningSessionServiceProvider.overrideWithValue(
+        _FakeLearningSessionService(),
+      ),
+      vocabBundleServiceProvider.overrideWithValue(
+        bundleService ?? _FakeVocabBundleService(),
+      ),
     ],
   );
   container
@@ -104,29 +110,39 @@ Future<ProviderContainer> _pumpStoryReading(
 }
 
 void main() {
-  testWidgets('generating a story shows the highlighted story and enables Selanjutnya', (
+  testWidgets(
+    'generating a story shows the highlighted story and enables Selanjutnya',
+    (tester) async {
+      final ai = _FakeAiWorkerService()
+        ..handler = (prompt) => GenerateStoryResult(
+          story: 'I [[run|ran]] today.',
+          translation: 'Saya berlari hari ini.',
+        );
+      await _pumpStoryReading(tester, aiWorkerService: ai);
+
+      await tester.enterText(find.byType(TextField), 'liburan');
+      await tester.tap(find.text('Generate'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('I ran today.', findRichText: true),
+        findsOneWidget,
+      );
+      final next = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Selanjutnya →'),
+      );
+      expect(next.onPressed, isNotNull);
+
+      await tester.tap(find.text('Selanjutnya →'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ClozeTestScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets('a failed generate shows a friendly error with a retry button', (
     tester,
   ) async {
-    final ai = _FakeAiWorkerService()
-      ..handler = (prompt) =>
-          GenerateStoryResult(story: 'I [[run|ran]] today.', translation: 'Saya berlari hari ini.');
-    await _pumpStoryReading(tester, aiWorkerService: ai);
-
-    await tester.enterText(find.byType(TextField), 'liburan');
-    await tester.tap(find.text('Generate'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('I ran today.', findRichText: true), findsOneWidget);
-    final next = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Selanjutnya →'));
-    expect(next.onPressed, isNotNull);
-
-    await tester.tap(find.text('Selanjutnya →'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(ClozeTestScreen), findsOneWidget);
-  });
-
-  testWidgets('a failed generate shows a friendly error with a retry button', (tester) async {
     final ai = _FakeAiWorkerService(); // handler null -> always throws
     await _pumpStoryReading(tester, aiWorkerService: ai);
 
@@ -134,10 +150,15 @@ void main() {
     await tester.tap(find.text('Generate'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Gagal membuat cerita. Periksa koneksi lalu coba lagi.'), findsOneWidget);
+    expect(
+      find.text('Gagal membuat cerita. Periksa koneksi lalu coba lagi.'),
+      findsOneWidget,
+    );
     expect(find.text('Coba lagi'), findsOneWidget);
 
-    final next = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Selanjutnya →'));
+    final next = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Selanjutnya →'),
+    );
     expect(next.onPressed, isNull);
   });
 
@@ -146,7 +167,10 @@ void main() {
     final ai = _FakeAiWorkerService()
       ..handler = (prompt) {
         callCount++;
-        return GenerateStoryResult(story: 'Story #$callCount [[run|ran]].', translation: 'T');
+        return GenerateStoryResult(
+          story: 'Story #$callCount [[run|ran]].',
+          translation: 'T',
+        );
       };
     await _pumpStoryReading(tester, aiWorkerService: ai);
 
@@ -168,11 +192,15 @@ void main() {
     'NOT open Cloze Test',
     (tester) async {
       final ai = _FakeAiWorkerService()
-        ..handler = (prompt) =>
-            GenerateStoryResult(story: 'I [[run|ran]] today.', translation: 'T');
+        ..handler = (prompt) => GenerateStoryResult(
+          story: 'I [[run|ran]] today.',
+          translation: 'T',
+        );
       final container = await _pumpStoryReading(tester, aiWorkerService: ai);
-      (container.read(learningSessionServiceProvider) as _FakeLearningSessionService)
-          .throwOnAdvanceToClozeTest = true;
+      (container.read(learningSessionServiceProvider)
+                  as _FakeLearningSessionService)
+              .throwOnAdvanceToClozeTest =
+          true;
 
       await tester.enterText(find.byType(TextField), 'liburan');
       await tester.tap(find.text('Generate'));
@@ -183,10 +211,18 @@ void main() {
 
       expect(find.byType(ClozeTestScreen), findsNothing);
       expect(find.byType(StoryReadingScreen), findsOneWidget);
-      expect(find.text('Gagal melanjutkan ke Cloze Test. Coba lagi.'), findsOneWidget);
+      expect(
+        find.text('Gagal melanjutkan ke Cloze Test. Coba lagi.'),
+        findsOneWidget,
+      );
       // Still retryable — the story and the button are both still there.
-      expect(find.textContaining('I ran today.', findRichText: true), findsOneWidget);
-      final next = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Selanjutnya →'));
+      expect(
+        find.textContaining('I ran today.', findRichText: true),
+        findsOneWidget,
+      );
+      final next = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Selanjutnya →'),
+      );
       expect(next.onPressed, isNotNull);
     },
   );
@@ -196,11 +232,14 @@ void main() {
     'straight to ClozeTestScreen without a second advanceToClozeTest() write',
     (tester) async {
       final ai = _FakeAiWorkerService()
-        ..handler = (prompt) =>
-            GenerateStoryResult(story: 'I [[run|ran]] today.', translation: 'T');
+        ..handler = (prompt) => GenerateStoryResult(
+          story: 'I [[run|ran]] today.',
+          translation: 'T',
+        );
       final container = await _pumpStoryReading(tester, aiWorkerService: ai);
       final fakeSessionService =
-          container.read(learningSessionServiceProvider) as _FakeLearningSessionService;
+          container.read(learningSessionServiceProvider)
+              as _FakeLearningSessionService;
 
       await tester.enterText(find.byType(TextField), 'liburan');
       await tester.tap(find.text('Generate'));
@@ -233,11 +272,14 @@ void main() {
     'shows the "sudah dikunci" message, without attempting overwriteStory()',
     (tester) async {
       final ai = _FakeAiWorkerService()
-        ..handler = (prompt) =>
-            GenerateStoryResult(story: 'I [[run|ran]] today.', translation: 'T');
+        ..handler = (prompt) => GenerateStoryResult(
+          story: 'I [[run|ran]] today.',
+          translation: 'T',
+        );
       final container = await _pumpStoryReading(tester, aiWorkerService: ai);
       final fakeSessionService =
-          container.read(learningSessionServiceProvider) as _FakeLearningSessionService;
+          container.read(learningSessionServiceProvider)
+              as _FakeLearningSessionService;
 
       await tester.enterText(find.byType(TextField), 'liburan');
       await tester.tap(find.text('Generate'));
@@ -248,7 +290,10 @@ void main() {
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
 
-      expect(find.text('Cerita sudah dikunci dan tidak dapat diubah lagi.'), findsOneWidget);
+      expect(
+        find.text('Cerita sudah dikunci dan tidak dapat diubah lagi.'),
+        findsOneWidget,
+      );
       final generateUlang = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Generate Ulang'),
       );
@@ -257,6 +302,29 @@ void main() {
       // Even if something did try to tap it, the button being disabled
       // means no tap can land — confirm no overwriteStory() call happened.
       expect(fakeSessionService.overwriteStoryCallCount, 0);
+    },
+  );
+
+  testWidgets(
+    'Bug B regression: raw translation markers are cleanly stripped when displaying translation',
+    (tester) async {
+      final ai = _FakeAiWorkerService()
+        ..handler = (prompt) => GenerateStoryResult(
+          story: 'I [[run|ran]] fast.',
+          translation: 'Saya [[run|berlari]] cepat.',
+        );
+      await _pumpStoryReading(tester, aiWorkerService: ai);
+
+      await tester.enterText(find.byType(TextField), 'olahraga');
+      await tester.tap(find.text('Generate'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Terjemahan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Saya berlari cepat.'), findsOneWidget);
+      expect(find.textContaining('[['), findsNothing);
+      expect(find.textContaining(']]'), findsNothing);
     },
   );
 }

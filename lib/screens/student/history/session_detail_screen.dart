@@ -42,7 +42,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(formatSessionTimestamp(session.startedAt), style: AppTextStyles.caption),
+            Text(
+              formatSessionTimestamp(session.startedAt),
+              style: AppTextStyles.caption,
+            ),
             const SizedBox(height: AppSpacing.md),
             RichText(
               text: TextSpan(
@@ -52,13 +55,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     switch (segment) {
                       PlainStorySegment(:final text) => TextSpan(text: text),
                       MarkedStorySegment(:final surfaceForm) => TextSpan(
-                          text: surfaceForm,
-                          style: const TextStyle(
-                            backgroundColor: AppColors.storyHighlightBackground,
-                            color: AppColors.storyHighlightText,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        text: surfaceForm,
+                        style: const TextStyle(
+                          backgroundColor: AppColors.storyHighlightBackground,
+                          color: AppColors.storyHighlightText,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
                     },
                 ],
               ),
@@ -66,12 +69,18 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             if (translation != null) ...[
               const SizedBox(height: AppSpacing.md),
               OutlinedButton(
-                onPressed: () => setState(() => _showTranslation = !_showTranslation),
-                child: Text(_showTranslation ? 'Sembunyikan Terjemahan' : 'Terjemahan'),
+                onPressed: () =>
+                    setState(() => _showTranslation = !_showTranslation),
+                child: Text(
+                  _showTranslation ? 'Sembunyikan Terjemahan' : 'Terjemahan',
+                ),
               ),
               if (_showTranslation) ...[
                 const SizedBox(height: AppSpacing.sm),
-                Text(translation, style: AppTextStyles.body),
+                Text(
+                  stripTranslationMarkers(translation),
+                  style: AppTextStyles.body,
+                ),
               ],
             ],
           ],

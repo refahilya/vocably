@@ -48,7 +48,10 @@ class PlainStorySegment extends StorySegment {
 /// the sentence (e.g. "ran" for target word "run") — this is what gets
 /// displayed/highlighted, never [targetWord].
 class MarkedStorySegment extends StorySegment {
-  const MarkedStorySegment({required this.targetWord, required this.surfaceForm});
+  const MarkedStorySegment({
+    required this.targetWord,
+    required this.surfaceForm,
+  });
 
   final String targetWord;
   final String surfaceForm;
@@ -85,10 +88,15 @@ List<StorySegment> parseStoryMarkers(String markedText) {
 
   for (final match in _markerPattern.allMatches(markedText)) {
     if (match.start > cursor) {
-      segments.add(PlainStorySegment(markedText.substring(cursor, match.start)));
+      segments.add(
+        PlainStorySegment(markedText.substring(cursor, match.start)),
+      );
     }
     segments.add(
-      MarkedStorySegment(targetWord: match.group(1)!, surfaceForm: match.group(2)!),
+      MarkedStorySegment(
+        targetWord: match.group(1)!,
+        surfaceForm: match.group(2)!,
+      ),
     );
     cursor = match.end;
   }
@@ -115,4 +123,13 @@ String stripStoryMarkers(String markedText) {
     });
   }
   return buffer.toString();
+}
+
+/// Strips internal markers (e.g. `[[word|translation]]` or `[[translation]]`)
+/// from a translation string so the end-user sees only plain readable Indonesian text.
+String stripTranslationMarkers(String translation) {
+  return translation.replaceAllMapped(
+    RegExp(r'\[\[(?:[^|\]]+\|)?([^\]]+)\]\]'),
+    (match) => match.group(1)!,
+  );
 }

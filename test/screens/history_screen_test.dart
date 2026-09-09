@@ -19,14 +19,16 @@ class _FakeLearningProgressService extends LearningProgressService {
   List<LearningProgress> rows = [];
 
   @override
-  Future<List<LearningProgress>> fetchForStudent(String studentId) async => rows;
+  Future<List<LearningProgress>> fetchForStudent(String studentId) async =>
+      rows;
 }
 
 class _FakeLearningSessionService extends LearningSessionService {
   List<LearningSession> sessions = [];
 
   @override
-  Future<List<LearningSession>> fetchForStudent(String studentId) async => sessions;
+  Future<List<LearningSession>> fetchForStudent(String studentId) async =>
+      sessions;
 }
 
 /// Simulates a real Firestore failure (a bad document shape, a rules
@@ -35,7 +37,9 @@ class _FakeLearningSessionService extends LearningSessionService {
 class _ThrowingLearningSessionService extends LearningSessionService {
   @override
   Future<List<LearningSession>> fetchForStudent(String studentId) {
-    throw Exception('simulated learningSessions failure (e.g. a bad document shape)');
+    throw Exception(
+      'simulated learningSessions failure (e.g. a bad document shape)',
+    );
   }
 }
 
@@ -66,7 +70,10 @@ final _studentProfile = AppUser(
   createdAt: DateTime(2026, 1, 1),
 );
 
-LearningProgress _progress({required String wordId, required String masteryStatus}) {
+LearningProgress _progress({
+  required String wordId,
+  required String masteryStatus,
+}) {
   return LearningProgress(
     studentId: 'student-1',
     wordId: wordId,
@@ -93,7 +100,9 @@ Future<void> _pumpHistory(
         learningSessionServiceProvider.overrideWithValue(
           sessionService ?? _FakeLearningSessionService(),
         ),
-        vocabBundleServiceProvider.overrideWithValue(bundleService ?? _FakeVocabBundleService()),
+        vocabBundleServiceProvider.overrideWithValue(
+          bundleService ?? _FakeVocabBundleService(),
+        ),
       ],
       child: MaterialApp(
         home: Scaffold(
@@ -108,89 +117,119 @@ Future<void> _pumpHistory(
 
 void main() {
   group('HistoryScreen — Per Kata tab', () {
-    testWidgets('shows the empty state when nothing has been learned yet', (tester) async {
+    testWidgets('shows the empty state when nothing has been learned yet', (
+      tester,
+    ) async {
       await _pumpHistory(tester);
       expect(find.text('Belum ada kata yang dipelajari'), findsOneWidget);
     });
 
-    testWidgets('shows resolved words with mastery badges, filterable by label', (tester) async {
-      final progressService = _FakeLearningProgressService()
-        ..rows = [
-          _progress(wordId: 'run', masteryStatus: MasteryStatus.mastered),
-          _progress(wordId: 'souvenir', masteryStatus: MasteryStatus.difficult),
-        ];
-      final bundleService = _FakeVocabBundleService()
-        ..byLevel = {
-          'A1': [
-            VocabBundleEntry(
-              word: 'run',
-              meanings: const [VocabMeaning(pos: 'verb', translation: 'lari')],
-              cefrLevel: 'A1',
-              topics: const [],
+    testWidgets(
+      'shows resolved words with mastery badges, filterable by label',
+      (tester) async {
+        final progressService = _FakeLearningProgressService()
+          ..rows = [
+            _progress(wordId: 'run', masteryStatus: MasteryStatus.mastered),
+            _progress(
+              wordId: 'souvenir',
+              masteryStatus: MasteryStatus.difficult,
             ),
-            VocabBundleEntry(
-              word: 'souvenir',
-              meanings: const [VocabMeaning(pos: 'noun', translation: 'oleh-oleh')],
-              cefrLevel: 'A1',
-              topics: const [],
-            ),
-          ],
-        };
+          ];
+        final bundleService = _FakeVocabBundleService()
+          ..byLevel = {
+            'A1': [
+              VocabBundleEntry(
+                word: 'run',
+                meanings: const [
+                  VocabMeaning(pos: 'verb', translation: 'lari'),
+                ],
+                cefrLevel: 'A1',
+                topics: const [],
+              ),
+              VocabBundleEntry(
+                word: 'souvenir',
+                meanings: const [
+                  VocabMeaning(pos: 'noun', translation: 'oleh-oleh'),
+                ],
+                cefrLevel: 'A1',
+                topics: const [],
+              ),
+            ],
+          };
 
-      await _pumpHistory(tester, progressService: progressService, bundleService: bundleService);
+        await _pumpHistory(
+          tester,
+          progressService: progressService,
+          bundleService: bundleService,
+        );
 
-      expect(find.text('run'), findsOneWidget);
-      expect(find.text('souvenir'), findsOneWidget);
+        expect(find.text('run'), findsOneWidget);
+        expect(find.text('souvenir'), findsOneWidget);
 
-      await tester.tap(find.text('Difficult'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Difficult'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('souvenir'), findsOneWidget);
-      expect(find.text('run'), findsNothing);
-      expect(find.text('Pelajari Kembali'), findsOneWidget);
+        expect(find.text('souvenir'), findsOneWidget);
+        expect(find.text('run'), findsNothing);
+        expect(find.text('Pelajari Kembali'), findsOneWidget);
 
-      // Milestone 7: tapping it starts a re-learn flow with exactly the
-      // words currently shown by the `difficult` filter (Decision 2 — no
-      // per-word checkbox selection).
-      final relearnButton = tester.widget<FilledButton>(
-        find.ancestor(of: find.text('Pelajari Kembali'), matching: find.byType(FilledButton)),
-      );
-      expect(relearnButton.onPressed, isNotNull);
+        // Milestone 7: tapping it starts a re-learn flow with exactly the
+        // words currently shown by the `difficult` filter (Decision 2 — no
+        // per-word checkbox selection).
+        final relearnButton = tester.widget<FilledButton>(
+          find.ancestor(
+            of: find.text('Pelajari Kembali'),
+            matching: find.byType(FilledButton),
+          ),
+        );
+        expect(relearnButton.onPressed, isNotNull);
 
-      await tester.tap(find.text('Pelajari Kembali'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Pelajari Kembali'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Baca Cerita'), findsOneWidget);
-    });
+        expect(find.text('Baca Cerita'), findsOneWidget);
+      },
+    );
 
-    testWidgets('filtering to difficult with none found shows the positive empty state', (
-      tester,
-    ) async {
-      final progressService = _FakeLearningProgressService()
-        ..rows = [_progress(wordId: 'run', masteryStatus: MasteryStatus.mastered)];
-      final bundleService = _FakeVocabBundleService()
-        ..byLevel = {
-          'A1': [
-            VocabBundleEntry(
-              word: 'run',
-              meanings: const [VocabMeaning(pos: 'verb', translation: 'lari')],
-              cefrLevel: 'A1',
-              topics: const [],
-            ),
-          ],
-        };
+    testWidgets(
+      'filtering to difficult with none found shows the positive empty state',
+      (tester) async {
+        final progressService = _FakeLearningProgressService()
+          ..rows = [
+            _progress(wordId: 'run', masteryStatus: MasteryStatus.mastered),
+          ];
+        final bundleService = _FakeVocabBundleService()
+          ..byLevel = {
+            'A1': [
+              VocabBundleEntry(
+                word: 'run',
+                meanings: const [
+                  VocabMeaning(pos: 'verb', translation: 'lari'),
+                ],
+                cefrLevel: 'A1',
+                topics: const [],
+              ),
+            ],
+          };
 
-      await _pumpHistory(tester, progressService: progressService, bundleService: bundleService);
+        await _pumpHistory(
+          tester,
+          progressService: progressService,
+          bundleService: bundleService,
+        );
 
-      await tester.tap(find.text('Difficult'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Difficult'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Tidak ada kata yang perlu diulang'), findsOneWidget);
-    });
+        expect(find.text('Tidak ada kata yang perlu diulang'), findsOneWidget);
+      },
+    );
   });
 
   group('HistoryScreen — Per Sesi tab', () {
-    testWidgets('shows the empty state when no sessions exist yet', (tester) async {
+    testWidgets('shows the empty state when no sessions exist yet', (
+      tester,
+    ) async {
       await _pumpHistory(tester);
 
       await tester.tap(find.text('Per Sesi'));
@@ -199,7 +238,9 @@ void main() {
       expect(find.text('Belum ada kata yang dipelajari'), findsOneWidget);
     });
 
-    testWidgets('shows a session card and opens the story replay on tap', (tester) async {
+    testWidgets('shows a session card and opens the story replay on tap', (
+      tester,
+    ) async {
       final sessionService = _FakeLearningSessionService()
         ..sessions = [
           LearningSession(
@@ -239,6 +280,52 @@ void main() {
 
       expect(find.text('Saya berlari ke taman.'), findsOneWidget);
     });
+
+    testWidgets(
+      'SessionDetailScreen strips raw translation markers from stored sessions',
+      (tester) async {
+        final sessionService = _FakeLearningSessionService()
+          ..sessions = [
+            LearningSession(
+              id: 'session-2',
+              studentId: 'student-1',
+              wordIds: const ['banana', 'carrot'],
+              sourceType: LearningSessionSourceType.targetGuru,
+              currentPhase: LearningSessionPhase.selesai,
+              storyTitle: 'Hospital',
+              storyContent:
+                  'In the hospital, I ate a [[banana|banana]] and a [[carrot|carrot]].',
+              storyTranslation:
+                  'Di rumah sakit, saya memakan [[banana|pisang]] dan [[carrot|wortel]].',
+              clozeTestResult: const {'banana': true, 'carrot': true},
+              cowriteTranscript: const [],
+              cowriteWordsUsedCorrectly: const ['banana', 'carrot'],
+              startedAt: DateTime(2026, 8, 2, 11, 0),
+              completedAt: DateTime(2026, 8, 2, 11, 30),
+            ),
+          ];
+
+        await _pumpHistory(tester, sessionService: sessionService);
+
+        await tester.tap(find.text('Per Sesi'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('2/8/2026 11:00'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SessionDetailScreen), findsOneWidget);
+
+        await tester.tap(find.text('Terjemahan'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Di rumah sakit, saya memakan pisang dan wortel.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('[['), findsNothing);
+        expect(find.textContaining(']]'), findsNothing);
+      },
+    );
   });
 
   group('HistoryScreen — error handling does not silently swallow the exception', () {
@@ -266,7 +353,10 @@ void main() {
         };
 
         try {
-          await _pumpHistory(tester, sessionService: _ThrowingLearningSessionService());
+          await _pumpHistory(
+            tester,
+            sessionService: _ThrowingLearningSessionService(),
+          );
 
           await tester.tap(find.text('Per Sesi'));
           await tester.pumpAndSettle();
@@ -305,11 +395,17 @@ void main() {
         };
 
         try {
-          await _pumpHistory(tester, progressService: _ThrowingLearningProgressService());
+          await _pumpHistory(
+            tester,
+            progressService: _ThrowingLearningProgressService(),
+          );
           await tester.pumpAndSettle();
 
           expect(find.text('Gagal memuat riwayat.'), findsOneWidget);
-          expect(find.textContaining('simulated learningProgress failure'), findsNothing);
+          expect(
+            find.textContaining('simulated learningProgress failure'),
+            findsNothing,
+          );
           expect(
             capturedDebugPrints.any(
               (line) => line.contains('simulated learningProgress failure'),

@@ -90,7 +90,11 @@ class _StoryReadingScreenState extends ConsumerState<StoryReadingScreen> {
                               Text('Menghasilkan cerita...'),
                             ],
                           )
-                        : Text(state.storyContent == null ? 'Generate' : 'Generate Ulang'),
+                        : Text(
+                            state.storyContent == null
+                                ? 'Generate'
+                                : 'Generate Ulang',
+                          ),
                   ),
                   if (isStoryLocked) ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -117,7 +121,10 @@ class _StoryReadingScreenState extends ConsumerState<StoryReadingScreen> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text(state.generateError!, style: AppTextStyles.body),
+                            child: Text(
+                              state.generateError!,
+                              style: AppTextStyles.body,
+                            ),
                           ),
                           TextButton(
                             onPressed: () {
@@ -133,21 +140,34 @@ class _StoryReadingScreenState extends ConsumerState<StoryReadingScreen> {
                   ],
                   if (state.storyContent != null) ...[
                     const SizedBox(height: AppSpacing.lg),
-                    Text(state.storyTitle ?? '', style: AppTextStyles.wordTitle.copyWith(fontSize: 18)),
+                    Text(
+                      state.storyTitle ?? '',
+                      style: AppTextStyles.wordTitle.copyWith(fontSize: 18),
+                    ),
                     const SizedBox(height: AppSpacing.sm),
                     _HighlightedStory(
                       markedText: state.storyContent!,
-                      onTapWord: (targetWord) => _openDictionary(context, targetWord),
+                      onTapWord: (targetWord) =>
+                          _openDictionary(context, targetWord),
                     ),
                     if (state.storyTranslation != null) ...[
                       const SizedBox(height: AppSpacing.md),
                       OutlinedButton(
-                        onPressed: () => setState(() => _showTranslation = !_showTranslation),
-                        child: Text(_showTranslation ? 'Sembunyikan Terjemahan' : 'Terjemahan'),
+                        onPressed: () => setState(
+                          () => _showTranslation = !_showTranslation,
+                        ),
+                        child: Text(
+                          _showTranslation
+                              ? 'Sembunyikan Terjemahan'
+                              : 'Terjemahan',
+                        ),
                       ),
                       if (_showTranslation) ...[
                         const SizedBox(height: AppSpacing.sm),
-                        Text(state.storyTranslation!, style: AppTextStyles.body),
+                        Text(
+                          stripTranslationMarkers(state.storyTranslation!),
+                          style: AppTextStyles.body,
+                        ),
                       ],
                     ],
                   ],
@@ -161,10 +181,16 @@ class _StoryReadingScreenState extends ConsumerState<StoryReadingScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: AppColors.error),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
-                            child: Text(state.advanceToClozeError!, style: AppTextStyles.body),
+                            child: Text(
+                              state.advanceToClozeError!,
+                              style: AppTextStyles.body,
+                            ),
                           ),
                         ],
                       ),
@@ -190,10 +216,15 @@ class _StoryReadingScreenState extends ConsumerState<StoryReadingScreen> {
                         // `currentPhase` still `membaca`, so the student
                         // stays here and can retry.
                         final succeeded =
-                            ref.read(learningFlowControllerProvider).advanceToClozeError == null;
+                            ref
+                                .read(learningFlowControllerProvider)
+                                .advanceToClozeError ==
+                            null;
                         if (succeeded && context.mounted) {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ClozeTestScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const ClozeTestScreen(),
+                            ),
                           );
                         }
                       },
@@ -207,7 +238,9 @@ class _StoryReadingScreenState extends ConsumerState<StoryReadingScreen> {
   }
 
   Future<void> _openDictionary(BuildContext context, String targetWord) async {
-    final entry = await ref.read(resolveWordAcrossLevelsProvider(targetWord).future);
+    final entry = await ref.read(
+      resolveWordAcrossLevelsProvider(targetWord).future,
+    );
     if (entry != null && context.mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -242,14 +275,16 @@ class _HighlightedStory extends StatelessWidget {
           for (final segment in segments)
             switch (segment) {
               PlainStorySegment(:final text) => TextSpan(text: text),
-              MarkedStorySegment(:final targetWord, :final surfaceForm) => TextSpan(
+              MarkedStorySegment(:final targetWord, :final surfaceForm) =>
+                TextSpan(
                   text: surfaceForm,
                   style: const TextStyle(
                     backgroundColor: AppColors.storyHighlightBackground,
                     color: AppColors.storyHighlightText,
                     fontWeight: FontWeight.w600,
                   ),
-                  recognizer: TapGestureRecognizer()..onTap = () => onTapWord(targetWord),
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () => onTapWord(targetWord),
                 ),
             },
         ],

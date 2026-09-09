@@ -13,7 +13,10 @@ void main() {
         const PlainStorySegment('Yesterday I '),
         const MarkedStorySegment(targetWord: 'run', surfaceForm: 'ran'),
         const PlainStorySegment(' to the park and bought two '),
-        const MarkedStorySegment(targetWord: 'souvenir', surfaceForm: 'souvenirs'),
+        const MarkedStorySegment(
+          targetWord: 'souvenir',
+          surfaceForm: 'souvenirs',
+        ),
         const PlainStorySegment('.'),
       ]);
     });
@@ -27,16 +30,19 @@ void main() {
       expect(parseStoryMarkers(''), isEmpty);
     });
 
-    test('text starting and ending with a marker has no empty plain segments', () {
-      const text = '[[run|ran]] fast [[jump|jumped]]';
-      final segments = parseStoryMarkers(text);
+    test(
+      'text starting and ending with a marker has no empty plain segments',
+      () {
+        const text = '[[run|ran]] fast [[jump|jumped]]';
+        final segments = parseStoryMarkers(text);
 
-      expect(segments, [
-        const MarkedStorySegment(targetWord: 'run', surfaceForm: 'ran'),
-        const PlainStorySegment(' fast '),
-        const MarkedStorySegment(targetWord: 'jump', surfaceForm: 'jumped'),
-      ]);
-    });
+        expect(segments, [
+          const MarkedStorySegment(targetWord: 'run', surfaceForm: 'ran'),
+          const PlainStorySegment(' fast '),
+          const MarkedStorySegment(targetWord: 'jump', surfaceForm: 'jumped'),
+        ]);
+      },
+    );
 
     test('handles a multi-word target word (phrase) unchanged', () {
       const text = 'She had to [[wake up|woken up]] early.';
@@ -44,7 +50,10 @@ void main() {
 
       expect(segments, [
         const PlainStorySegment('She had to '),
-        const MarkedStorySegment(targetWord: 'wake up', surfaceForm: 'woken up'),
+        const MarkedStorySegment(
+          targetWord: 'wake up',
+          surfaceForm: 'woken up',
+        ),
         const PlainStorySegment(' early.'),
       ]);
     });
@@ -61,15 +70,18 @@ void main() {
   });
 
   group('stripStoryMarkers', () {
-    test('replaces every marker with its surface form, keeps plain text as-is', () {
-      const text =
-          'Yesterday I [[run|ran]] to the park and bought two [[souvenir|souvenirs]].';
+    test(
+      'replaces every marker with its surface form, keeps plain text as-is',
+      () {
+        const text =
+            'Yesterday I [[run|ran]] to the park and bought two [[souvenir|souvenirs]].';
 
-      expect(
-        stripStoryMarkers(text),
-        'Yesterday I ran to the park and bought two souvenirs.',
-      );
-    });
+        expect(
+          stripStoryMarkers(text),
+          'Yesterday I ran to the park and bought two souvenirs.',
+        );
+      },
+    );
 
     test('text with no markers is returned unchanged', () {
       const text = 'No target words here.';
@@ -78,6 +90,39 @@ void main() {
 
     test('empty string returns empty string', () {
       expect(stripStoryMarkers(''), '');
+    });
+  });
+
+  group('stripTranslationMarkers', () {
+    test(
+      'replaces [[word|translation]] and [[word]] markers with translation, keeps plain text',
+      () {
+        const text =
+            'Di rumah sakit, seorang pasien meminta [[banana|pisang]] untuk dimakan. '
+            'Perawat membawa piring dengan [[carrot|wortel]] di sampingnya. '
+            'Sementara itu, seekor [[dog|anjing]] yang ramah menunggu.';
+
+        expect(
+          stripTranslationMarkers(text),
+          'Di rumah sakit, seorang pasien meminta pisang untuk dimakan. '
+          'Perawat membawa piring dengan wortel di sampingnya. '
+          'Sementara itu, seekor anjing yang ramah menunggu.',
+        );
+      },
+    );
+
+    test('replaces single-element marker without pipe [[word]]', () {
+      const text = 'Saya membeli [[apel]] dan [[jeruk]].';
+      expect(stripTranslationMarkers(text), 'Saya membeli apel dan jeruk.');
+    });
+
+    test('text with no markers is returned unchanged', () {
+      const text = 'Teks terjemahan biasa tanpa marker.';
+      expect(stripTranslationMarkers(text), text);
+    });
+
+    test('empty string returns empty string', () {
+      expect(stripTranslationMarkers(''), '');
     });
   });
 }
