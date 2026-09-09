@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/app_user.dart';
-import '../../../providers/auth_providers.dart';
 import '../../../providers/dashboard_providers.dart';
 import '../../../providers/vocab_browser_providers.dart';
 import '../../../theme/theme.dart';
@@ -37,13 +36,6 @@ class DashboardScreen extends ConsumerWidget {
           const Divider(),
           const SizedBox(height: AppSpacing.md),
           const _PreTestPostTestSection(),
-          const SizedBox(height: AppSpacing.lg),
-          Center(
-            child: TextButton(
-              onPressed: () => ref.read(authServiceProvider).signOut(),
-              child: const Text('Keluar'),
-            ),
-          ),
         ],
       ),
     );
