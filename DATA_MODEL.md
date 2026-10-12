@@ -58,6 +58,12 @@ lewat field `role`), `docId` = Firebase Auth `uid`.
 > yang cuma relevan untuk satu role (`cefrLevel`, `teacherCodeInput`, dst)
 > cukup dibiarkan `null`/absent untuk role lainnya — jangan buat collection
 > terpisah kecuali nanti field spesifik-role bertambah banyak.
+>
+> **Catatan persiapan responden penelitian:** Skema `users` saat ini hanya
+> mencatat `name` dan `email`. Jika analisis kohort skripsi membutuhkan data
+> identifikasi spesifik (seperti kelas, NISN, atau asal sekolah), field ini
+> perlu ditambahkan ke skema dan form pendaftaran sebelum 60 siswa responden
+> didaftarkan.
 
 > **Soal `teacherCodeInput` disimpan permanen:** di Firestore tidak ada
 > mekanisme "field yang divalidasi tapi tidak ikut tersimpan" — apa pun yang
@@ -857,17 +863,12 @@ Yesterday I [[run|ran]] to the park and bought two [[souvenir|souvenirs]].
 ```
 
 **Kewajiban Worker:**
-- Semua kata target **wajib** dipakai dan **wajib** bertanda.
-- Setelah menerima respons OpenAI, Worker **memvalidasi** bahwa setiap kata
-  target muncul minimal sekali sebagai `[[kataTarget|...]]`. Kalau ada yang
-  hilang, retry sekali ke OpenAI; kalau masih gagal, balikan error yang
-  bisa dibaca client (bukan cerita cacat).
-- `kataTarget` di dalam penanda harus **persis** sama dengan kata yang
-  dikirim client (sudah lewat `normalizeWord()`), supaya client bisa
-  mencocokkannya tanpa normalisasi tambahan.
-- AI **boleh dan seharusnya** memakai bentuk infleksi yang natural di
-  `bentukTerpakai` — jangan memaksa bentuk dasar, karena itu menghasilkan
-  kalimat yang salah gramatikal.
+- Cerita memiliki tepat N kalimat untuk N kata target (satu kata target per kalimat).
+- Urutan kata target dalam cerita **bebas naratif (narrative-driven)** — model diinstruksikan menyusun urutan kemunculan kata berdasarkan alur narasi yang paling koheren dan alami, **bukan** mengikuti urutan daftar masukan, untuk mencegah kebocoran posisi (positional leakage) pada Fase 2 Cloze Test.
+- Semua kata target **wajib** dipakai tepat satu kali dan **wajib** bertanda `[[kataTarget|bentukTerpakai]]`.
+- Setelah menerima respons OpenAI, Worker **memvalidasi** (set-based via `validateMarkers()`) bahwa setiap kata target muncul tepat sekali sebagai `[[kataTarget|...]]`. Kalau ada yang hilang/duplikat/tidak sesuai, retry sekali ke OpenAI; kalau masih gagal, balikan error 502 yang bisa dibaca client (bukan cerita cacat).
+- `kataTarget` di dalam penanda harus **persis** sama dengan kata yang dikirim client (sudah lewat `normalizeWord()`), supaya client bisa mencocokkannya tanpa normalisasi tambahan.
+- AI **boleh dan seharusnya** memakai bentuk infleksi yang natural di `bentukTerpakai` dari leksem yang sama — jangan memaksa bentuk dasar (menghasilkan kalimat salah gramatikal) dan dilarang mengganti dengan kata/sinonim lain.
 
 #### `POST /cowrite-turn` — Fase 3 (SPEC §5.3)
 

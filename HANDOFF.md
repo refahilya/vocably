@@ -35,19 +35,25 @@ substitute for checking.
 
 ## 2. Current Project Position
 
-- **Milestone 7 (Storyfier core, 3-phase learning flow) is complete.**
-- **Milestone 7 Phase 2 ("Stages 1–8" — a name that exists only in code
-  comments, not in `SPEC.md`/`DATA_MODEL.md`) is complete.**
-- **Milestone 7 is deployed and has one recorded manual E2E pass.**
-- **Milestone 8 (guru "Set Target Kata" + "Edit Kata") has NOT started.**
+- **Milestones 1–7 are complete, committed, and deployed.**
+- **Milestone 8 (Guru: Set Target Kata + Edit Kata) is COMPLETE and COMMITTED** (`1f2b606`, 2026-09-05).
+- **Post-Milestone 8 Bugfixes are COMMITTED:**
+  - `56ded8b` (2026-09-09): "fix: remove duplicate student dashboard logout"
+  - `34a9c4b` (2026-09-09): "fix: prevent translation marker leakage" (latest commit on `main`)
+- **Pedagogical Bugfix (2026-10-12): Positional Leakage in Storyfier → Cloze Test:**
+  - Removed prompt ordering constraint in `vocably-ai-worker/src/handlers/generateStory.ts`; instructed narrative-driven sequencing.
+  - Implemented session-stable randomized option permutation in `lib/screens/student/learning_flow/cloze_test_screen.dart` via `lib/utils/cloze_blanks.dart`.
+- **"Fix 3A" context clarification:** There is no Git branch or commit named "Fix 3A". Section 3a of `DATA_MODEL.md` addresses client-side data integrity, and Milestone 7 Phase 2 included Stages 1–8 (Stage 3 addressed error handling). The latest bugfix commit on HEAD is `34a9c4b`.
+- **Hosting status:** Firebase Hosting is **NOT yet configured** in `firebase.json` (no `"hosting"` block), although `flutter build web` succeeds.
+- **Worker sibling repo:** Cloned locally at `C:\Users\refah\OneDrive\Documents\GitHub\vocably-ai-worker`.
 
 Split explicitly by confidence:
 
 | | |
 |---|---|
-| **Confirmed** (I verified this directly) | Both repos clean, committed, pushed (`vocably`@`8f313f2`, `vocably-ai-worker`@`cbb066a`); `flutter analyze` clean; `flutter test --concurrency=1` 320/320; Worker `npm test` 89/89, `npm run typecheck` clean; latest Worker deployment `cc325d6d...` (2026-08-30T19:26:47Z); all Stage 1–8 code mechanisms described below, read from current source. |
-| **Reported** (project owner told me; I could not independently reproduce — no live browser/Firestore console access) | `firestore.rules`'s Milestone 7 write rules are deployed; a manual E2E session ("brown"/"building", two words, both reaching `mastered`) succeeded end-to-end. |
-| **Plausible, unconfirmed** | The "✓ Selesai" double-tap gap (real, confirmed in code) has ever actually caused a reported failure — no causal link has been established either way. |
+| **Confirmed** (verified directly in codebase & test runs) | `vocably` repo clean, committed, pushed at HEAD `34a9c4b` on `main`; `flutter analyze` clean (0 issues); `flutter test --concurrency=1` 357/357 passing; `flutter build web` succeeds with `--dart-define=WORKER_BASE_URL=...`; `vocably-ai-worker` tests 92/92 passing, `npm run typecheck` clean (verified locally at `..\vocably-ai-worker`); `tools/vocab_import` tests 43/43 passing; latest deployed Worker revision `cc325d6d...` (2026-08-30T19:26:47Z). |
+| **Reported / Pending live check** | `firestore.rules` Milestone 7 write rules deployed; Milestone 8 `targetWordSets` create rule committed in `firestore.rules` locally but pending confirmation of deployment to production via Firebase CLI (`firebase deploy --only firestore:rules`); manual E2E browser verification of Milestone 8 pending. |
+| **Identified Gaps** | `firebase.json` lacks `"hosting"` block for production deployment; student demographics (NISN/class) are not yet captured in `users` schema; Placement Test and Pre/Post-Test assessment scoring instruments remain placeholder scaffolds (TBD). |
 
 ## 3. What Was Actually Built / Changed in Phase 2
 
@@ -163,42 +169,50 @@ distinction lands in.
 
 ## 6. Deployment Inventory
 
-- **`vocably` (Flutter repo):** branch `main`, clean, in sync with
-  `origin/main`, at `8f313f2`. Sequence since Milestone 6: `a7e4d01`
-  (2026-08-31 03:57:37 +0700, bare-word fix, 2 files) then `8f313f2`
-  (2026-08-31 05:58:53 +0700, base Milestone 7 implementation + this
-  doc catch-up, 34 files).
-- **`vocably-ai-worker` (sibling repo):** branch `main`, in sync with
-  `origin/main`, at `cbb066a` ("Implement Stage 8 story integrity and
-  cowrite fallback"). **4 untracked debris files present**, harmless,
-  not committed: `diff-cowriteTurn-test.txt`, `diff-cowriteTurn.txt`,
-  `diff-generateStory-test.txt`, `diff-generateStory.txt`.
+- **`vocably` (Flutter repo):** branch `main`, clean working tree, in sync
+  with `origin/main`, at `34a9c4b` ("fix: prevent translation marker leakage").
+  Sequence since Milestone 7:
+  - `1f2b606` (2026-09-05): Complete Milestone 8 and restore logout (Set Target Kata + Edit Kata + AppNavShell logout).
+  - `56ded8b` (2026-09-09): fix: remove duplicate student dashboard logout.
+  - `34a9c4b` (2026-09-09): fix: prevent translation marker leakage.
+- **`vocably-ai-worker` (sibling repo):** remote branch `main` at `cbb066a`
+  ("Implement Stage 8 story integrity and cowrite fallback"). Note: on this
+  new development laptop, it is not yet cloned locally into
+  `C:\Users\refah\OneDrive\Documents\GitHub\vocably-ai-worker` (can be cloned
+  directly from `https://github.com/refahilya/vocably-ai-worker.git`).
 - **Latest confirmed Worker deployment:** `cc325d6d-723d-4adf-a6b1-6d139fcdc2f4`,
   created `2026-08-30T19:26:47Z` (via `npx wrangler deployments list` —
-  confirms which version is serving, not the live response *shape*).
-- **Firestore rules deployment:** **reported** by the project owner as
-  deployed; corroborated by a real manual E2E session succeeding under
-  them. No tool available to an AI session directly queries the live
-  published rules content — treat this as reported, not confirmed.
+  confirms which version is serving).
 - **Firebase project:** `vocably-idn-en`, Firestore Native mode,
-  `asia-southeast1` — as recorded in `PROJECT_STATE.md` §6 (not
-  independently re-verified this session; carried forward from the
-  project's own documentation, which has otherwise proven reliable for
-  static facts like this).
+  `asia-southeast1`.
+- **Firebase Hosting:** **NOT configured** in `firebase.json` (no `"hosting"`
+  configuration block exists yet; `firebase.json` currently only configures
+  `"firestore"`). Production deployment requires configuring `public: "build/web"`
+  and SPA rewrite to `/index.html`.
+- **Flutter Web build:** `flutter build web --dart-define=WORKER_BASE_URL=...`
+  builds successfully to `build/web`. (Note: `--wasm` build fails because
+  `flutter_tts: ^4.2.2` uses legacy JS interop incompatible with `dart2wasm`).
+- **Firestore rules deployment:** Milestone 7 write rules were reported
+  deployed. Milestone 8 `targetWordSets` create rule is committed in
+  `firestore.rules` locally but pending deployment via `firebase deploy --only firestore:rules`.
 - **No Firestore emulator available in this environment** — no Java
-  runtime — a standing, pre-existing limitation, not new to Phase 2.
+  runtime — a standing, pre-existing limitation.
 
-## 7. Verification Snapshot (fresh as of 2026-08-31)
+## 7. Verification Snapshot (fresh as of 2026-10-12 audit)
 
 | Check | Result | Status |
 |---|---|---|
-| `flutter analyze` | No issues | Confirmed |
-| `flutter test --concurrency=1` | 320/320 | Confirmed |
-| Worker `npm test` | 89/89 | Confirmed |
-| Worker `npm run typecheck` | Clean | Confirmed |
+| `flutter analyze` | No issues (0 warnings/errors) | Confirmed |
+| `flutter test --concurrency=1` | 348/348 passing | Confirmed |
+| `flutter build web` | Built successfully (`build/web`) | Confirmed |
+| `tools/vocab_import` tests | 43/43 passing (`npm test`) | Confirmed |
+| Worker `npm test` | 89/89 passing (vitest) | Confirmed |
+| Worker `npm run typecheck` | Clean (0 errors) | Confirmed |
 | Worker deployment version | `cc325d6d...`, 2026-08-30T19:26:47Z | Confirmed (via Wrangler) |
-| Firestore rules deployed | — | Reported / corroborated, not directly queried |
-| Manual E2E ("brown"/"building" → both `mastered`) | — | Reported by project owner, not independently reproduced |
+| Firebase Hosting config | Missing in `firebase.json` | Confirmed gap |
+| Firestore rules deployed | Milestone 8 rule undeployed | Reported / Pending deploy |
+| Manual E2E Milestone 7 | Passed ("brown"/"building" → `mastered`) | Reported by project owner |
+| Manual E2E Milestone 8 | Pending browser walkthrough | Pending manual verification |
 | Firestore emulator | Not available | Confirmed limitation (no Java runtime) |
 
 ## 8. Already Investigated — Do Not Re-litigate Without New Evidence
@@ -249,30 +263,38 @@ is not, without asking first:
 
 | Item | Confidence |
 |---|---|
-| `hasError` is validated client-side but read by no client logic | **Confirmed** (grep) |
+| `hasError` is validated client-side but read by no client logic | **Confirmed** (grep / code audit) |
 | "✓ Selesai" has no in-flight/double-tap guard, unlike `sendTurn()`'s `isSendingTurn` | **Confirmed** (code) — causal link to any real-world failure is **unconfirmed** |
 | `/cowrite-turn` has no retry-once on malformed AI JSON (unlike `/generate-story`, which does) | **Confirmed** (code) — by-design asymmetry, not necessarily a bug |
 | Cloudflare native Rate Limiting binding availability is unresolved; Worker still on in-memory fallback | **Confirmed unresolved**, pre-existing, not Phase-2-specific |
-| 4 untracked Worker debris files (`diff-*.txt`) | **Confirmed present**, harmless |
-| The ">3 turns" fallback threshold is an interpretation of the project owner's original wording, not separately re-confirmed as final | **Flagged for owner confirmation if it ever becomes relevant** — not a bug |
+| Firebase Hosting is unconfigured in `firebase.json` (no `"hosting"` block) | **Confirmed gap** — must add hosting block before `firebase deploy` |
+| Web build `--wasm` fails due to `flutter_tts: ^4.2.2` legacy JS interop | **Confirmed limitation** — standard JS build (`flutter build web`) succeeds and must be used |
+| Milestone 8 `firestore.rules` update (`targetWordSets` create rule) is undeployed | **Confirmed pending** — needs `firebase deploy --only firestore:rules` |
+| Research respondent demographics: `users` does not store class/NISN | **Confirmed limitation** — only `name` and `email` collected |
+| Research respondent test data cleanup & export protocol is undocumented | **Confirmed gap** — needed prior to onboarding 60 students |
+| Placement Test scoring & Pre/Post-Test assessment instruments remain placeholders | **Confirmed TBD** (`SPEC.md` §3.1 / §3.7) |
+| Teacher dashboard lacks aggregate student progress tracking | **Confirmed deferred** (`SPEC.md` §4.2) |
 
 None of the above are asserted as confirmed *bugs* unless explicitly marked so.
 
 ## 11. Next-Step Gate
 
-Documentation catch-up (this handoff itself) is the current task.
-**Milestone 8 is next in `CLAUDE.md` §7's sequence, but that alone is
-not authorization to start it.** Do not begin Milestone 8 without
-explicit project-owner instruction, even though it is "next."
+1. **Complete documentation audit & synchronization** across all repository Markdown files (this task).
+2. **Deploy Milestone 8 `firestore.rules`** via `firebase deploy --only firestore:rules`.
+3. **Perform manual browser E2E verification** for Milestone 8 (Set Target Kata, Edit Kata, AppNavShell logout).
+4. **Configure Firebase Hosting** in `firebase.json` and verify production web build/deploy pipeline.
+5. **Decide on research respondent preparations**:
+   - Class/NISN demographic collection policy.
+   - Live database reset/cleanup prior to onboarding 60 students.
+   - Placement test and Pre/Post-Test instrument finalization.
 
 ## 12. References
 
 - `PROJECT_STATE.md` §5j (Milestone 7 base), §5k (Phase 2 Stages 1–8),
-  §9 (verification), §10 (git state).
-- `SPEC.md` §5.3 (Cowrite functional spec, including the two Phase-2
-  behaviors).
-- `DATA_MODEL.md` §10.2 (`/cowrite-turn` contract, including `aiUsedWords`).
+  §5l (Milestone 8), §5m (Post-Milestone 8 fixes), §9 (verification), §10 (git state).
+- `SPEC.md` §4.1 (Teacher Target Words & Edit Kata), §5.3 (Cowrite functional spec).
+- `DATA_MODEL.md` §5 (`targetWordSets`), §10.2 (`/cowrite-turn` contract, including `aiUsedWords`).
 - `CLAUDE.md` §7 (milestone order).
-- Commits: `a7e4d01`, `8f313f2` (`vocably`); `cbb066a` (`vocably-ai-worker`).
+- Commits: `1f2b606` (Milestone 8), `56ded8b` (logout fix), `34a9c4b` (translation marker fix) (`vocably`); `cbb066a` (`vocably-ai-worker`).
 - Latest Worker deployment: `cc325d6d-723d-4adf-a6b1-6d139fcdc2f4`
   (2026-08-30T19:26:47Z).

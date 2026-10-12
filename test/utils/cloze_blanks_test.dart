@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vocably/utils/cloze_blanks.dart';
 
@@ -53,6 +55,38 @@ void main() {
         '[[souvenir|souvenirs]] and [[run|running]] and [[souvenir|souvenir]] again.',
       );
       expect(blankTargetWords(segments), ['souvenir', 'run']);
+    });
+  });
+
+  group('shuffleClozeOptions', () {
+    test('contains all expected target words exactly once', () {
+      final input = ['harvest', 'fragile', 'wander', 'shelter', 'whisper'];
+      final shuffled = shuffleClozeOptions(input);
+
+      expect(shuffled.length, input.length);
+      expect(shuffled.toSet(), input.toSet());
+    });
+
+    test('does not mutate the original input list', () {
+      final input = ['harvest', 'fragile', 'wander', 'shelter', 'whisper'];
+      final originalCopy = List<String>.from(input);
+      shuffleClozeOptions(input);
+
+      expect(input, originalCopy);
+    });
+
+    test('handles empty and single-element lists without error', () {
+      expect(shuffleClozeOptions([]), isEmpty);
+      expect(shuffleClozeOptions(['harvest']), ['harvest']);
+    });
+
+    test('produces deterministic permutation when seeded Random is provided', () {
+      final input = ['harvest', 'fragile', 'wander', 'shelter', 'whisper'];
+      final seeded1 = shuffleClozeOptions(input, Random(42));
+      final seeded2 = shuffleClozeOptions(input, Random(42));
+
+      expect(seeded1, seeded2);
+      expect(seeded1.toSet(), input.toSet());
     });
   });
 
@@ -120,6 +154,21 @@ void main() {
 
       expect(gradeClozeAnswers(segments, {}), {'run': false});
       expect(gradeClozeAnswers(segments, {'run': null}), {'run': false});
+    });
+
+    test('grades correctly when target words appear in a different order from canonical list', () {
+      final segments = buildClozeSegments(
+        'I bought a [[souvenir|souvenir]]. Then I [[run|ran]] home.',
+      );
+      // Canonical list was ['run', 'souvenir'], but story order is ['souvenir', 'run']
+      final blanks = blankTargetWords(segments);
+      expect(blanks, ['souvenir', 'run']);
+
+      final grading = gradeClozeAnswers(segments, {
+        'souvenir': 'souvenir',
+        'run': 'run',
+      });
+      expect(grading, {'souvenir': true, 'run': true});
     });
   });
 }

@@ -385,6 +385,13 @@ persis** — yang membedakan cuma asal daftar kata targetnya:
 - Kata target di-highlight dalam cerita (yang ditampilkan adalah bentuk
   terpakainya, mis. *ran*); klik kata → buka kamus detail (3.5) untuk
   bentuk dasarnya (*run*).
+- **Urutan kemunculan kata dalam cerita bersifat bebas naratif (narrative-driven):**
+  model AI diinstruksikan menyusun kalimat dan memilih urutan kemunculan kata
+  target berdasarkan alur cerita yang paling alami dan koheren — **bukan**
+  mengikuti urutan daftar kata target yang dikirimkan. Hal ini mencegah kebocoran
+  posisi (positional leakage) ke Fase 2 Cloze Test. Invarian jumlah kalimat
+  (tepat N kalimat untuk N kata target, satu kata per kalimat) dan format
+  penanda `[[kataTarget|bentukTerpakai]]` tetap wajib ditegakkan penuh.
 - Toggle untuk menampilkan/menyembunyikan terjemahan cerita.
 - **Siswa boleh generate ulang berkali-kali** dengan judul berbeda-beda
   (tombol "Generate" bisa diklik ulang). Setiap generate ulang **menimpa**
@@ -406,6 +413,12 @@ persis** — yang membedakan cuma asal daftar kata targetnya:
   benarnya adalah bentuk dasar** (`kataTarget`), dan dropdown berisi daftar
   kata target dalam bentuk dasar — jadi siswa yang melihat blank menggantikan
   *ran* tetap menjawab dengan memilih *run*.
+- **Pilihan dropdown diacak (randomized permutation):** urutan pilihan kata pada
+  dropdown diacak sekali saat sesi Cloze Test aktif dan dipertahankan stabil
+  sepanjang sesi (tidak berubah saat widget rebuild atau saat menjawab). Hal ini
+  menghilangkan petunjuk posisi di mana posisi blank sebelumnya berkorelasi
+  dengan indeks opsi dropdown. Penilaian jawaban tetap dicocokkan berdasarkan
+  identitas string `kataTarget`, bukan indeks opsi.
 - **Satu blank per kata target.** Kalau satu kata kebetulan muncul lebih
   dari sekali di cerita, hanya kemunculan pertama yang jadi blank; sisanya
   tetap tampil sebagai teks biasa.

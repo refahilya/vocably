@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,11 +12,46 @@ import 'cowrite_screen.dart';
 /// Fase 2 — Cloze Test (`SPEC.md` §5.2, `DESIGN_REFERENCE.md` §3.5). No
 /// AI call — blanks and answer choices come straight from the locked
 /// story's markers via `utils/cloze_blanks.dart`.
-class ClozeTestScreen extends ConsumerWidget {
-  const ClozeTestScreen({super.key});
+class ClozeTestScreen extends ConsumerStatefulWidget {
+  const ClozeTestScreen({
+    super.key,
+    this.random,
+    this.optionsOverride,
+  });
+
+  /// Optional [Random] instance for shuffling dropdown options (e.g. seeded
+  /// in unit/widget tests for deterministic verification). In production,
+  /// defaults to a standard non-constant [Random].
+  final Random? random;
+
+  /// Optional explicit options override for testing specific permutations.
+  final List<String>? optionsOverride;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ClozeTestScreen> createState() => _ClozeTestScreenState();
+}
+
+class _ClozeTestScreenState extends ConsumerState<ClozeTestScreen> {
+  List<String>? _shuffledOptions;
+
+  List<String> _resolveOptions(List<String> wordIds) {
+    if (widget.optionsOverride != null) {
+      return widget.optionsOverride!;
+    }
+    return _shuffledOptions ??= shuffleClozeOptions(wordIds, widget.random);
+  }
+
+  @override
+  void didUpdateWidget(covariant ClozeTestScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.optionsOverride != oldWidget.optionsOverride ||
+        widget.random != oldWidget.random) {
+      _shuffledOptions = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(learningFlowControllerProvider);
     final controller = ref.read(learningFlowControllerProvider.notifier);
     final segments = buildClozeSegments(state.storyContent ?? '');
@@ -22,6 +59,7 @@ class ClozeTestScreen extends ConsumerWidget {
     final allAnswered = blanks.every((w) => state.clozeAnswers[w] != null);
     final grading = state.hasSubmittedCloze ? gradeClozeAnswers(segments, state.clozeAnswers) : null;
     final anyWrong = grading != null && grading.values.any((correct) => !correct);
+    final options = _resolveOptions(state.wordIds);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Cloze Test')),
@@ -46,7 +84,7 @@ class ClozeTestScreen extends ConsumerWidget {
                   _ClozeStory(
                     segments: segments,
                     answers: state.clozeAnswers,
-                    options: state.wordIds,
+                    options: options,
                     grading: grading,
                     // Milestone 7 Phase 2 Stage 5: once Submit has been
                     // tapped, answers are locked — `hasSubmittedCloze` is

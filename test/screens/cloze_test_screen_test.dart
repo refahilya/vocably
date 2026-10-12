@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,13 +14,16 @@ import 'package:vocably/services/learning_progress_service.dart';
 import 'package:vocably/services/learning_session_service.dart';
 
 class _FakeAiWorkerService extends AiWorkerService {
+  _FakeAiWorkerService({this.story});
+  final String? story;
+
   @override
   Future<GenerateStoryResult> generateStory({
     required List<String> targetWords,
     required String prompt,
   }) async {
     return GenerateStoryResult(
-      story: 'I [[run|ran]] and bought a [[souvenir|souvenir]].',
+      story: story ?? 'I [[run|ran]] and bought a [[souvenir|souvenir]].',
       translation: 'T',
     );
   }
@@ -64,10 +69,18 @@ class _FakeLearningProgressService extends LearningProgressService {
   }
 }
 
-Future<ProviderContainer> _pumpClozeTest(WidgetTester tester) async {
+Future<ProviderContainer> _pumpClozeTest(
+  WidgetTester tester, {
+  Random? random,
+  List<String>? optionsOverride,
+  List<String>? wordIds,
+  String? story,
+}) async {
   final container = ProviderContainer(
     overrides: [
-      aiWorkerServiceProvider.overrideWithValue(_FakeAiWorkerService()),
+      aiWorkerServiceProvider.overrideWithValue(
+        _FakeAiWorkerService(story: story),
+      ),
       learningSessionServiceProvider.overrideWithValue(_FakeLearningSessionService()),
       learningProgressServiceProvider.overrideWithValue(_FakeLearningProgressService()),
     ],
@@ -75,7 +88,7 @@ Future<ProviderContainer> _pumpClozeTest(WidgetTester tester) async {
   final controller = container.read(learningFlowControllerProvider.notifier);
   controller.startFlow(
     studentId: 'student-1',
-    wordIds: ['run', 'souvenir'],
+    wordIds: wordIds ?? ['run', 'souvenir'],
     sourceType: LearningSessionSourceType.targetGuru,
   );
   await controller.generateStory(prompt: 'judul');
@@ -84,7 +97,12 @@ Future<ProviderContainer> _pumpClozeTest(WidgetTester tester) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(home: ClozeTestScreen()),
+      child: MaterialApp(
+        home: ClozeTestScreen(
+          random: random,
+          optionsOverride: optionsOverride,
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -254,6 +272,133 @@ void main() {
       expect(find.text('Gagal menyimpan hasil Cloze Test. Coba lagi.'), findsOneWidget);
       // Still retryable — the button is still there, unchanged.
       expect(find.text('Selanjutnya →'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'displayed answer options contain all target words exactly once, not fixed to input or alphabetical order',
+    (tester) async {
+      final wordIds = ['harvest', 'fragile', 'wander', 'shelter', 'whisper'];
+      final permutation = ['whisper', 'wander', 'harvest', 'fragile', 'shelter'];
+      final story =
+          'I saw a [[harvest|harvest]]. It was [[fragile|fragile]]. '
+          'We [[wander|wander]]. Found a [[shelter|shelter]]. Heard a [[whisper|whisper]].';
+
+      await _pumpClozeTest(
+        tester,
+        wordIds: wordIds,
+        story: story,
+        optionsOverride: permutation,
+      );
+
+      final dropdowns = find.byType(DropdownButton<String>);
+      expect(dropdowns, findsNWidgets(5));
+
+      final firstDropdown = tester.widget<DropdownButton<String>>(dropdowns.first);
+      final items = [
+        for (final item in firstDropdown.items!) (item.value as String),
+      ];
+
+      expect(items, permutation);
+      expect(items.toSet(), wordIds.toSet());
+    },
+  );
+
+  testWidgets(
+    'option permutation remains stable across answer selections and ordinary rebuilds',
+    (tester) async {
+      await _pumpClozeTest(
+        tester,
+        random: Random(999),
+      );
+
+      final dropdowns = find.byType(DropdownButton<String>);
+      final initialOptions = [
+        for (final item in tester.widget<DropdownButton<String>>(dropdowns.first).items!)
+          item.value as String,
+      ];
+
+      // Select an answer for the first dropdown — triggers a Riverpod state update and rebuild
+      await tester.tap(dropdowns.first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(initialOptions.first).last);
+      await tester.pumpAndSettle();
+
+      final optionsAfterSelect = [
+        for (final item in tester.widget<DropdownButton<String>>(dropdowns.first).items!)
+          item.value as String,
+      ];
+      expect(optionsAfterSelect, initialOptions);
+
+      // Select an answer for the second dropdown
+      await tester.tap(dropdowns.last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(initialOptions.last).last);
+      await tester.pumpAndSettle();
+
+      // Tap Submit — triggers another rebuild
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+
+      final optionsAfterSubmit = [
+        for (final item in tester.widget<DropdownButton<String>>(dropdowns.first).items!)
+          item.value as String,
+      ];
+      expect(optionsAfterSubmit, initialOptions);
+    },
+  );
+
+  testWidgets(
+    'canonical state.wordIds list remains unchanged after options permutation',
+    (tester) async {
+      final container = await _pumpClozeTest(
+        tester,
+        wordIds: ['run', 'souvenir'],
+        optionsOverride: ['souvenir', 'run'],
+      );
+
+      final flowState = container.read(learningFlowControllerProvider);
+      expect(flowState.wordIds, ['run', 'souvenir']);
+    },
+  );
+
+  testWidgets(
+    'story whose marker order differs from input word list produces correct blanks and grades accurately',
+    (tester) async {
+      final container = await _pumpClozeTest(
+        tester,
+        wordIds: ['run', 'souvenir'],
+        story: 'I bought a [[souvenir|souvenir]]. Then I [[run|ran]] home.',
+        optionsOverride: ['souvenir', 'run'],
+      );
+
+      final dropdowns = find.byType(DropdownButton<String>);
+      expect(dropdowns, findsNWidgets(2));
+
+      // First blank in story is "souvenir" — pick "souvenir"
+      await tester.tap(dropdowns.first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('souvenir').last);
+      await tester.pumpAndSettle();
+
+      // Second blank in story is "run" — pick "run"
+      await tester.tap(dropdowns.last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('run').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Selanjutnya →'));
+      await tester.pumpAndSettle();
+
+      final sessionService =
+          container.read(learningSessionServiceProvider) as _FakeLearningSessionService;
+      expect(sessionService.recordClozeResultCalls.single['clozeTestResult'], {
+        'souvenir': true,
+        'run': true,
+      });
+      expect(find.byType(CowriteScreen), findsOneWidget);
     },
   );
 }

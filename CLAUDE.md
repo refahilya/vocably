@@ -42,31 +42,14 @@ komponen disesuaikan untuk web, bukan disalin persis. Detail di
   `DATA_MODEL.md` §10.1).
 - **Database & Auth:** Firebase (Firestore + Firebase Auth), **plan Spark
   (gratis)** — tidak perlu upgrade Blaze/billing account sama sekali.
-- **Deployment app:** Firebase Hosting via `web.app` (free tier).
-- **AI proxy: Cloudflare Workers** (bukan Firebase Cloud Functions — diganti
-  karena kendala billing/kartu kredit untuk Blaze plan). Ini **repo/project
-  terpisah** dari Flutter app (TypeScript, deploy sendiri via `wrangler`,
-  free tier tanpa kartu kredit, 100.000 request/hari). Satu-satunya alasan
-  butuh proxy ini: **API key ChatGPT tidak boleh ada di client**. Worker ini
-  yang menyimpan `OPENAI_API_KEY` dan meneruskan panggilan AI. Detail
-  arsitektur lengkap di `DATA_MODEL.md` §10.
-- **AI generation:** ChatGPT API — **selalu dipanggil lewat Cloudflare
-  Worker**. Endpoint yang tersedia: `POST /generate-story`,
-  `POST /cowrite-turn`, `POST /translate` (kontrak lengkap di
-  `DATA_MODEL.md` §10.2).
-- **Dictionary/audio pengucapan:** `https://api.dictionaryapi.dev/api/v2/entries/en`
-  — dipanggil langsung dari client, tidak perlu proxy (tidak ada secret).
-  Punya fallback berlapis karena API ini sering tidak punya entri (terutama
-  frasa) dan tidak punya jaminan uptime — lihat `SPEC.md` §3.5.
-- **Bank kosakata dibaca dari aset statis, bukan Firestore.** File JSON per
-  level CEFR (`assets/vocab/vocab_a1.json` dst) dimuat ke memori untuk
-  semua kebutuhan browse. Firestore tetap sumber kebenaran; aset itu
-  artefak turunan. Alasannya kuota baca plan Spark — detail di
-  `DATA_MODEL.md` §11.
-
-**Dependency yang belum dikonfirmasi:** text-to-speech untuk fallback audio
-(kemungkinan `flutter_tts`) — belum disetujui, minta konfirmasi dulu sesuai
-§6.
+- **Deployment app:** Firebase Hosting via `web.app` (free tier). **Catatan audit:** konfigurasi blok `"hosting"` di `firebase.json` belum dibuat (baru ada `"firestore"`). Blok hosting dengan `public: "build/web"` dan SPA rewrite ke `/index.html` harus ditambahkan sebelum `firebase deploy`.
+- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (348 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
+- **Build web produksi:** `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`.
+- **AI proxy: Cloudflare Workers** (bukan Firebase Cloud Functions — diganti karena kendala billing/kartu kredit untuk Blaze plan). Ini **repo/project terpisah** dari Flutter app (TypeScript, deploy sendiri via `wrangler`, free tier tanpa kartu kredit, 100.000 request/hari). Satu-satunya alasan butuh proxy ini: **API key ChatGPT tidak boleh ada di client**. Worker ini yang menyimpan `OPENAI_API_KEY` dan meneruskan panggilan AI. Detail arsitektur lengkap di `DATA_MODEL.md` §10.
+- **AI generation:** ChatGPT API — **selalu dipanggil lewat Cloudflare Worker**. Endpoint yang tersedia: `POST /generate-story`, `POST /cowrite-turn`, `POST /translate` (kontrak lengkap di `DATA_MODEL.md` §10.2).
+- **Dictionary/audio pengucapan:** `https://api.dictionaryapi.dev/api/v2/entries/en` — dipanggil langsung dari client, tidak perlu proxy (tidak ada secret). Punya fallback berlapis karena API ini sering tidak punya entri (terutama frasa) dan tidak punya jaminan uptime — lihat `SPEC.md` §3.5.
+- **Text-to-speech fallback audio:** Menggunakan package `flutter_tts: ^4.2.2` (sudah terpasang). **Penting:** `flutter_tts` di platform web menggunakan JS interop legasi (`dart:js`/`package:js`), sehingga **tidak kompatibel dengan flag `--wasm`**. Web build harus menggunakan target JavaScript standar.
+- **Bank kosakata dibaca dari aset statis, bukan Firestore.** File JSON per level CEFR (`assets/vocab/vocab_a1.json` dst) dimuat ke memori untuk semua kebutuhan browse. Firestore tetap sumber kebenaran; aset itu artefak turunan. Alasannya kuota baca plan Spark — detail di `DATA_MODEL.md` §11.
 
 ## 3. Struktur Folder
 
@@ -251,14 +234,15 @@ dulu kalau perlu penyesuaian.
 7. **Fitur utama 3 fase (Storyfier core):** reading story → cloze test →
    co-write AI (generate & feedback lewat Worker, client yang menulis hasil
    ke Firestore). Termasuk parser penanda `[[kata|bentuk]]` dan logic
-   update mastery (§8).
+   update mastery (§8). *(Selesai, hardened di Phase 2 Stages 1–8, committed di `8f313f2`).*
 8. **Guru:** set target kata per sesi/waktu + Edit Kata (edit topik kata
-   yang sudah ada).
+   yang sudah ada). *(Selesai, committed di `1f2b606`).*
 
-> **Kenapa milestone 4 & 5 disusun begini (perubahan v6):** versi lama
-> menaruh "guru tambah kata (translate lewat Worker)" di milestone 4,
-> padahal Worker-nya baru dibangun di milestone 5 — dependensi yang
-> terbalik. Sekarang semua yang butuh Worker dikumpulkan di milestone 5.
+> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**348 tests passing**, `flutter test --concurrency=1`). Dua commit perbaikan bug berikutnya telah di-commit ke `main`:
+> - `56ded8b`: Pembersihan tombol logout ganda pada dashboard siswa.
+> - `34a9c4b`: Sanitasi feedback Co-Write untuk mencegah kebocoran marker terjemahan.
+>
+> **Langkah Selanjutnya:** Konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, verifikasi manual E2E browser, dan persiapan responden penelitian (skema demografi, pembersihan data uji, instrumen pre/post test).
 
 ## 8. Logic Penting yang Sering Disalahpahami
 

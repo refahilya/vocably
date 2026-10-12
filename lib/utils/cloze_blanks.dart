@@ -22,6 +22,8 @@
 /// be rendered if it's ever produced.
 library;
 
+import 'dart:math';
+
 import 'story_markers.dart';
 
 /// One piece of a cloze-ified story: plain text, a repeated (non-blank)
@@ -126,6 +128,18 @@ List<String> blankTargetWords(List<ClozeSegment> segments) {
     for (final segment in segments)
       if (segment is ClozeBlankSegment) segment.targetWord,
   ];
+}
+
+/// Generates a randomized permutation of [wordIds] for Cloze test dropdown
+/// options. Pure function: does not mutate [wordIds].
+///
+/// Uses [random] (or a new [Random] by default) to produce a non-predictable
+/// ordering across sessions, preventing students from guessing answers based
+/// on list order, while allowing deterministic testing via a seeded [Random].
+List<String> shuffleClozeOptions(List<String> wordIds, [Random? random]) {
+  final list = List<String>.from(wordIds);
+  list.shuffle(random);
+  return list;
 }
 
 /// Cross-checks a marked story's target-word markers against the
