@@ -1,9 +1,14 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/learning_session.dart';
 import '../services/ai_worker_service.dart';
 import '../utils/cloze_blanks.dart';
+import '../utils/cowrite_feedback.dart';
+import '../utils/cowrite_suggestion.dart';
+import '../utils/cowrite_validator.dart';
 import '../utils/normalize_word.dart';
 import 'ai_worker_providers.dart';
 import 'history_providers.dart';
@@ -40,6 +45,8 @@ class LearningFlowState {
     this.pendingSuggestion,
     this.isSendingTurn = false,
     this.isRequestingSuggestion = false,
+    this.consecutiveMissedStudentTurns = 0,
+    this.isCompletingCowrite = false,
     this.turnError,
     this.clozeSubmitError,
     this.advanceToClozeError,
@@ -99,12 +106,13 @@ class LearningFlowState {
 
   final List<CowriteTurn> cowriteTranscript;
 
-  /// Target words the Worker has reported as "used correctly" in **any**
-  /// turn so far (suggestion-assisted or not) — drives the co-write
-  /// pill display ("terpakai/belum terpakai") and the auto-stop
-  /// condition (`SPEC.md` §5.3: "Percakapan berhenti otomatis begitu
-  /// semua kata target sudah dipakai"), which is about usage, not
-  /// independence.
+  /// Session-level `wordUsedCorrectly`: target words validly used so far
+  /// by the student (suggestion-assisted or not) **or** by the bot in an
+  /// application-forced fallback turn whose text was validated to contain
+  /// the selected word. Drives the co-write pill display ("terpakai/belum
+  /// terpakai") and the auto-stop condition (`SPEC.md` §5.3), which is
+  /// about usage, not independence. A target word appearing incidentally
+  /// in an ordinary AI turn is never added here.
   final Set<String> allWordsUsedCorrectly;
 
   /// Subset of [allWordsUsedCorrectly] used correctly on a turn that did
@@ -123,8 +131,26 @@ class LearningFlowState {
   /// student sends a turn or asks for a fresh one.
   final String? pendingSuggestion;
 
+  /// True for the whole send cycle — the ordinary Worker call and, when
+  /// due, the forced-word fallback call.
   final bool isSendingTurn;
   final bool isRequestingSuggestion;
+
+  /// Application-owned counter of consecutive **accepted** student turns
+  /// with no valid target-word usage. Incremented only by a student turn
+  /// that was sent and graded with no newly validated target word; reset
+  /// to 0 when a student turn validly uses at least one remaining target
+  /// word, and when a forced fallback turn succeeds. Never changed by AI
+  /// turns, locally rejected inputs, or failed sends. When it reaches
+  /// `kCowriteFallbackMissThreshold` (3) and words remain, the next bot
+  /// turn is an application-forced fallback (see
+  /// [LearningFlowController.sendTurn]); a failed fallback leaves it at
+  /// 3+, so the next missed turn retries the fallback.
+  final int consecutiveMissedStudentTurns;
+
+  /// True while "✓ Selesai" is writing the session — guards against a
+  /// double tap writing the completion twice.
+  final bool isCompletingCowrite;
 
   /// Friendly, student-facing message for a failed send/suggestion call —
   /// or, since Milestone 7 Phase 2 Stage 3, a failed [LearningFlowController.
@@ -173,6 +199,8 @@ class LearningFlowState {
     Object? pendingSuggestion = _unset,
     bool? isSendingTurn,
     bool? isRequestingSuggestion,
+    int? consecutiveMissedStudentTurns,
+    bool? isCompletingCowrite,
     Object? turnError = _unset,
     Object? clozeSubmitError = _unset,
     Object? advanceToClozeError = _unset,
@@ -207,6 +235,9 @@ class LearningFlowState {
           : pendingSuggestion as String?,
       isSendingTurn: isSendingTurn ?? this.isSendingTurn,
       isRequestingSuggestion: isRequestingSuggestion ?? this.isRequestingSuggestion,
+      consecutiveMissedStudentTurns:
+          consecutiveMissedStudentTurns ?? this.consecutiveMissedStudentTurns,
+      isCompletingCowrite: isCompletingCowrite ?? this.isCompletingCowrite,
       turnError: identical(turnError, _unset) ? this.turnError : turnError as String?,
       clozeSubmitError: identical(clozeSubmitError, _unset)
           ? this.clozeSubmitError
@@ -225,6 +256,12 @@ class LearningFlowState {
 /// since several nullable fields need it here.
 const Object _unset = Object();
 
+/// Source of randomness for the Co-Write fallback's word selection
+/// (`selectFallbackWord`) — a provider so tests can inject a seeded or
+/// scripted [Random] and assert exactly which word was forced.
+@Riverpod(keepAlive: true)
+Random cowriteFallbackRandom(Ref ref) => Random();
+
 /// Drives one Storyfier flow end-to-end (`SPEC.md` §5): Fase 1 generate/
 /// regenerate, Fase 2 grading, Fase 3 chat — writing to
 /// `learningSessions`/`learningProgress` at exactly the points
@@ -238,6 +275,11 @@ const Object _unset = Object();
 /// flow's Firestore document, if any, is simply left as-is.
 @Riverpod(keepAlive: true)
 class LearningFlowController extends _$LearningFlowController {
+  /// Incremented by [startFlow]. An in-flight Worker response whose epoch
+  /// no longer matches belongs to a previous flow and is dropped instead of
+  /// being attached to the current flow's transcript.
+  int _flowEpoch = 0;
+
   @override
   LearningFlowState build() {
     return const LearningFlowState(studentId: '', wordIds: [], sourceType: '');
@@ -264,6 +306,7 @@ class LearningFlowController extends _$LearningFlowController {
       final normalized = normalizeWord(raw);
       if (seen.add(normalized)) deduped.add(normalized);
     }
+    _flowEpoch++;
     state = LearningFlowState(studentId: studentId, wordIds: deduped, sourceType: sourceType);
   }
 
@@ -439,7 +482,7 @@ class LearningFlowController extends _$LearningFlowController {
     final sessionId = state.sessionId;
     if (sessionId == null) return;
 
-    state = state.copyWith(clozeSubmitError: null);
+    state = state.copyWith(clozeSubmitError: null, turnError: null);
     final result = gradeClozeAnswers(segments, state.clozeAnswers);
 
     try {
@@ -457,6 +500,7 @@ class LearningFlowController extends _$LearningFlowController {
       state = state.copyWith(
         clozeTestResult: result,
         currentPhase: LearningSessionPhase.coWrite,
+        turnError: null,
       );
     } catch (error, stackTrace) {
       debugPrint('LearningFlowController.confirmClozeAndAdvance failed: $error\n$stackTrace');
@@ -466,19 +510,20 @@ class LearningFlowController extends _$LearningFlowController {
     }
   }
 
-  /// Fase 3's "Saran menulis" (`SPEC.md` §5.3). Deliberately does **not**
-  /// touch [state.cowriteTranscript]/[state.allWordsUsedCorrectly] —
-  /// `vocably-ai-worker/src/handlers/cowriteTurn.ts`'s contract is built
-  /// around grading the student's *latest sent* turn and producing the
-  /// AI's *next* turn in one call, with the requested suggestion riding
-  /// along for the turn the student hasn't written yet. Since no new
-  /// student turn exists yet when this is called, this implementation
-  /// re-sends the existing transcript unchanged and keeps only
-  /// [CowriteTurnResult.suggestion] from the response — the returned
-  /// `aiTurn`/`feedback`/`wordsUsedCorrectly` (which would just
-  /// re-describe the already-processed previous turn) are intentionally
-  /// discarded, not appended again.
+  /// Fase 3's "Saran menulis" (`SPEC.md` §5.3). Does not touch the
+  /// transcript or any word status — the Worker's suggestion mode returns
+  /// only a bare English sentence ([CowriteTurnResult.suggestion]), stored
+  /// in [LearningFlowState.pendingSuggestion] and shown with an Indonesian
+  /// instruction (`formatWritingSuggestion`). Requesting one disqualifies
+  /// the next sent turn from "mandiri" (`DATA_MODEL.md` §10.2).
+  ///
+  /// Ignored while a turn is being sent (or the session is complete): a
+  /// suggestion computed against a transcript that is about to change
+  /// would be stale, and would wrongly mark the *next* turn as assisted.
   Future<void> requestSuggestion() async {
+    if (state.isSendingTurn || state.isRequestingSuggestion || state.allWordsUsed) return;
+    final epoch = _flowEpoch;
+
     state = state.copyWith(isRequestingSuggestion: true, turnError: null);
     try {
       final result = await ref
@@ -488,12 +533,16 @@ class LearningFlowController extends _$LearningFlowController {
             remainingWords: state.remainingWordsForCowrite,
             requestSuggestion: true,
           );
+      if (epoch != _flowEpoch) return;
+
+      final sentence = extractSuggestedSentence(result.suggestion ?? '');
       state = state.copyWith(
         isRequestingSuggestion: false,
         usedSuggestionThisTurn: true,
-        pendingSuggestion: result.suggestion,
+        pendingSuggestion: sentence.isEmpty ? null : sentence,
       );
     } catch (error, stackTrace) {
+      if (epoch != _flowEpoch) return;
       debugPrint('LearningFlowController.requestSuggestion failed: $error\n$stackTrace');
       state = state.copyWith(
         isRequestingSuggestion: false,
@@ -502,36 +551,75 @@ class LearningFlowController extends _$LearningFlowController {
     }
   }
 
-  /// Fase 3's send action — appends the student's [text] as a new turn,
-  /// gets the Worker's feedback + the AI's reply, and updates the
-  /// "used"/"used independently" tracking (`DATA_MODEL.md` §10.2's
-  /// "mandiri" rule: [LearningFlowState.usedSuggestionThisTurn] at the
-  /// moment of sending — not whether [text] happens to match the
-  /// suggestion verbatim — decides whether this turn's correctly-used
-  /// words count toward independent use).
+  /// Fase 3's send action. The application owns every decision here; the
+  /// Worker only generates text and its output is validated before it can
+  /// change any state:
   ///
-  /// Persists the whole transcript to Firestore after every turn (project
-  /// owner's Decision 1: an abandoned session "remains stored at its last
-  /// persisted phase/state" — for that to mean anything during Fase 3,
-  /// each turn needs to actually land, not just the final one).
+  /// 1. **Local rejection.** A turn that mentions a target word only as a
+  ///    bare word, fragment, or list ([shouldRejectStudentTurnLocally]) is
+  ///    rejected with [kBareOrFragmentTurnErrorMessage]: no Worker call, no
+  ///    transcript entry, no AI turn, counter unchanged. Ordinary replies
+  ///    with no target word ("Okay.") are accepted as normal turns.
+  /// 2. **Ordinary call.** The student's turn is appended immediately
+  ///    (Stage 6), then `/cowrite-turn` assesses exactly this turn. The
+  ///    response is attached only to the turn that was sent: it is dropped
+  ///    if the flow was restarted meanwhile ([_flowEpoch]), and treated as
+  ///    a failed send if the Worker's `assessedStudentTurn` doesn't match.
+  /// 3. **Student credit.** `validateStudentTargetWords` against the words
+  ///    remaining *before* this turn. Validated words always count toward
+  ///    session coverage ([LearningFlowState.allWordsUsedCorrectly]). They
+  ///    also count as independent use ("mandiri") only when the turn did
+  ///    not use a suggestion ([LearningFlowState.usedSuggestionThisTurn] at
+  ///    send time) **and** is not Indonesian/mixed-language
+  ///    (`containsIndonesianWords`, decided here in app code and sent to the
+  ///    Worker as `studentTurnContainsIndonesian` so feedback can remind the
+  ///    student to write in English).
+  ///    **Feedback (CW-02):** the Worker's feedback is attached to this turn
+  ///    only, replaced by [kCowriteUncreditedClaimFeedback] if it claimed
+  ///    words that validation rejected, and given a display-only
+  ///    [CowriteFeedbackKind] from the validated result
+  ///    ([classifyCowriteFeedback]) — never from its wording, and never
+  ///    affecting coverage or mastery.
+  /// 4. **Counter.** [LearningFlowState.consecutiveMissedStudentTurns]
+  ///    resets to 0 if this turn validly used a remaining target word,
+  ///    otherwise increments.
+  /// 5. **Bot turn.** If no words remain, the session is complete and no
+  ///    AI bubble is appended. Else, if the counter has reached
+  ///    [kCowriteFallbackMissThreshold], the app picks exactly one
+  ///    remaining word at random ([selectFallbackWord]) and asks the Worker
+  ///    for a forced-word turn; the word is marked used only if it is
+  ///    detected in the returned text (`validateBotTargetWords`), and the
+  ///    counter then resets. If that call fails or doesn't validate, the
+  ///    ordinary AI turn is shown instead, nothing is marked, and the
+  ///    counter stays at 3+ so the next missed turn retries. Otherwise the
+  ///    ordinary AI turn is shown and never credits any target word, even
+  ///    if it happens to contain one — so incidental bot use can't bypass
+  ///    the fallback schedule.
   ///
-  /// Milestone 7 Phase 2 Stage 6: the student's own turn is appended to
-  /// [LearningFlowState.cowriteTranscript] **immediately**, before the
-  /// Worker call — a real chat app shows the sent message right away, not
-  /// only once a reply comes back (the previous version built the whole
-  /// updated transcript, student turn included, only *after* `await`ing
-  /// the Worker, so the student's message and the AI's reply appeared
-  /// together, visibly delayed). If the Worker call fails, the
-  /// optimistically-added turn is rolled back — the existing, intentional
-  /// contract (a failed send leaves no trace in the transcript once the
-  /// failure is fully handled) is preserved; only the *timing* of the
-  /// success path changed, not the failure outcome.
+  /// The whole transcript is persisted after every turn (Decision 1). If
+  /// the ordinary call fails, the optimistic student turn is rolled back.
   Future<void> sendTurn(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || state.isSendingTurn) return;
+    if (trimmed.isEmpty ||
+        state.isSendingTurn ||
+        state.isRequestingSuggestion ||
+        state.allWordsUsed) {
+      return;
+    }
 
+    if (shouldRejectStudentTurnLocally(trimmed, state.wordIds)) {
+      state = state.copyWith(
+        isSendingTurn: false,
+        turnError: kBareOrFragmentTurnErrorMessage,
+      );
+      return;
+    }
+
+    final epoch = _flowEpoch;
     final usedSuggestion = state.usedSuggestionThisTurn;
+    final mixedLanguage = containsIndonesianWords(trimmed, state.wordIds);
     final transcriptBeforeSend = state.cowriteTranscript;
+    final remainingBeforeTurn = state.remainingWordsForCowrite;
 
     state = state.copyWith(
       cowriteTranscript: [
@@ -548,163 +636,200 @@ class LearningFlowController extends _$LearningFlowController {
       isSendingTurn: true,
       turnError: null,
     );
+    final payloadWithStudentTurn = _transcriptPayload();
 
+    final CowriteTurnResult result;
     try {
-      final result = await ref
+      result = await ref
           .read(aiWorkerServiceProvider)
           .cowriteTurn(
-            transcript: _transcriptPayload(),
-            remainingWords: state.remainingWordsForCowrite,
+            transcript: payloadWithStudentTurn,
+            remainingWords: remainingBeforeTurn,
             requestSuggestion: false,
+            studentTurnContainsIndonesian: mixedLanguage,
           );
-
-      // Client-side safety guard (Milestone 7 Phase 2 Stage 8 follow-up):
-      // live testing found the Worker's own `wordsUsedCorrectly`
-      // occasionally including a bare word (e.g. the student just types
-      // "breakfast") even though its own feedback correctly recognized it
-      // wasn't a real sentence. Rather than trusting `wordsUsedCorrectly`
-      // unconditionally, a bare single-word turn is forced to contribute
-      // nothing here — see `_isBareSingleWordTurn`'s doc comment for why
-      // this stays a narrow, deterministic check, not a grammar parser.
-      final usedCorrectlyThisTurn = _isBareSingleWordTurn(trimmed)
-          ? const <String>{}
-          : result.wordsUsedCorrectly
-              .map(normalizeWord)
-              .where(state.wordIds.contains)
-              .toSet();
-
-      // Milestone 7 Phase 2 Stage 8 (3-turn fallback): words the AI itself
-      // used this turn — normalized/filtered against the known target
-      // words exactly like the student's own usage above, but kept in a
-      // separate set throughout. This union feeds ONLY
-      // `allWordsUsedCorrectly` (below) so Cowrite can still end when the
-      // AI supplies the last remaining word; it must never reach
-      // `independentWordsUsedCorrectly`, since AI-assisted usage is not
-      // evidence the student mastered the word (`SPEC.md`/`DATA_MODEL.md`
-      // §3 rule 2 — mastery requires the student's own independent use).
-      final aiUsedWordsThisTurn = result.aiUsedWords
-          .map(normalizeWord)
-          .where(state.wordIds.contains)
-          .toSet();
-
-      final newAllWordsUsedCorrectly = {
-        ...state.allWordsUsedCorrectly,
-        ...usedCorrectlyThisTurn,
-        ...aiUsedWordsThisTurn,
-      };
-
-      // Milestone 7 Phase 2 Stage 8 (Issue 4 — end Cowrite immediately):
-      // true only when this exact turn is what completes every target
-      // word. When that happens purely from the student's own usage (no
-      // AI-fallback word contributed this turn), the trailing AI bubble
-      // from this same response is suppressed — the conversation should
-      // end right on the student's completing message, with no
-      // unnecessary extra AI reply. If an AI-fallback word is what
-      // completed it (or contributed to completing it), the AI bubble
-      // stays, since that bubble is itself the turn that consumed the
-      // final target (decision table, Stage 8 investigation/plan).
-      final completedByThisTurn = state.wordIds.every(newAllWordsUsedCorrectly.contains);
-      final suppressAiBubble = completedByThisTurn && aiUsedWordsThisTurn.isEmpty;
-
-      final updatedTranscript = [
-        ...transcriptBeforeSend,
-        CowriteTurn(
-          sender: CowriteSender.siswa,
-          text: trimmed,
-          feedback: result.feedback,
-          usedSuggestion: usedSuggestion,
-        ),
-        if (!suppressAiBubble)
-          CowriteTurn(
-            sender: CowriteSender.ai,
-            text: result.aiTurn,
-            feedback: null,
-            usedSuggestion: false,
-          ),
-      ];
-
-      state = state.copyWith(
-        cowriteTranscript: updatedTranscript,
-        allWordsUsedCorrectly: newAllWordsUsedCorrectly,
-        independentWordsUsedCorrectly: usedSuggestion
-            ? state.independentWordsUsedCorrectly
-            : {...state.independentWordsUsedCorrectly, ...usedCorrectlyThisTurn},
-        usedSuggestionThisTurn: false,
-        pendingSuggestion: null,
-        isSendingTurn: false,
-      );
-
-      // Milestone 7 Phase 2 Stage 7/8: temporary, non-behavioral
-      // diagnostic for an unresolved live observation (Stage 7
-      // investigation, Problem A) — a student appeared to use a target
-      // word multiple times in Cowrite without the phase ever completing.
-      // The app-side mechanism (this file, `allWordsUsedCorrectly`/
-      // `allWordsUsed`) is already covered by passing unit tests, so the
-      // open question is what the Worker actually returned on those
-      // turns — this print gives the next live E2E test that answer
-      // directly from the browser console, without guessing at or
-      // changing the completion logic itself. Extended in Stage 8 to also
-      // show `aiUsedWords`, now that it can also affect completion. Does
-      // not log the student id, session id, or any auth/token data.
-      debugPrint(
-        '[COWRITE DIAGNOSTIC]\n'
-        'Student turn: $trimmed\n'
-        'Worker wordsUsedCorrectly: ${result.wordsUsedCorrectly}\n'
-        'Worker aiUsedWords: ${result.aiUsedWords}\n'
-        'Accumulated wordsUsedCorrectly: ${state.allWordsUsedCorrectly}\n'
-        'All words used: ${state.allWordsUsed}\n'
-        'Feedback: ${result.feedback}',
-      );
-
-      final sessionId = state.sessionId;
-      if (sessionId != null) {
-        try {
-          await ref
-              .read(learningSessionServiceProvider)
-              .saveCowriteTranscript(sessionId: sessionId, transcript: state.cowriteTranscript);
-        } catch (error, stackTrace) {
-          // The turn itself already succeeded and is reflected in the UI
-          // — a save failure here just means this particular turn isn't
-          // durable yet. Not surfaced as a blocking error: the *next*
-          // successful call re-writes the whole transcript anyway (see
-          // `saveCowriteTranscript`'s doc comment), so this self-heals
-          // without the student needing to do anything differently.
-          debugPrint('LearningFlowController: saveCowriteTranscript failed: $error\n$stackTrace');
-        }
+      if (epoch != _flowEpoch) return;
+      final assessed = result.assessedStudentTurn;
+      if (assessed != null && assessed.trim() != trimmed) {
+        throw AiWorkerException(
+          'Worker assessed a different student turn ("$assessed") than the one sent.',
+        );
       }
     } catch (error, stackTrace) {
+      if (epoch != _flowEpoch) return;
       debugPrint('LearningFlowController.sendTurn failed: $error\n$stackTrace');
       state = state.copyWith(
         cowriteTranscript: transcriptBeforeSend,
         isSendingTurn: false,
         turnError: 'Gagal mengirim giliran. Coba lagi.',
       );
+      return;
+    }
+
+    final usedCorrectlyThisTurn = validateStudentTargetWords(
+      claimedWords: result.wordsUsedCorrectly,
+      studentTurnText: trimmed,
+      eligibleTargetWords: remainingBeforeTurn,
+    ).toSet();
+    // CW-02: feedback text and its display kind are fixed here, from this
+    // turn's validated result, and attached only to this turn below.
+    final studentFeedback = reconcileCowriteFeedback(
+      workerFeedback: result.feedback,
+      claimedWords: result.wordsUsedCorrectly,
+      creditedWords: usedCorrectlyThisTurn,
+      studentTurnContainsIndonesian: mixedLanguage,
+    );
+    final studentFeedbackKind = studentFeedback == null
+        ? null
+        : classifyCowriteFeedback(
+            studentTurnContainsIndonesian: mixedLanguage,
+            creditedWords: usedCorrectlyThisTurn,
+            attemptedTargetWord: containsAnyTargetWord(trimmed, remainingBeforeTurn),
+            hasError: result.hasError,
+          );
+    final wordsUsedAfterStudentTurn = {
+      ...state.allWordsUsedCorrectly,
+      ...usedCorrectlyThisTurn,
+    };
+    final remainingAfterStudentTurn = [
+      for (final word in state.wordIds)
+        if (!wordsUsedAfterStudentTurn.contains(word)) word,
+    ];
+    var missedTurns = usedCorrectlyThisTurn.isEmpty
+        ? state.consecutiveMissedStudentTurns + 1
+        : 0;
+
+    String? botText;
+    final botWordsThisTurn = <String>{};
+    if (remainingAfterStudentTurn.isNotEmpty) {
+      // Ordinary continuation — shown, but never credits a target word.
+      botText = result.aiTurn;
+
+      if (missedTurns >= kCowriteFallbackMissThreshold) {
+        final forcedWord = selectFallbackWord(
+          remainingAfterStudentTurn,
+          ref.read(cowriteFallbackRandomProvider),
+        )!;
+        try {
+          final forced = await ref
+              .read(aiWorkerServiceProvider)
+              .cowriteForcedTurn(
+                transcript: payloadWithStudentTurn,
+                remainingWords: remainingAfterStudentTurn,
+                forcedWord: forcedWord,
+              );
+          if (epoch != _flowEpoch) return;
+          // Detected from the actual text; the Worker's aiUsedWords claim
+          // is deliberately not consulted.
+          final validated = validateBotTargetWords(
+            claimedWords: const [],
+            aiTurnText: forced.aiTurn,
+            eligibleTargetWords: [forcedWord],
+          );
+          if (validated.isNotEmpty) {
+            botText = forced.aiTurn;
+            botWordsThisTurn.addAll(validated);
+            missedTurns = 0;
+          } else {
+            debugPrint(
+              'LearningFlowController: forced turn did not contain "$forcedWord"; '
+              'keeping the ordinary AI turn and retrying on the next missed turn.',
+            );
+          }
+        } catch (error, stackTrace) {
+          if (epoch != _flowEpoch) return;
+          debugPrint(
+            'LearningFlowController: forced turn for "$forcedWord" failed: '
+            '$error\n$stackTrace',
+          );
+        }
+      }
+    }
+
+    final updatedTranscript = [
+      ...transcriptBeforeSend,
+      CowriteTurn(
+        sender: CowriteSender.siswa,
+        text: trimmed,
+        feedback: studentFeedback,
+        usedSuggestion: usedSuggestion,
+        feedbackKind: studentFeedbackKind,
+      ),
+      if (botText != null && botText.trim().isNotEmpty)
+        CowriteTurn(
+          sender: CowriteSender.ai,
+          text: botText.trim(),
+          feedback: null,
+          usedSuggestion: false,
+        ),
+    ];
+
+    state = state.copyWith(
+      cowriteTranscript: updatedTranscript,
+      allWordsUsedCorrectly: {...wordsUsedAfterStudentTurn, ...botWordsThisTurn},
+      // Bot usage never reaches the independent (mastery) set, and neither
+      // does a suggestion-assisted or Indonesian/mixed-language turn — those
+      // count for session coverage (above) only.
+      independentWordsUsedCorrectly: usedSuggestion || mixedLanguage
+          ? state.independentWordsUsedCorrectly
+          : {...state.independentWordsUsedCorrectly, ...usedCorrectlyThisTurn},
+      consecutiveMissedStudentTurns: missedTurns,
+      usedSuggestionThisTurn: false,
+      pendingSuggestion: null,
+      isSendingTurn: false,
+    );
+
+    // Debug builds only: never logs student text in release builds.
+    if (kDebugMode) {
+      debugPrint(
+        '[COWRITE DIAGNOSTIC]\n'
+        'Student turn: $trimmed\n'
+        'Worker wordsUsedCorrectly: ${result.wordsUsedCorrectly}\n'
+        'Validated student words: $usedCorrectlyThisTurn\n'
+        'Indonesian/mixed-language turn: $mixedLanguage\n'
+        'Validated bot (forced) words: $botWordsThisTurn\n'
+        'Consecutive missed turns: $missedTurns\n'
+        'All words used: ${state.allWordsUsed}',
+      );
+    }
+
+    final sessionId = state.sessionId;
+    if (sessionId != null) {
+      try {
+        await ref
+            .read(learningSessionServiceProvider)
+            .saveCowriteTranscript(sessionId: sessionId, transcript: state.cowriteTranscript);
+      } catch (error, stackTrace) {
+        // The turn itself already succeeded and is reflected in the UI —
+        // the next successful save rewrites the whole transcript anyway
+        // (see `saveCowriteTranscript`'s doc comment), so this self-heals.
+        debugPrint('LearningFlowController: saveCowriteTranscript failed: $error\n$stackTrace');
+      }
     }
   }
 
   /// Fase 3 → `selesai` (`SPEC.md` §5.3's "✓ Selesai" button, shown once
   /// [LearningFlowState.allWordsUsed] is true). Writes the session's
-  /// final fields, then — per Decision 3 — the second (and last) mastery
-  /// write, upgrading any word that qualifies.
+  /// final fields, then the second (and last) mastery write — using only
+  /// [LearningFlowState.independentWordsUsedCorrectly], never bot usage.
   ///
-  /// Milestone 7 Phase 2 Stage 3: wrapped in try/catch, same pattern as
-  /// [generateStory]/[sendTurn] — reuses [LearningFlowState.turnError]
-  /// (already rendered on `cowrite_screen.dart`) rather than a new field,
-  /// since this is still a Fase 3 write failure shown in the same spot.
-  /// On failure, [LearningFlowState.currentPhase] is left untouched
-  /// (still `coWrite`), so the student stays on the co-write screen and
-  /// can retry by tapping "✓ Selesai" again. Callers must check
-  /// [LearningFlowState.turnError] (or that `currentPhase` actually
-  /// became `selesai`) after awaiting this before navigating away — this
-  /// method no longer throws, so a bare `await` alone is not enough to
-  /// detect failure.
+  /// Guarded by [LearningFlowState.isCompletingCowrite] (and a no-op once
+  /// `selesai`), so a double tap cannot write the completion twice. On
+  /// failure, [LearningFlowState.currentPhase] stays `coWrite` and
+  /// [LearningFlowState.turnError] is set, so the student can retry —
+  /// callers must check the phase after awaiting this (it never throws).
   Future<void> completeCowrite() async {
     final sessionId = state.sessionId;
     final clozeTestResult = state.clozeTestResult;
     if (sessionId == null || clozeTestResult == null) return;
+    if (state.isCompletingCowrite ||
+        state.currentPhase == LearningSessionPhase.selesai ||
+        !state.allWordsUsed) {
+      return;
+    }
 
     final independentWords = state.independentWordsUsedCorrectly.toList();
-    state = state.copyWith(turnError: null);
+    state = state.copyWith(turnError: null, isCompletingCowrite: true);
 
     try {
       await ref
@@ -723,10 +848,16 @@ class LearningFlowController extends _$LearningFlowController {
             sessionId: sessionId,
           );
 
-      state = state.copyWith(currentPhase: LearningSessionPhase.selesai);
+      state = state.copyWith(
+        currentPhase: LearningSessionPhase.selesai,
+        isCompletingCowrite: false,
+      );
     } catch (error, stackTrace) {
       debugPrint('LearningFlowController.completeCowrite failed: $error\n$stackTrace');
-      state = state.copyWith(turnError: 'Gagal menyelesaikan sesi. Coba lagi.');
+      state = state.copyWith(
+        turnError: 'Gagal menyelesaikan sesi. Coba lagi.',
+        isCompletingCowrite: false,
+      );
     }
   }
 
@@ -737,16 +868,9 @@ class LearningFlowController extends _$LearningFlowController {
   }
 }
 
-/// Client-side safety guard for bare single-word Cowrite turns.
-/// This is intentionally narrow: it does not attempt grammar checking.
-/// A single word is excluded from mastery/completion tracking, while
-/// the student's message and Worker feedback are still preserved.
-bool _isBareSingleWordTurn(String text) {
-  final stripped = text.replaceAll(_terminalPunctuationPattern, '').trim();
-
-  if (stripped.isEmpty) return false;
-
-  return !stripped.contains(RegExp(r'\s'));
-}
-
-final RegExp _terminalPunctuationPattern = RegExp(r'''^[.,!?;:"']+|[.,!?;:"']+$''');
+/// User-facing Indonesian feedback shown when a student's input mentions a
+/// target word only as a bare word, repeated word, short determiner/
+/// preposition fragment, or list of target words instead of a complete
+/// English sentence/clause (`shouldRejectStudentTurnLocally`).
+const String kBareOrFragmentTurnErrorMessage =
+    'Tulis kalimat lengkap dalam bahasa Inggris yang menggunakan kata target, bukan hanya kata lepas.';

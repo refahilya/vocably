@@ -35,6 +35,7 @@ class CowriteTurnResult {
     required this.wordsUsedCorrectly,
     required this.suggestion,
     required this.aiUsedWords,
+    this.assessedStudentTurn,
   });
 
   final String aiTurn;
@@ -48,17 +49,26 @@ class CowriteTurnResult {
   /// Worker has no notion of).
   final List<String> wordsUsedCorrectly;
 
-  /// Only non-null when the request had `requestSuggestion: true`.
+  /// Only non-null when the request had `requestSuggestion: true`: the
+  /// bare English sentence. The Indonesian instruction ("Coba tulis
+  /// \"...\"") is added by the client (`utils/cowrite_suggestion.dart`).
   final String? suggestion;
 
-  /// Milestone 7 Phase 2 Stage 8 (3-turn fallback): remaining target
-  /// words the AI itself used in [aiTurn] this turn — empty in the
-  /// normal case. Semantically distinct from [wordsUsedCorrectly] (the
-  /// student's own usage): the client must union this into
-  /// `allWordsUsedCorrectly` (so Cowrite can still end) but never into
-  /// `independentWordsUsedCorrectly` (so it never counts as student
-  /// mastery) — see `LearningFlowController.sendTurn`.
+  /// Target words the AI used in [aiTurn]. Only meaningful for a
+  /// forced-word turn ([AiWorkerService.cowriteForcedTurn]); ordinary
+  /// turns always return `[]` from the current Worker, and the client
+  /// ignores it for ordinary turns anyway. The client never trusts this
+  /// list alone — it re-detects the selected word in [aiTurn] itself
+  /// (`validateBotTargetWords`) — and never counts it toward
+  /// `independentWordsUsedCorrectly` (student mastery).
   final List<String> aiUsedWords;
+
+  /// The exact student text the Worker assessed (ordinary turns). `null`
+  /// for suggestion/forced-word responses and for responses from an older
+  /// deployed Worker that predates this field. When present, the client
+  /// checks it equals the turn it just sent, so feedback can never be
+  /// attached to a different student turn.
+  final String? assessedStudentTurn;
 }
 
 /// One generated story, from `POST /generate-story` (`DATA_MODEL.md`
@@ -141,11 +151,15 @@ class AiWorkerService {
   /// `vocably-ai-worker/src/handlers/cowriteTurn.ts` validates).
   /// [remainingWords] are target words (base form) not yet used
   /// correctly. [requestSuggestion] asks the Worker to also fill
-  /// [CowriteTurnResult.suggestion].
+  /// [CowriteTurnResult.suggestion]. [studentTurnContainsIndonesian] is the
+  /// app's own deterministic classification of the latest student turn
+  /// (`containsIndonesianWords`); the Worker uses it to ask for a short
+  /// "write in English" reminder and never re-classifies the turn itself.
   Future<CowriteTurnResult> cowriteTurn({
     required List<Map<String, String>> transcript,
     required List<String> remainingWords,
     required bool requestSuggestion,
+    bool studentTurnContainsIndonesian = false,
   }) async {
     final decoded = await _postJson(
       path: '/cowrite-turn',
@@ -153,6 +167,7 @@ class AiWorkerService {
         'transcript': transcript,
         'remainingWords': remainingWords,
         'requestSuggestion': requestSuggestion,
+        'studentTurnContainsIndonesian': studentTurnContainsIndonesian,
       },
       timeout: const Duration(seconds: 45),
     );
@@ -163,6 +178,7 @@ class AiWorkerService {
     final wordsUsedCorrectly = decoded['wordsUsedCorrectly'];
     final suggestion = decoded['suggestion'];
     final aiUsedWords = decoded['aiUsedWords'];
+    final assessedStudentTurn = decoded['assessedStudentTurn'];
     if (aiTurn is! String ||
         (feedback != null && feedback is! String) ||
         hasError is! bool ||
@@ -170,7 +186,8 @@ class AiWorkerService {
         !wordsUsedCorrectly.every((w) => w is String) ||
         (suggestion != null && suggestion is! String) ||
         aiUsedWords is! List ||
-        !aiUsedWords.every((w) => w is String)) {
+        !aiUsedWords.every((w) => w is String) ||
+        (assessedStudentTurn != null && assessedStudentTurn is! String)) {
       throw const AiWorkerException('AI proxy returned an unexpected response shape.');
     }
     return CowriteTurnResult(
@@ -179,6 +196,47 @@ class AiWorkerService {
       hasError: hasError,
       wordsUsedCorrectly: [for (final w in wordsUsedCorrectly) w as String],
       suggestion: suggestion as String?,
+      aiUsedWords: [for (final w in aiUsedWords) w as String],
+      assessedStudentTurn: assessedStudentTurn as String?,
+    );
+  }
+
+  /// Forced-word turn of `POST /cowrite-turn` (`DATA_MODEL.md` §10.2): the
+  /// application has already decided the fallback is due and chosen
+  /// [forcedWord] (one of [remainingWords]); the Worker only generates and
+  /// validates one continuation sentence using it. [transcript] must end
+  /// with the student's latest turn. Throws [AiWorkerException] when the
+  /// Worker could not produce a valid sentence (it answers 502 rather than
+  /// claim an unvalidated word).
+  Future<CowriteTurnResult> cowriteForcedTurn({
+    required List<Map<String, String>> transcript,
+    required List<String> remainingWords,
+    required String forcedWord,
+  }) async {
+    final decoded = await _postJson(
+      path: '/cowrite-turn',
+      body: {
+        'transcript': transcript,
+        'remainingWords': remainingWords,
+        'requestSuggestion': false,
+        'forcedWord': forcedWord,
+      },
+      timeout: const Duration(seconds: 45),
+    );
+
+    final aiTurn = decoded['aiTurn'];
+    final aiUsedWords = decoded['aiUsedWords'];
+    if (aiTurn is! String ||
+        aiUsedWords is! List ||
+        !aiUsedWords.every((w) => w is String)) {
+      throw const AiWorkerException('AI proxy returned an unexpected response shape.');
+    }
+    return CowriteTurnResult(
+      aiTurn: aiTurn,
+      feedback: null,
+      hasError: false,
+      wordsUsedCorrectly: const [],
+      suggestion: null,
       aiUsedWords: [for (final w in aiUsedWords) w as String],
     );
   }

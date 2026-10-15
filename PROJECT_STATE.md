@@ -78,18 +78,24 @@ FilterChips and "+ Tambah topik baru" creator, saving only `topics` and
   `AppNavShell` hosts the global logout action.
 - `34a9c4b` (2026-09-09): "fix: prevent translation marker leakage" — sanitized
   Co-Write AI feedback to prevent translation/morphological markers from leaking
-  into the student feedback stream. This is the latest commit on `main`.
-- **Pedagogical Bugfix (2026-10-12): Positional Leakage Elimination in Storyfier → Cloze Test:**
+  into the student feedback stream.
+- **Pedagogical Bugfix (2026-10-12): Positional Leakage Elimination in Storyfier → Cloze Test (`fa4d52c` / `6239f7e`):**
   - Resolved systematic pattern where story sentence order matched target-word input order.
   - Worker (`generateStory.ts`): Removed the `"in the same order the target words were given"` prompt constraint; instructed model to sequence words by narrative flow without following list order. Validated via `validateMarkers()` set-based invariant checks. Added 3 new tests in `generateStory.test.ts`.
   - Flutter (`cloze_test_screen.dart`, `cloze_blanks.dart`): Replaced predictable dropdown order with session-stable randomized permutation (`shuffleClozeOptions`), preserving canonical `state.wordIds` and key-based grading (`gradeClozeAnswers`). Added 9 new tests across `cloze_blanks_test.dart` and `cloze_test_screen_test.dart`.
+- **Co-Write Reliability Remediation — Phase 1 (2026-10-13) and Phase 2 (2026-10-15), uncommitted working tree in both repos; Worker side deployed as Worker version `0bec79ee` (deployed 2026-10-15T17:08Z UTC, §5t); Flutter side not hosted** (§5o, §5p):
+  - Deterministic student target-word validation and local rejection of target-word bare words/fragments/lists, with composer focus and keyboard retention (`cowrite_screen.dart`).
+  - Phase 2: application-owned 3-consecutive-miss counter and one-word random fallback (bot usage validated from generated text, counted at session level only, never as student mastery); validator fixes (`Birds fly.`, `This works.`, `Okay.`, `said`/`bit`, comparatives, `lay`≠`lie`); feedback tied to the current student turn; Indonesian "Coba tulis" suggestions; anti-echo continuation with bounded retries.
+  - CW-05 (§5q): credit for meaningful target-word use despite grammar or tense errors; model-reported surface forms mapped to base targets; spelling-rule inflections (no `attackked`); a retry never erases the first student assessment.
+  - Indonesian/mixed-language input (§5r): deterministic app-side detection; a short "write in English" reminder; session coverage only, never independent mastery; the bot always writes in English and stays in the story.
+  - CW-02 feedback (§5s): feedback prioritises current-turn target-word use; praise for rejected claims is replaced; a display-only ✓/💡/💬 indicator from validated results; a 502 instead of an unacceptable bot sentence.
 
-**Confirmed fresh (2026-10-12 verification):**
+**Confirmed fresh (2026-10-15 verification, working tree, after §5s):**
 - `flutter analyze`: clean (**0 issues**).
-- `flutter test --concurrency=1`: **357/357 passing** (100% of test suite).
-- `flutter build web`: **succeeds** with `--dart-define=WORKER_BASE_URL=...`.
+- `flutter test --concurrency=1`: **467/467 passing** (100% of test suite).
+- `flutter build web --release --dart-define=WORKER_BASE_URL=...`: **succeeds** (re-run after §5s).
   (Note: `--wasm` is blocked by legacy JS interop in `flutter_tts: ^4.2.2`).
-- `vocably-ai-worker`: `npm test` **92/92 passing**, `npm run typecheck` clean.
+- `vocably-ai-worker`: `npx vitest run --fileParallelism=false` **148/148 passing**, `npx tsc --noEmit` clean. The default parallel run can hit a Node out-of-memory error on this low-RAM machine.
 - `tools/vocab_import`: `npm test` **43/43 passing**.
 - `firebase.json`: **Hosting is NOT configured** (no `"hosting"` block).
 - `firestore.rules`: Milestone 8 `targetWordSets` create rule is committed
@@ -1008,7 +1014,9 @@ place that name is recorded; it does not appear in `SPEC.md` or
    grammar parsing. Confirmed to still allow short multi-word sentences
    and phrases like "the baby" (2 words, no verb) — those must remain
    eligible per the project owner's explicit constraint.
-3. **3-turn AI fallback** — `CowriteTurnResult`/`cowriteTurn.ts` gained
+3. **3-turn AI fallback** *(historical — replaced on 2026-10-15 by the
+   application-owned fallback in §5p; the prompt-driven eligibility below
+   no longer exists)* — `CowriteTurnResult`/`cowriteTurn.ts` gained
    `aiUsedWords: string[]`: if a student completes more than 3 turns
    without using all target words, the Worker *may* use exactly one
    remaining word itself in its own next turn (eligibility is judged
@@ -1064,6 +1072,8 @@ not this document's job to silently resolve):**
   `completeCowrite()` is ever reported, since `firestore.rules`'
   `learningSessions` update rule would reject the second concurrent
   write once the first has already advanced `currentPhase`.
+- *(Resolved since: the double-tap guard was added in §5p, and the
+  `DATA_MODEL.md` §10.2 / `SPEC.md` §5.3 gaps below were closed in §5o/§5p.)*
 - `DATA_MODEL.md` §10.2's `/cowrite-turn` response table is missing the
   `aiUsedWords` field entirely.
 - The 3-turn fallback and bare-word exclusion have no trace in `SPEC.md`.
@@ -1116,7 +1126,290 @@ Two subsequent bugfix commits were added to `main` following Milestone 8:
 
 3. **Clarification on "Fix 3A":**
    - No Git branch or commit named "Fix 3A" exists in the repository.
-   - "3a" refers to Section 3a of `DATA_MODEL.md` ("Integritas Data Sisi Klien"), and Milestone 7 Phase 2 included Stages 1–8 (Stage 3 handled cloze/cowrite error cases). The latest bugfix commit on HEAD is `34a9c4b`.
+   - "3a" refers to Section 3a of `DATA_MODEL.md` ("Integritas Data Sisi Klien"), and Milestone 7 Phase 2 included Stages 1–8 (Stage 3 handled cloze/cowrite error cases).
+
+### 5n. Pedagogical Bugfix: Positional Leakage in Storyfier → Cloze Test (2026-10-12)
+
+1. **Worker (`vocably-ai-worker/src/handlers/generateStory.ts`, commit `6239f7e`):**
+   - Removed the prompt ordering bias that caused sentence 1 to use target word 1, sentence 2 to use target word 2, etc.; instructed narrative-driven target-word ordering while preserving all `[[targetWord|usedForm]]` marker invariants.
+2. **Flutter (`lib/utils/cloze_blanks.dart`, `lib/screens/student/learning_flow/cloze_test_screen.dart`, commit `fa4d52c`):**
+   - Implemented `shuffleWordOptions()` and cached a session-stable randomized dropdown permutation in `_ClozeTestScreenState` so option positions no longer leak blank answers.
+
+### 5o. Co-Write Reliability Remediation — Phase 1: Deterministic Target-Word Validation and Bare-Input Handling (2026-10-13)
+
+Implemented **Phase 1 only** (plus three browser E2E follow-up bugfixes) of the Co-Write reliability remediation across both repositories:
+
+1. **Deterministic Student & Bot Target-Word Validation (`lib/utils/cowrite_validator.dart`, `lib/providers/learning_session_controller.dart`, `vocably-ai-worker/src/handlers/cowriteTurn.ts`):**
+   - Enforced the core rule: AI may generate content and provide linguistic feedback, but application code deterministically validates whether target words were actually used in the current turn.
+   - `validateStudentTargetWords()` (Flutter) and `sanitizeStudentWordsUsedCorrectly()` (Worker) verify that each word in `wordsUsedCorrectly` belongs to the active target-word set (`state.wordIds` / `remainingWords`), appears as a whole word (or valid grammatical inflection, never an arbitrary substring such as `attack` in `attacker` or `run` in `crunchy`) in the student's current turn text, and that the student's turn is not a bare word or fragment.
+   - `validateBotTargetWords()` (Flutter) and `sanitizeBotAiUsedWords()` (Worker) detected remaining target words in **any** `aiTurn` and credited them at session level. **Superseded in Phase 2 (§5p):** ordinary AI turns no longer credit any word; only the application-selected fallback word, detected in the forced turn's text, is credited. Bot usage still **never** enters `independentWordsUsedCorrectly` or persisted `cowriteWordsUsedCorrectly`.
+2. **Local Bare-Word & Fragment Rejection + Composer Focus & Post-Response Keyboard Connection Retention (`isBareOrFragmentTurn`, `LearningFlowController.sendTurn`, `cowrite_screen.dart`):**
+   - Rejects bare single words (`"attack"`, `"button?"`, `"breakfast"`), repeated single words (`"button button"`), short determiner/preposition noun fragments (`"the button"`, `"a souvenir"`, `"the baby"`), and bare lists of target words (`"attack button completely"`) **locally** before calling the Worker. (Phase 2 narrowed this to inputs that contain a target word — `"Okay."` is now an ordinary turn — and fixed false rejections such as `"Birds fly."` and `"This works."`, §5p.)
+   - Rejected inputs do **not** enter `cowriteTranscript`, do **not** call `/cowrite-turn`, do **not** trigger a bot continuation (`aiTurn`), surface clear Indonesian feedback via `state.turnError` (`kBareOrFragmentTurnErrorMessage`), and preserve the student's draft in `_textController` (`cowrite_screen.dart`).
+   - Wrapped the composer `TextField` + Send button in `TextFieldTapRegion`, stabilized the bottom layout keys, and explicitly managed `_inputFocusNode` + `EditableTextState.requestKeyboard()` on local rejection so the composer remains immediately clickable/editable on Flutter Web even after single or repeated local rejections. Also cleared any stale `turnError` in `confirmClozeAndAdvance()`.
+   - **Follow-up fix for focused `TextField` stopping keyboard input after send/response cycles (`cowrite_screen.dart`):** During browser E2E testing, after several turns and submitting a valid sentence (`"one day a monster came and attack the village"`), the composer still visually showed its focused purple border and blinking caret, yet physical keyboard typing inserted no characters. Root cause traced to three interacting mechanisms in the Flutter Web composer lifecycle: (a) `_handleSend` did not `await controller.sendTurn(text)`, so when `isSendingTurn` transitioned `true -> false` (`TextField(enabled: false -> true)`), `_inputFocusNode.canRequestFocus` was toggled off during the in-flight request (closing `_textInputConnection`) and only restored on the post-response rebuild without any post-frame `EditableTextState.requestKeyboard()` call to reopen a fresh `TextInputConnection`; (b) `TextField`'s default non-null `autofillHints: const <String>[]` enabled `EngineAutofillForm` (`hasAutofillGroup == true` in `text_editing.dart`) on Flutter Web, wrapping the hidden `<textarea class="flt-text-editing">` in a `<form>` managed via `dormantForms` across `TextInput.updateConfig(readOnly: ...)` transitions; and (c) `_textController.clear()` set an invalid collapsed selection (`offset: -1`) while a custom `onTap: _activateComposerInput` hook interfered with `EditableText`'s built-in selection gesture detector. Fixed by making `_handleSend` `async` and awaiting `controller.sendTurn(text)`, clearing `_textController` with a valid `TextSelection.collapsed(offset: 0)`, scheduling `_scheduleComposerInputActivation()` (`addPostFrameCallback` -> `EditableTextState.requestKeyboard()`) after the post-response rebuild when `!afterState.allWordsUsed && !afterState.isSendingTurn`, setting `autofillHints: null` on the chat composer `TextField`, and removing the custom `onTap` override. Added 2 regression widget tests in `test/screens/cowrite_screen_test.dart` (12/12 passing). **Browser E2E retest in Chrome is still required to confirm the physical-keyboard fix live.**
+3. **Deferred from Phase 1:** the code-owned 3-consecutive-miss counter and forced bot word scheduler — **implemented in Phase 2 (§5p)**. Still deferred: operation-ID architecture and a full feedback UI redesign.
+
+### 5p. Co-Write Phase 2: Application-Owned Fallback, Validator Fixes, Feedback Association, Indonesian Suggestions (2026-10-15, working tree, NOT committed or deployed)
+
+Authoritative requirements from the project owner (2026-10-15) replaced the earlier prompt-driven fallback. Root causes found and fixed:
+
+1. **Validator false rejections/matches (`lib/utils/cowrite_validator.dart`, mirrored in the new `vocably-ai-worker/src/cowriteValidator.ts`):**
+   - The "list of target words" rule rejected any turn whose content words were all targets, so `"Birds fly."` (targets `bird`, `fly`) was rejected. A turn like that now counts as a list only if it contains a separator (`,` `;` `/`) or none of its words is inflected.
+   - The determiner rule rejected `"This works."`. A demonstrative followed by a verb-like word (`-s`/`-ed`) is now a clause.
+   - Local rejection applied to **any** fragment, so `"Okay."` was blocked with a message about target words. `shouldRejectStudentTurnLocally` now rejects only inputs that contain a target word. `"Okay."` is sent and counts as a miss.
+   - Irregular forms were missing (`said`→`say`, `bit`/`bitten`→`bite`, plus ~20 more common irregulars, `good`→`better/best`, `bad`→`worse/worst`). `lay` was wrongly accepted for `lie`; it has been removed.
+   - Comparatives were never matched. `-er`/`-est` forms now count only in a comparative context (`is taller`, `taller than`, `the tallest`) — part of speech isn't available client-side, and this keeps agent nouns (`teacher`, `attacker`, `runner`) from matching.
+2. **Fallback was prompt-owned (the model counted turns and chose the word).** It is now application-owned in `LearningFlowController.sendTurn`:
+   - `consecutiveMissedStudentTurns` resets on valid student usage or a successful fallback. It is never changed by AI turns, rejected inputs, or failed sends.
+   - At 3 misses, `selectFallbackWord` picks one remaining word at random (`cowriteFallbackRandomProvider`), and `AiWorkerService.cowriteForcedTurn` calls `/cowrite-turn` with `forcedWord`.
+   - The word is credited only when the client detects it in the returned text. A failed or invalid fallback credits nothing, keeps the ordinary AI turn, and retries on the next missed turn.
+   - Incidental target words in ordinary AI turns are never credited.
+3. **Bot usage vs mastery:** validated fallback words enter `allWordsUsedCorrectly` (session level), never `independentWordsUsedCorrectly`. Tests assert `completeSession`/`recordCowriteCompletion` receive only the student's own words.
+4. **Feedback could describe the wrong turn:** the Worker sent the whole transcript and told the model to find the last student turn. It now sends `storySoFar` and `currentStudentTurn` separately and returns `assessedStudentTurn`. The client rejects mismatches and drops responses that arrive after `startFlow` (`_flowEpoch`). Suggestion and send now block each other. The feedback prompt requires concrete corrections, forbids invented mistakes, and forbids generic praise when a correction is needed.
+5. **Suggestions came back in English ("Try: ...")**: the Worker now returns only the English sentence (prefixes stripped in code). The client shows `Coba tulis "<sentence>"` (`lib/utils/cowrite_suggestion.dart`), and also strips English prefixes coming from the older deployed Worker.
+6. **Continuations echoed the student:** a new prompt requires a new event or development. The Worker detects echoes and target-word use in code (`isEchoOfStudentTurn`, `containsAnyTargetWord`), with at most 2 generations per request (`MAX_GENERATION_ATTEMPTS`). Unit tests only pin the prompt contract and the retry logic; real output quality still needs live LLM testing.
+7. **Other hardening:**
+   - "✓ Selesai" double-tap guard (`isCompletingCowrite`).
+   - `sendTurn` is a no-op once all words are used.
+   - The `[COWRITE DIAGNOSTIC]` log (which includes student text) now prints only in debug builds.
+
+Tests:
+- Flutter: 413 passing. New validator regressions; a state-machine group (threshold, single-word selection, reset, AI turns not counted, rejected/failed sends not counted, invalid/failed forced output, repeated cycles to completion, mastery separation, double-tap); a feedback-association/concurrency group; service tests for `cowriteForcedTurn`; UI tests for `Okay.`, the forced-fallback pill, and Indonesian suggestions. The Bug A keyboard tests still pass.
+- Worker: 112 passing (new `test/cowriteValidator.test.ts`; `cowriteTurn.test.ts` rewritten for the three-mode contract).
+
+**No Firestore schema or Security Rules change.** Not browser- or LLM-E2E tested.
+
+### 5q. CW-05: Reliable Target-Word Crediting (2026-10-15, working tree — implemented and locally tested; NOT committed; Worker side deployed in §5t)
+
+**Requirement (project owner):** credit a target word when the student uses it meaningfully with an acceptable intended meaning, even with grammar or tense errors. Never credit on string presence alone. "Tanpa kesalahan" in the mastery rule means acceptable meaning and usage of the target word, not an error-free sentence.
+
+Root causes found in the CW-05 audit, and the fixes:
+
+1. **The model's word had to be spelled exactly as the base form.**
+   - In `validateStudentTargetWords` (Dart `lib/utils/cowrite_validator.dart` and TypeScript `vocably-ai-worker/src/cowriteValidator.ts`), each claim was lowercased and trimmed, then had to equal a remaining base word. A model reporting `attacked`, `attacks`, `Attack.`, or `'attack'` was silently dropped, which explains the inconsistent credit for `attack`/`attacked`/`attacks`.
+   - **Fix:** a new `_canonicalTargetsForClaim` / `canonicalTargetsForClaim` tokenizes the claim (dropping quotes, punctuation, and case) and maps it to the remaining base target whose inflections or comparative forms include it. The existing safeguards still apply: the target must be remaining, must occur in the student's text as a whole word or valid inflection, and the turn must not be a bare word, fragment, or list.
+2. **The prompt gated credit on grammar.**
+   - The deployed prompt (`cbb066a`) required use "in a grammatically valid way". The local Phase 2 prompt said "a short, simple, grammatically valid sentence is enough". The model therefore omitted words from sentences with tense errors (e.g. "one day a monster came and attack the village"), and code can't add a word the model didn't report.
+   - **Fix:** the ordinary-turn rubric in `cowriteTurn.ts` now defines credit as meaningful use with an acceptable intended meaning. It states explicitly that grammar, tense, and agreement errors and a wrong inflection of the target don't disqualify, and that these errors go to `hasError`/`feedback` and never remove credit. It keeps the exclusions for bare words, lists, fragments, mere mentions, nonsense, and wrong meanings. All "grammatically valid" wording is removed.
+3. **A retry could erase credit.**
+   - `ordinaryTurn` replaced the whole response, grading included, when it retried to fix the bot's sentence.
+   - **Fix:** the student assessment (`feedback`, `hasError`, `wordsUsedCorrectly`) comes from the first well-formed attempt and is kept. Retries replace only `aiTurn`.
+4. **Inflections were over-generated** (`attackked`, `attackes`, `attackd`, and `be`→`bed`, `see`→`seed`, `run`→`runned`).
+   - **Fix:** `validFormsForSingleWord` (Dart and TypeScript) now applies suffixes by spelling rule. Consonant doubling happens only for consonant-vowel-consonant endings (with `qu` treated as one consonant). `-es` only after s/x/z/o/ch/sh. `-d` only after a silent `-e`. Words with an irregular entry get no generated regular past forms.
+
+Unchanged: the bot-fallback rules, the separation between session-level coverage and independent mastery, bare-word/fragment rejection, `Coba tulis "…"` suggestions, and the local-only `wrangler.jsonc` origin.
+
+Tests (run 2026-10-15):
+- **Flutter:** `flutter test --concurrency=1` **426/426**; `flutter analyze` clean.
+  - +11 in the validator CW-05 group: grammar-error positives, attack/attacked/attacks/attacking, surface-form and formatted claims, other inflections, absent/not-remaining/substring/fragment negatives, over-inflection rejection, valid spelling-rule forms, and the meaning-judgement boundary.
+  - +2 controller tests: a tense-error sentence plus a `"Attacked."` claim is credited at session level and independently and resets the counter; an absent target or an over-inflection is not credited and counts as a miss.
+- **Worker:** `npx vitest run --fileParallelism=false` **123/123**; `npx tsc --noEmit` clean.
+  - +7 validator parity tests.
+  - +3 handler tests: surface-form/formatted claim; retry preserves the first attempt's credit; assessment taken from the first well-formed attempt after a malformed one.
+  - The old prompt-contract test that pinned "grammatically valid sentence is enough" was replaced by two CW-05 contract tests.
+- The default parallel `npx vitest run` crashed once with a Node out-of-memory error at startup on this machine (about 0.9 GB RAM free). The sequential run passes; the crash is an environment memory limit, not a test failure.
+
+**Limitations:**
+- Whether the real model reports grammatically flawed but meaningful uses, and rejects mentions, nonsense, and wrong meanings, is only prompt-contract tested and needs a live-model check.
+- Misspellings (`atacked`) and telegraphic all-target sentences (`Monster attack village.` when all three are targets) are still not credited.
+- *(Superseded 2026-10-16: the Worker is now deployed, §5t.)* At the time of writing, production ran the 2026-08-30 Worker, so the prompt fix (2) and retry fix (3) depended on that deployment. The deterministic fixes (1, 4) are client-side.
+
+### 5r. Co-Write: Indonesian / Mixed-Language Input and Session Coverage vs. Independent Mastery (2026-10-15, working tree — implemented and locally tested; NOT committed; Worker side deployed in §5t)
+
+**Trigger:** manual testing ("aku attack temanku", "lalu aku tertawa hahaha", off-topic requests) followed by an audit.
+
+Root causes found, and the fixes:
+
+1. **No language detection anywhere in the app, and mixed-language use counted toward mastery.**
+   - In `LearningFlowController.sendTurn`, independent credit was gated only by `usedSuggestion`. A validated `attack` in "aku attack temanku" therefore went into both `allWordsUsedCorrectly` and `independentWordsUsedCorrectly`, and on completion into the persisted `cowriteWordsUsedCorrectly`.
+   - **Fix:** a new deterministic `containsIndonesianWords` (Dart `lib/utils/cowrite_validator.dart`, mirrored in `vocably-ai-worker/src/cowriteValidator.ts` with parity tests).
+     - Uses a curated list of unambiguous Indonesian function words, pronouns, and particles; case and punctuation are normalized.
+     - English homographs are excluded (`main`, `data`, `jam`, `bank`, `ya`, `yuk`, `dong`, `situ`, `agar`).
+     - Name-like weak markers (`dan`, `ada`, `anda`, `dia`, `mau`, `apa`) count only alongside another marker.
+     - Mid-sentence capitalized words, target words, and `yang` next to `yin` are ignored.
+   - `sendTurn` computes the flag before calling the Worker. A validated word from a flagged turn goes into session coverage only (and still resets the miss counter). Independent credit now requires `!usedSuggestion && !mixedLanguage`. `completeCowrite` still persists only the independent set.
+   - No transcript field and no Firestore schema change.
+2. **The app's classification wasn't passed to the Worker.**
+   - **Fix:** `AiWorkerService.cowriteTurn` always sends an explicit `studentTurnContainsIndonesian` boolean. The Worker validates it (400 if not a boolean; it defaults to false when absent) and forwards it to the model. The model never classifies the language itself.
+3. **No rule kept the bot in English, and line 103 pushed it to mirror the student.**
+   - The continuation rules never stated the bot's language, and "never ignore what they just wrote" encouraged engaging with whatever the student wrote.
+   - **Fix:**
+     - `SHARED_CONTEXT` now says the story is in English and the bot is a story co-writer, not a general assistant that answers questions, calculations, or requests.
+     - `CONTINUATION_RULES` now say: write `aiTurn` in English only, never mirror the student's language; connect to the student's turn only when it is part of the story; otherwise continue from `storySoFar` without answering.
+     - These apply to both ordinary and forced turns.
+4. **No reminder rule for Indonesian input.**
+   - **Fix:** when `studentTurnContainsIndonesian` is true, the ordinary-turn feedback must be exactly one short, polite Indonesian sentence reminding the student to write in English. No grammar lesson.
+5. **No code check on the bot's language.**
+   - **Fix:** `ordinaryTurn` and `forcedTurn` treat an `aiTurn` flagged by `containsIndonesianWords` as a failed attempt, within the existing `MAX_GENERATION_ATTEMPTS` (2). The student assessment from the first well-formed attempt is kept (CW-05).
+
+**Unchanged:** the three-missed-turn fallback rules (Indonesian turns without a validated word are ordinary misses), bot words never entering independent mastery, bare-word/fragment rejection, CW-05 crediting and inflection rules, the `Coba tulis "…"` suggestions, the local-only `wrangler.jsonc` origin, and the Firestore schema.
+
+**Tests (run 2026-10-15):**
+- **Flutter:** `flutter test --concurrency=1` **440/440**; `flutter analyze` clean.
+  - +6 detector tests: Indonesian/mixed, case/punctuation, English and off-topic English not flagged, name-like markers, yin-yang, target-word exclusion.
+  - +7 controller tests: "aku attack temanku" (session coverage only, flag sent, counter reset, persisted set empty); Indonesian without a target is a miss; English keeps CW-05 credit; an English name/homograph turn isn't flagged; a suggestion plus a mixed turn earns no independent credit; bare words are rejected and mentions earn nothing; three Indonesian misses trigger the unchanged fallback and the bot word stays session-only.
+  - +1 service test: `studentTurnContainsIndonesian: true` is sent.
+  - The existing request-body test now also expects the explicit `false` flag (a contract change).
+- **Worker:** `npx vitest run --fileParallelism=false` **137/137**; `npx tsc --noEmit` clean.
+  - +5 detector parity tests.
+  - +5 handler tests: 400 on a non-boolean flag; the flag is forwarded (true and default false); an Indonesian `aiTurn` is retried, the English one is kept with the first assessment; a homograph English `aiTurn` isn't retried; a forced Indonesian sentence is retried.
+  - +4 prompt-contract tests: English-only, the off-topic rule, the reminder rule, and the forced prompt being English-only.
+  - Three of the new prompt tests first failed because my regexes were case-sensitive while the prompt sentences start with a capital letter. I fixed them with exact-case substring checks; the prompt itself was correct.
+- **`flutter build web --release --dart-define=WORKER_BASE_URL=…`:** succeeds (`√ Built build\web`).
+
+**Limitations:**
+- The detector is a word-list heuristic, not language identification. It misses Indonesian made only of content words, and can flag an English sentence that quotes a listed word.
+- Whether the real model keeps every `aiTurn` in English, gives only a short reminder, and refuses off-topic requests is only prompt-contract tested and needs a live-model or browser check.
+- *(Superseded 2026-10-16: the Worker is now deployed, §5t.)* The 2026-08-30 Worker ignored the new flag and prompts.
+
+### 5s. CW-02 Feedback Accuracy, Turn Alignment, and Indicators (2026-10-15, working tree — audited, then implemented and locally tested; NOT committed; Worker side deployed in §5t)
+
+CW-02: Co-Write feedback is sometimes irrelevant, excessive, delayed, about the wrong turn, or about trivial writing errors. A read-only audit first traced the real code in both working trees (`vocably` at `fa4d52c` + uncommitted §5p–§5r; `vocably-ai-worker` at `6239f7e` + uncommitted changes). The fix was then implemented on approval; see **Implementation** below.
+
+**Turn pipeline after the fix (working tree):**
+
+```mermaid
+flowchart TD
+  A["CowriteScreen._handleSend<br/>(cowrite_screen.dart:57)"] --> B["LearningFlowController.sendTurn(text)<br/>(learning_session_controller.dart:594)"]
+  B --> C{"guards: empty / isSendingTurn /<br/>isRequestingSuggestion / allWordsUsed"}
+  C -- blocked --> Z0["return (no-op)"]
+  C --> D{"shouldRejectStudentTurnLocally<br/>(bare word / fragment / list)"}
+  D -- yes --> Z1["turnError = kBareOrFragmentTurnErrorMessage<br/>no Worker call, no transcript entry"]
+  D -- no --> E["capture epoch, usedSuggestion,<br/>mixedLanguage = containsIndonesianWords,<br/>remainingBeforeTurn"]
+  E --> F["optimistic append student turn N (feedback: null)<br/>isSendingTurn = true"]
+  F --> G["AiWorkerService.cowriteTurn → POST /cowrite-turn<br/>{transcript (sender,text only), remainingWords,<br/>requestSuggestion:false, studentTurnContainsIndonesian}"]
+  G --> H["Worker handleCowriteTurn: validate body;<br/>splitAtCurrentStudentTurn → storySoFar + currentStudentTurn = turn N"]
+  H --> I["AI CALL #1 ordinaryTurn attempt 1<br/>ORDINARY_SYSTEM_PROMPT, temp 0.7<br/>input: turn N + history; output: feedback, hasError,<br/>wordsUsedCorrectly (turn N) + aiTurn (bot turn N)"]
+  I --> J{"well-formed JSON?"}
+  J -- no --> K
+  J -- yes --> J2["first well-formed only: validateStudentTargetWords;<br/>claims but no credit → UNCREDITED_CLAIM_FEEDBACK"]
+  J2 --> J3{"aiTurn acceptable? non-empty, not echo,<br/>no still-remaining target, not Indonesian"}
+  J3 -- yes --> L["200 {aiTurn, feedback, hasError, wordsUsedCorrectly,<br/>aiUsedWords: [], assessedStudentTurn = request text}"]
+  J3 -- no --> K["AI CALL #2 ordinaryTurn attempt 2 (same prompt + input)<br/>only aiTurn is used; its feedback is discarded"]
+  K --> K2{"acceptable aiTurn?"}
+  K2 -- no --> X["502 (never an unacceptable aiTurn)"]
+  K2 -- yes --> L
+  X --> R1["client: roll back turn N,<br/>turnError 'Gagal mengirim giliran'"]
+  L --> M{"client: epoch unchanged?<br/>assessedStudentTurn == sent text?"}
+  M -- epoch changed --> Z2["drop response"]
+  M -- mismatch --> R1
+  M -- ok --> N["validateStudentTargetWords (client re-check)<br/>reconcileCowriteFeedback + classifyCowriteFeedback<br/>session coverage; missedTurns ±"]
+  N --> O{"words remain AND missedTurns ≥ 3?"}
+  O -- no --> Q
+  O -- yes --> P["selectFallbackWord → cowriteForcedTurn<br/>AI CALL #3/#4: forcedSystemPrompt, temp 0.7<br/>input: same transcript (turn N last); output: aiTurn only"]
+  P -- validated --> P2["botText = forced aiTurn; bot word → session only; missedTurns = 0"]
+  P -- 502 / not validated --> P3["keep ordinary aiTurn; counter stays ≥ 3"]
+  P2 --> Q
+  P3 --> Q
+  Q["single state update: turn N gets its feedback + feedbackKind;<br/>bot turn appended; independent set only if<br/>!usedSuggestion && !mixedLanguage; isSendingTurn = false"]
+  Q --> S["saveCowriteTranscript (whole transcript, best-effort)"]
+  Q --> T["_FeedbackNote: ✓ positive / 💡 needsImprovement /<br/>💬 reminder (icon + color + semantic label)"]
+```
+
+**AI calls per ordinary turn:** 1–2 calls to `ORDINARY_SYSTEM_PROMPT` (assessment and continuation in one JSON reply), plus 1–2 calls to `forcedSystemPrompt(...)` when the fallback is due — at most 4 sequential model calls before the student sees the feedback. The suggestion button is a separate request (`SUGGESTION_SYSTEM_PROMPT`, 1–2 calls) and never produces feedback.
+
+**Root causes confirmed in the pre-fix code** (line numbers refer to the pre-fix files):
+1. **The prompt puts grammar correction first, not vocabulary.** The `feedback` rule (`cowriteTurn.ts` `ORDINARY_SYSTEM_PROMPT`) only asks for an error correction ("quote the corrected English sentence") or, without an error, a "specific, honest remark about what the student did well". It doesn't tell the model to:
+   - focus on the target words;
+   - say why a target word wasn't credited;
+   - say that no target word was used;
+   - ignore capitalization, punctuation, or apostrophes.
+
+   `hasError` covers "spelling", which these minor mechanics can fall under.
+2. **When there's no error, the prompt requires praise.** It always asks for a "did well" remark. The deployed 2026-08-30 prompt (`cbb066a`) is stronger still: "Always write a short, friendly comment … give brief encouraging feedback".
+3. **Feedback isn't reconciled with the credit decided in code.** The feedback text is written before `validateStudentTargetWords` runs, in the Worker and again in the client. It can praise a word the code rejected, or skip one the code credited. Nothing compares the two.
+4. **Assessment and continuation come from one sampled call at temperature 0.7.** The evaluation is as random as the creative sentence.
+5. **The UI shows every piece of feedback as a warning.** `_ChatBubble` (`cowrite_screen.dart:246-264`) always uses ⚠️ and `warningBackground`. `hasError` is dropped: it isn't stored in `CowriteTurn` or read anywhere (HANDOFF §5 already lists this as a known gap). Praise and corrections look identical.
+6. **Feedback is delayed by the fallback call.** Turn N's feedback is attached only in the final state update (`learning_session_controller.dart:726-756`), after the forced-word call when the fallback is due. Meanwhile the previous turn's feedback is the newest visible feedback.
+7. **The ordinary turn can show a rejected bot sentence.** If attempt 2 is well-formed but also unacceptable, the last well-formed attempt is returned anyway (`ordinaryTurn`, `accepted` is set before the `acceptable` check). An echo, an Indonesian sentence, or one containing a target word can reach the student.
+8. **The `assessedStudentTurn` check only proves request/response pairing.** The Worker copies the request's last student text into that field; it isn't produced by the model. It can't detect the model commenting on an older `storySoFar` sentence. The deployed Worker doesn't return the field, so the client skips the check.
+9. **The deployed Worker differs from the working tree.** `cbb066a` sends the whole transcript and only says "look at the student's most recent turn". It has no separate `currentStudentTurn` and no CW-05 credit rule (it requires "grammatically valid" use). It has the model count turns for its own fallback and always produce praise. Most CW-02 reports may come from this version, but which Worker served the reported sessions isn't verified.
+
+**Likely causes (need live-model evidence):**
+- The model comments on an earlier `storySoFar` sentence. This is less likely with the working-tree prompt than with the deployed one.
+- The `"siswa"`/`"ai"` sender labels are never explained in the current ordinary prompt.
+- Forcing an ordinary continuation to avoid every remaining target word, with a retry when one appears, can make bot sentences awkward or off-topic.
+
+**Not CW-02 defects:**
+- No client race was found: the `_flowEpoch` check, the `isSendingTurn` / `isRequestingSuggestion` guards and the rollback on failure hold.
+- Retries keep the first assessment (CW-05).
+- The transcript payload carries no earlier feedback.
+
+**Implementation (CW-02 fix, 2026-10-15):**
+- **Worker `src/handlers/cowriteTurn.ts`:**
+  - The ordinary prompt asks for `wordsUsedCorrectly` first, so credit is decided before feedback is written. The JSON response order changed to match.
+  - `hasError` now means an *important* problem: a target word in the wrong form or with a wrong or unclear meaning, or a grammar or word-choice error that changes the meaning. Capitalization, punctuation, apostrophes and minor slips are ignored and never mentioned.
+  - Feedback uses the first case that applies:
+    - (a) credited word → specific acknowledgement, plus one brief correction if `hasError`;
+    - (b) attempted but uncredited → the real issue;
+    - (c) no target word → a gentle, actionable nudge.
+  - At most one important problem is mentioned; there's no generic praise and no claim of correct use outside `wordsUsedCorrectly`.
+  - The prompt now explains the `siswa`/`ai` sender labels and forbids assessing the bot's own sentence or the story as a whole.
+  - Reconciliation: if the model claimed words but validation credited none, `feedback` becomes the fixed `UNCREDITED_CLAIM_FEEDBACK`. Indonesian reminders are never overridden.
+  - When neither attempt yields an acceptable `aiTurn`, the Worker returns **502** (`AI did not produce an acceptable story continuation.`) instead of the last well-formed but unacceptable sentence. The first well-formed assessment is still kept across a retry. There are no extra model calls and no new retry architecture.
+- **Flutter:**
+  - `lib/utils/cowrite_feedback.dart` (new) holds:
+    - `kCowriteUncreditedClaimFeedback` (same text as the Worker constant);
+    - `reconcileCowriteFeedback`, the same rule applied client-side, which matters for an older Worker that returns unvalidated claims;
+    - `classifyCowriteFeedback`.
+  - Classification order: Indonesian/mixed → reminder. Then validated credit → positive, or needsImprovement if `hasError`. Then attempted (`containsAnyTargetWord` on the words remaining before the turn) → needsImprovement. Otherwise → reminder. Positive is impossible without code-validated credit.
+  - `lib/models/learning_session.dart`: a `CowriteFeedbackKind` enum and an optional in-memory `CowriteTurn.feedbackKind`. It's excluded from `toMap`/`fromMap`, so there's **no Firestore schema change**.
+  - `LearningFlowController.sendTurn` computes the feedback and its kind from this turn's validated result and attaches both only to this turn. The epoch and `assessedStudentTurn` protections are unchanged. Coverage, independent mastery, the counter and the fallback are untouched.
+  - `cowrite_screen.dart`: `_FeedbackNote` replaces the always-⚠️ box, in the same position and size. ✓ `Icons.check_circle` is green "Sudah tepat", 💡 `Icons.lightbulb` is amber "Perlu perbaikan", and 💬 `Icons.chat_bubble_outline` is blue "Pengingat", each with an icon `semanticLabel`. A missing kind renders neutral, never positive.
+  - `lib/theme/theme.dart`: new `AppColors.info` and `AppColors.infoBackground` tokens.
+- **Not changed:** the validator rules (CW-01/03/04/05), the Indonesian detection and reminder, the fallback algorithm, mastery separation, the Firestore schema and rules, and `wrangler.jsonc`.
+- **Feedback timing:** feedback is still attached only after any fallback call completes. That's a known UX limitation, not a correctness bug, and a test shows it lands on the right turn.
+
+**Tests (run 2026-10-15):**
+- **Worker:** `npx vitest run --fileParallelism=false` **148/148** (was 137); `npx tsc --noEmit` clean.
+  - +2 ordinary-turn 502 tests: a double echo, and an unacceptable attempt followed by a malformed one.
+  - The former "returns the last well-formed attempt" test now expects a 502.
+  - The `aiUsedWords` test now has an acceptable second attempt. Both are intended contract changes.
+  - +6 reconciliation tests: praise for a bare word is replaced; praise for a word absent from the text is replaced; validated feedback is kept; a nudge is kept; the Indonesian reminder is never overridden; a retry keeps the reconciled first assessment.
+  - +3 prompt-contract tests: priority order, credit before feedback, minor mechanics ignored, one important problem, no unbacked praise. The old generic-praise test was replaced.
+- **Flutter:** `flutter test --concurrency=1` **467/467** (was 440); `flutter analyze` clean.
+  - +11 `cowrite_feedback_test.dart` tests: classification, reconciliation, constant parity, `toMap` excludes the kind.
+  - +11 controller tests: each kind; credit unchanged by the kind; the old-Worker claim is replaced; null feedback gets no kind; the persisted map has no kind; a 502 rolls back only the new turn; feedback alignment with a slow fallback; a restart drops the pending fallback.
+  - +4 screen tests: green check, amber bulb, neutral icon even for praise text, pills unchanged.
+  - +1 service test: an ordinary 502 throws `AiWorkerException`.
+- **`flutter build web --release --dart-define=WORKER_BASE_URL=…`:** succeeds.
+
+**Remaining limitations:**
+- Partial contradictions aren't caught, e.g. the model claims two words, one is rejected, and the feedback still praises it.
+- Feedback praising a word the model didn't claim can't be caught without parsing text, though the indicator is then amber or blue, never green.
+- Misspelled attempts (`atacked`) are classified as reminders.
+- The assessment is still sampled at temperature 0.7 together with the continuation.
+- A 502 for an unacceptable continuation makes the student resend a turn that might have earned credit.
+- The project owner reported a satisfactory local manual E2E of the CW-02 feedback on 2026-10-16; I didn't independently verify it. The Worker was then deployed (§5t). No authenticated CW-02 request has been run against production.
+
+### 5t. Worker Deployment — Co-Write Phase 1/2 + CW-05 + Indonesian Input + CW-02 (2026-10-16 WIB / 2026-10-15T17:08Z UTC)
+
+Authorized by the project owner after their local manual E2E of CW-02, which they reported as satisfactory. Only the Cloudflare Worker was deployed: Flutter, Firebase Hosting and Firestore rules are untouched, and nothing was committed or pushed.
+
+**What was deployed:**
+- **Code:** the `vocably-ai-worker` **uncommitted working tree** on top of `6239f7e`, covering §5o–§5s Worker changes (`src/cowriteValidator.ts`, `src/handlers/cowriteTurn.ts`). The deployed code matches no Git commit until those changes are committed.
+- **Worker:** `vocably-ai-worker` at `https://vocably-ai-worker.refahilyaa.workers.dev`.
+- **Version:** `0bec79ee-2958-475e-97fe-64ababf31c9c`, created 2026-10-15T17:08:04.518Z UTC, serving 100% of traffic. It replaces `cc325d6d-723d-4adf-a6b1-6d139fcdc2f4` (2026-08-30).
+- **Command:** `npx wrangler deploy --var "ALLOWED_ORIGINS:https://vocably-idn-en.web.app,https://vocably-idn-en.firebaseapp.com,http://localhost:5555"` (wrangler 4.127.0, OAuth login).
+  - The `--var` override deploys the **committed** origin list, so the working copy's local-only `http://localhost:5000` entry was **not** deployed.
+  - `wrangler.jsonc` itself was not edited.
+  - **A future plain `wrangler deploy` from this working copy would deploy `localhost:5000`.** Use the same override, or remove that local entry first.
+  - Secrets (`OPENAI_API_KEY`) were not touched, and `.dev.vars` was not read.
+
+**Preflight (immediately before):** `npx vitest run --fileParallelism=false` 148/148, `npx tsc --noEmit` clean, and a `--dry-run` with the same override bundled 87.11 KiB.
+
+**Production verification (no credentials, no AI calls, no data writes):**
+
+| Check | Result |
+|---|---|
+| `OPTIONS /cowrite-turn` from `web.app`, `firebaseapp.com`, `localhost:5555` | 204 + matching `Access-Control-Allow-Origin` |
+| `OPTIONS` from `localhost:5000` and an arbitrary origin | 204 with **no** `Access-Control-Allow-Origin` (blocked, as intended) |
+| `POST /cowrite-turn` without a token, and with a bogus token; `POST /translate` without a token | 401 `Unauthorized: invalid or missing ID token.` |
+| `GET /cowrite-turn` | 405 |
+| `wrangler deployments list` | `0bec79ee…` at 100% |
+
+**Not verified in production:** the CW-02 feedback content and the 502-on-unacceptable-continuation path. Both need an authenticated request with a Firebase ID token, which this environment doesn't have. They're covered by the local automated tests and the owner's local manual E2E; a live student-flow check against the production Worker is still pending.
 
 ## 6. Firebase / Firestore State
 
@@ -1139,17 +1432,18 @@ Two subsequent bugfix commits were added to `main` following Milestone 8:
 - ~~Manually click through Milestone 7 end-to-end~~ — done ("brown"/"building" reached `mastered`) (§5k).
 - ~~Commit Milestone 8 implementation~~ — committed in `1f2b606`.
 - ~~Commit post-Milestone 8 fixes~~ — committed in `56ded8b` and `34a9c4b`.
+- ~~Commit Storyfier → Cloze positional leakage fixes~~ — committed in `fa4d52c` (`vocably`) and `6239f7e` (`vocably-ai-worker`).
 
 **Outstanding:**
 
-1. **Deploy Milestone 8's `firestore.rules` update** (`targetWordSets` guru create rule) — run `firebase deploy --only firestore:rules`.
-2. **Configure Firebase Hosting in `firebase.json`** — add `"hosting"` block with `public: "build/web"` and SPA rewrite rule.
-3. **Manually click through Milestone 8 end-to-end in the browser:**
+1. **Commit the Co-Write Phase 1 + Phase 2 + CW-05 + Indonesian-input + CW-02 changes** (`vocably` and `vocably-ai-worker`), leaving the local-only `localhost:5000` origin out. The Worker code is **already deployed** (§5t) from the uncommitted working tree, so committing it will make the deployed code traceable. Then **run a live Chrome + real-LLM E2E retest against the production Worker**: the physical-keyboard composer fix; three missed turns → exactly one forced word; feedback matching the current sentence, prioritising target-word use (CW-02) with the ✓/💡/💬 indicators; continuations that don't echo the student; "Coba tulis" suggestions.
+2. **Deploy Milestone 8's `firestore.rules` update** (`targetWordSets` guru create rule) — run `firebase deploy --only firestore:rules`.
+3. **Configure Firebase Hosting in `firebase.json`** — add `"hosting"` block with `public: "build/web"` and SPA rewrite rule.
+4. **Manually click through Milestone 8 and Co-Write end-to-end in the browser:**
    - **Guru flow (Set Target Kata):** Login as Guru $\rightarrow$ "Target Kata" $\rightarrow$ click "+ Set Target Baru" $\rightarrow$ select CEFR level, select words, set date range with "Tanpa batas akhir" $\rightarrow$ Simpan $\rightarrow$ verify card appears in Target Kata list.
    - **Student regression flow:** Login as Siswa $\rightarrow$ Dashboard "Target Kata Hari Ini" card reflects target words $\rightarrow$ tap "Belajar Kata Ini dengan Cerita" $\rightarrow$ verify Storyfier generates story targeting those words.
    - **Guru flow (Edit Kata):** Login as Guru $\rightarrow$ "Kosakata" $\rightarrow$ "Edit Kata" $\rightarrow$ search word $\rightarrow$ edit topics $\rightarrow$ Simpan $\rightarrow$ verify updated topics appear.
    - **Logout action:** Verify top-right `AppBar` logout button ('Keluar') is accessible and logs out cleanly for both Guru and Siswa across responsive widths.
-4. **Clone `vocably-ai-worker` locally on this development machine** — run `git clone https://github.com/refahilya/vocably-ai-worker.git` in the sibling GitHub directory.
 5. **Confirm whether Cloudflare native Rate Limiting binding is available** (§5g) — Worker is currently running on the in-memory fallback.
 6. **Execute Research Respondent Preparations** (§12) prior to onboarding the 60 thesis participants.
 
@@ -1167,22 +1461,28 @@ Two subsequent bugfix commits were added to `main` following Milestone 8:
 
 ## 9. Verification Status
 
+Run on 2026-10-15 against the uncommitted working trees (after the CW-02 feedback change, §5s):
+
 - `flutter analyze`: **no issues (0 warnings/errors)**.
-- `flutter test --concurrency=1`: **348/348 passing** (100% of test suite).
-- `flutter build web`: **succeeds** (JavaScript/CanvasKit build). Note: `--wasm` is blocked by `flutter_tts: ^4.2.2` legacy JS interop.
-- `vocably-ai-worker/` tests: `npm test` **89/89 passing**, `npm run typecheck` clean.
-- `tools/vocab_import` tests: **43/43 passing**.
+- `flutter test --concurrency=1`: **467/467 passing** (100% of test suite).
+- `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`: **succeeds** (`√ Built build\web`, JavaScript/CanvasKit). Note: `--wasm` is blocked by `flutter_tts: ^4.2.2` legacy JS interop.
+- `vocably-ai-worker/` tests: `npx vitest run --fileParallelism=false` **148/148 passing**, `npx tsc --noEmit` clean.
+- `tools/vocab_import` tests: 43/43 passing (last run 2026-10-13; not re-run, unaffected by this work).
+- **Worker deployment (2026-10-16):** see §5t. The preflight 148/148 and `tsc` were re-run immediately before it, and the production CORS, auth and routing smoke tests passed.
+- **Not performed by Claude:** browser E2E or real-LLM output checks. The owner reported a satisfactory local manual CW-02 E2E. No authenticated production `/cowrite-turn` request was made.
 
 ## 10. Current Git State
 
-- **Flutter repo (`vocably/`):** branch `main`, clean working tree, in sync with `origin/main` at commit `34a9c4b` ("fix: prevent translation marker leakage").
-- **`vocably-ai-worker/` (sibling repo):** branch `main`, in sync with `origin/main` at commit `cbb066a` on remote GitHub. Not yet cloned locally on this laptop.
+- **Flutter repo (`vocably/`):** branch `main`, at commit `fa4d52c` ("fix: shuffle cloze options per session"), with uncommitted Co-Write Phase 1 + Phase 2 + CW-05 + Indonesian-input (§5r) + CW-02 feedback (§5s) working-tree changes.
+- **`vocably-ai-worker/` (sibling repo):** branch `main`, at commit `6239f7e` ("fix: allow natural target-word order in generated stories"), with uncommitted Co-Write Phase 1 + Phase 2 + CW-05 + Indonesian-input (§5r) + CW-02 feedback (§5s) working-tree changes (including the new `src/cowriteValidator.ts` and `test/cowriteValidator.test.ts`). Separately, `wrangler.jsonc` has a **local-only** `http://localhost:5000` origin that must not be committed or deployed.
+- **Deployment:** the Worker is deployed as version `0bec79ee-2958-475e-97fe-64ababf31c9c` (2026-10-15T17:08:04Z UTC) **from the uncommitted working tree** on top of `6239f7e`, so the deployed code matches no commit (§5t). The Flutter app is not hosted, and its Co-Write changes run only locally.
 
 ## 11. Next Recommended Step
 
-1. Deploy the updated `firestore.rules` via `firebase deploy --only firestore:rules`.
-2. Configure Firebase Hosting in `firebase.json` and deploy web build.
-3. Perform manual browser E2E verification of Milestone 8 using the checklist in §7.
+1. Commit the Co-Write work across `vocably` and `vocably-ai-worker`, keeping the local-only `wrangler.jsonc` origin out of the commit. The Worker side is already deployed (§5t). Then run the live E2E checks in §7 item 1 against the production Worker.
+2. Deploy the updated `firestore.rules` via `firebase deploy --only firestore:rules`.
+3. Configure Firebase Hosting in `firebase.json` and deploy web build.
+4. Perform manual browser E2E verification of Milestone 8 and Co-Write using the checklist in §7.
 
 ## 12. Production Hosting, Deployment & Research Rollout Plan
 

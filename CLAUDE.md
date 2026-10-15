@@ -43,7 +43,7 @@ komponen disesuaikan untuk web, bukan disalin persis. Detail di
 - **Database & Auth:** Firebase (Firestore + Firebase Auth), **plan Spark
   (gratis)** — tidak perlu upgrade Blaze/billing account sama sekali.
 - **Deployment app:** Firebase Hosting via `web.app` (free tier). **Catatan audit:** konfigurasi blok `"hosting"` di `firebase.json` belum dibuat (baru ada `"firestore"`). Blok hosting dengan `public: "build/web"` dan SPA rewrite ke `/index.html` harus ditambahkan sebelum `firebase deploy`.
-- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (348 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
+- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (467 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
 - **Build web produksi:** `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`.
 - **AI proxy: Cloudflare Workers** (bukan Firebase Cloud Functions — diganti karena kendala billing/kartu kredit untuk Blaze plan). Ini **repo/project terpisah** dari Flutter app (TypeScript, deploy sendiri via `wrangler`, free tier tanpa kartu kredit, 100.000 request/hari). Satu-satunya alasan butuh proxy ini: **API key ChatGPT tidak boleh ada di client**. Worker ini yang menyimpan `OPENAI_API_KEY` dan meneruskan panggilan AI. Detail arsitektur lengkap di `DATA_MODEL.md` §10.
 - **AI generation:** ChatGPT API — **selalu dipanggil lewat Cloudflare Worker**. Endpoint yang tersedia: `POST /generate-story`, `POST /cowrite-turn`, `POST /translate` (kontrak lengkap di `DATA_MODEL.md` §10.2).
@@ -238,11 +238,13 @@ dulu kalau perlu penyesuaian.
 8. **Guru:** set target kata per sesi/waktu + Edit Kata (edit topik kata
    yang sudah ada). *(Selesai, committed di `1f2b606`).*
 
-> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**348 tests passing**, `flutter test --concurrency=1`). Dua commit perbaikan bug berikutnya telah di-commit ke `main`:
+> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**467 tests passing**, `flutter test --concurrency=1`; Worker **148 tests passing**, `npx vitest run --fileParallelism=false`). Perbaikan berikutnya di `main` dan working tree:
 > - `56ded8b`: Pembersihan tombol logout ganda pada dashboard siswa.
 > - `34a9c4b`: Sanitasi feedback Co-Write untuk mencegah kebocoran marker terjemahan.
+> - `fa4d52c` (`vocably`) & `6239f7e` (`vocably-ai-worker`): Perbaikan kebocoran posisi kata target pada alur Storyfier → Cloze Test (committed; Worker-nya kini ikut ter-deploy dalam versi `0bec79ee` 2026-10-16).
+> - **Co-Write Phase 1 + Phase 2 (working tree, belum di-commit; sisi Worker SUDAH di-deploy 2026-10-16 sebagai versi `0bec79ee-2958-475e-97fe-64ababf31c9c` langsung dari working tree, dengan override `--var ALLOWED_ORIGINS` sehingga `localhost:5000` tidak ikut ter-deploy; sisi Flutter belum di-hosting — `PROJECT_STATE.md` §5t):** validasi deterministik kata target (Dart `utils/cowrite_validator.dart` ⇄ Worker `src/cowriteValidator.ts`); penolakan lokal hanya untuk input yang memuat kata target sebagai kata lepas/fragmen/daftar; **fallback tiga giliran dimiliki aplikasi** (penghitung `consecutiveMissedStudentTurns`, pemilihan satu kata acak, mode `forcedWord` di `/cowrite-turn`, kata dari bot dihitung di tingkat sesi saja — tidak pernah mastery); feedback terikat ke giliran siswa saat ini; saran menulis `Coba tulis "..."`; retensi fokus/papan ketik composer. **CW-05:** kredit kosakata untuk pemakaian bermakna walau ada kesalahan grammar/tense; bentuk yang dilaporkan model (`attacked`, `"ATTACKS"`) dipetakan ke kata dasar; infleksi sesuai aturan ejaan (`attackked` ditolak); retry Worker tidak menghapus kredit siswa. **Input Indonesia/campuran:** dideteksi deterministik oleh aplikasi (`containsIndonesianWords`) → feedback pengingat singkat untuk menulis dalam bahasa Inggris, kata sah hanya untuk cakupan sesi (bukan mastery mandiri); bot selalu berbahasa Inggris dan tetap di dalam cerita. **CW-02 (feedback):** prompt memprioritaskan pemakaian kata target di giliran saat ini (bukan grammar kecil/pujian generik); feedback yang memuji klaim kata yang ditolak validasi diganti pesan netral; indikator tampilan ✓/💡/💬 diturunkan dari hasil validasi (in-memory `feedbackKind`, tidak disimpan ke Firestore, tidak memengaruhi mastery); Worker menjawab 502 bila tidak ada `aiTurn` yang dapat diterima. Detail: `SPEC.md` §5.3, `DATA_MODEL.md` §10.2, `PROJECT_STATE.md` §5p–§5s.
 >
-> **Langkah Selanjutnya:** Konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, verifikasi manual E2E browser, dan persiapan responden penelitian (skema demografi, pembersihan data uji, instrumen pre/post test).
+> **Langkah Selanjutnya:** Review/commit Co-Write (jangan ikutkan origin lokal `localhost:5000` di `wrangler.jsonc`; deploy Worker berikutnya wajib memakai override `--var ALLOWED_ORIGINS` yang sama), uji E2E browser + LLM asli terhadap Worker produksi, konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, dan persiapan responden penelitian (skema demografi, pembersihan data uji, instrumen pre/post test).
 
 ## 8. Logic Penting yang Sering Disalahpahami
 
@@ -258,12 +260,30 @@ Empat aturan yang harus dipegang:
    langsung `difficult`. Tidak pernah ada "sudah dipelajari tapi mastery
    kosong". Ini juga yang menangani sesi yang ditinggal di tengah jalan.
 2. **Naik ke `mastered`** hanya kalau di sesi yang sama kata itu benar di
-   cloze test DAN dipakai mandiri tanpa kesalahan di co-write.
+   cloze test DAN dipakai mandiri tanpa kesalahan di co-write. **"Tanpa
+   kesalahan" = makna & pemakaian kosakata targetnya dapat diterima**
+   (dipakai bermakna, dengan makna yang dimaksud tepat), **bukan**
+   kalimat yang sempurna secara tata bahasa. Kesalahan grammar/tense/
+   agreement — termasuk infleksi kata target yang salah, mis. "Yesterday
+   the monster attack the village." — boleh diberi feedback, tapi tidak
+   otomatis menghapus kredit kosakata (CW-05, `SPEC.md` §5.3).
 3. **`mastered` permanen — tidak bisa turun.** Kalau siswa mempelajari ulang
    kata yang sudah `mastered` lalu salah, statusnya tetap `mastered`. Logic
    update harus eksplisit menolak penurunan.
-4. **"Mandiri"** = siswa menulis giliran itu tanpa menekan "saran menulis".
-   Kata yang dipakai pada giliran bersaran tidak dihitung mandiri.
+4. **"Mandiri"** = siswa menulis giliran itu tanpa menekan "saran menulis"
+   **dan** dalam bahasa Inggris. Kata yang dipakai pada giliran bersaran,
+   atau pada giliran berbahasa Indonesia/campuran (mis. "aku attack
+   temanku"), hanya dihitung untuk **cakupan sesi**, tidak mandiri. Bahasa
+   giliran ditentukan **aplikasi** secara deterministik
+   (`containsIndonesianWords`), bukan LLM; feedback-nya berupa pengingat
+   singkat untuk menulis dalam bahasa Inggris, dan bot selalu menjawab dalam
+   bahasa Inggris di dalam cerita — lihat `SPEC.md` §5.3.
+5. **Kata yang dipakai bot** lewat fallback tiga giliran (kata dipilih acak
+   oleh **aplikasi**, divalidasi dari teks yang dihasilkan) dihitung
+   terpakai di tingkat sesi, tapi **tidak pernah** mandiri / mastery. Kata
+   target yang kebetulan muncul di balasan bot biasa tidak dihitung sama
+   sekali. LLM tidak pernah memilih kata, menghitung giliran, atau
+   memutuskan sesi selesai — lihat `SPEC.md` §5.3.
 
 Detail lengkap di `SPEC.md` §6 dan `DATA_MODEL.md` §3.
 

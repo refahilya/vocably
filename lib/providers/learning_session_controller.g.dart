@@ -8,6 +8,59 @@ part of 'learning_session_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Source of randomness for the Co-Write fallback's word selection
+/// (`selectFallbackWord`) — a provider so tests can inject a seeded or
+/// scripted [Random] and assert exactly which word was forced.
+
+@ProviderFor(cowriteFallbackRandom)
+final cowriteFallbackRandomProvider = CowriteFallbackRandomProvider._();
+
+/// Source of randomness for the Co-Write fallback's word selection
+/// (`selectFallbackWord`) — a provider so tests can inject a seeded or
+/// scripted [Random] and assert exactly which word was forced.
+
+final class CowriteFallbackRandomProvider
+    extends $FunctionalProvider<Random, Random, Random>
+    with $Provider<Random> {
+  /// Source of randomness for the Co-Write fallback's word selection
+  /// (`selectFallbackWord`) — a provider so tests can inject a seeded or
+  /// scripted [Random] and assert exactly which word was forced.
+  CowriteFallbackRandomProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'cowriteFallbackRandomProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$cowriteFallbackRandomHash();
+
+  @$internal
+  @override
+  $ProviderElement<Random> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Random create(Ref ref) {
+    return cowriteFallbackRandom(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Random value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Random>(value),
+    );
+  }
+}
+
+String _$cowriteFallbackRandomHash() =>
+    r'5ea7c4a3621673b3571932167bf7096b3b502e23';
+
 /// Drives one Storyfier flow end-to-end (`SPEC.md` §5): Fase 1 generate/
 /// regenerate, Fase 2 grading, Fase 3 chat — writing to
 /// `learningSessions`/`learningProgress` at exactly the points
@@ -75,7 +128,7 @@ final class LearningFlowControllerProvider
 }
 
 String _$learningFlowControllerHash() =>
-    r'e05b3daa3606b8e284dbbe6906e79e46c59c9a22';
+    r'0eda8167c03d4bdeaf1bc613f47a3df407ffe5f6';
 
 /// Drives one Storyfier flow end-to-end (`SPEC.md` §5): Fase 1 generate/
 /// regenerate, Fase 2 grading, Fase 3 chat — writing to

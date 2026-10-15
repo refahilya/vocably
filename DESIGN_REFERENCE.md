@@ -40,7 +40,8 @@ Android**, deprecated).
 | Accent / secondary | Teal/cyan muda | Avatar AI di co-write, aksen ikon |
 | Success / correct | Hijau (`#2E7D32`-ish) + latar hijau muda | Jawaban benar di cloze test, banner "semua kata target sudah digunakan", badge mastery `mastered` |
 | Error / salah | Merah/pink (`#C62828`-ish) + latar pink muda | Jawaban salah di cloze test, inline error form |
-| Warning | Kuning/oranye muda | Feedback grammar di co-write |
+| Warning | Kuning/oranye muda | Feedback co-write "Perlu perbaikan" (ikon bohlam) |
+| Info (netral) | Biru (`#1565C0`) + latar biru muda | Feedback co-write "Pengingat" (ikon pesan) |
 | Mastery `difficult` | Amber/oranye solid | Dot penanda kata difficult (§5.3) |
 | Highlight kata target | Oranye/tan muda dengan teks oranye tua | Highlight target word di dalam cerita (Baca Cerita) |
 | Background utama | Putih / abu sangat muda | Body screen |
@@ -187,9 +188,12 @@ bawah app bar, style konsisten dengan stepper §3.1 tapi versi 2 opsi.
 - Chat bubble alternating: avatar bulat kecil di kiri tiap bubble — navy solid
   untuk user, teal/cyan untuk AI. Bubble user sedikit lebih terang/putih,
   bubble AI abu muda.
-- Feedback grammar muncul sebagai banner kuning muda di atas tombol aksi
-  (ikon warning ⚠️), contoh: "Kalimat tersebut tidak gramatikal karena perlu
-  menggunakan preposisi."
+- Feedback muncul sebagai kotak kecil di bawah bubble siswa yang dinilainya
+  (bukan banner terpisah), dengan ikon + warna + label semantik sesuai
+  jenisnya (CW-02, `SPEC.md` §5.3): ✓ hijau "Sudah tepat", 💡 amber "Perlu
+  perbaikan", 💬 biru "Pengingat". Tidak ada lagi ikon peringatan ⚠️ untuk
+  semua feedback, sehingga pujian tidak terlihat seperti teguran. Jenisnya
+  ditentukan aplikasi dari hasil validasi, bukan dari bunyi teks.
 - **Tombol "Saran menulis"** di dekat input chat, untuk siswa yang bingung
   mau menulis apa. Beri afordans visual bahwa ini bantuan opsional (mis.
   tombol outline kecil dengan ikon lampu, bukan CTA solid) — karena giliran

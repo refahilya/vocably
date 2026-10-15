@@ -21,6 +21,20 @@ class _FakeAiWorkerService extends AiWorkerService {
   /// before the AI response arrives).
   FutureOr<CowriteTurnResult> Function(List<Map<String, String>>, List<String>, bool)? handler;
 
+  /// Application-forced fallback turns; `null` -> throws (Worker failure).
+  FutureOr<CowriteTurnResult> Function(String forcedWord)? forcedHandler;
+
+  @override
+  Future<CowriteTurnResult> cowriteForcedTurn({
+    required List<Map<String, String>> transcript,
+    required List<String> remainingWords,
+    required String forcedWord,
+  }) async {
+    final h = forcedHandler;
+    if (h == null) throw const AiWorkerException('no forced handler configured');
+    return await h(forcedWord);
+  }
+
   @override
   Future<GenerateStoryResult> generateStory({
     required List<String> targetWords,
@@ -37,6 +51,7 @@ class _FakeAiWorkerService extends AiWorkerService {
     required List<Map<String, String>> transcript,
     required List<String> remainingWords,
     required bool requestSuggestion,
+    bool studentTurnContainsIndonesian = false,
   }) async {
     final h = handler;
     if (h == null) throw const AiWorkerException('no handler configured');
@@ -205,27 +220,55 @@ void main() {
     );
   });
 
-  testWidgets('"Saran menulis" shows a suggestion without adding a chat bubble', (tester) async {
-    final ai = _FakeAiWorkerService()
-      ..handler = (transcript, remaining, requestSuggestion) {
-        expect(requestSuggestion, isTrue);
-        return const CowriteTurnResult(
-          aiTurn: 'ignored',
-          feedback: null,
-          hasError: false,
-          wordsUsedCorrectly: [],
-          suggestion: 'Try: I ran to buy a souvenir.',
-          aiUsedWords: [],
-        );
-      };
-    await _pumpCowrite(tester, ai: ai);
+  testWidgets(
+    '"Saran menulis" shows an Indonesian instruction around the English sentence, '
+    'without adding a chat bubble',
+    (tester) async {
+      final ai = _FakeAiWorkerService()
+        ..handler = (transcript, remaining, requestSuggestion) {
+          expect(requestSuggestion, isTrue);
+          return const CowriteTurnResult(
+            aiTurn: '',
+            feedback: null,
+            hasError: false,
+            wordsUsedCorrectly: [],
+            suggestion: 'I order a cup of coffee.',
+            aiUsedWords: [],
+          );
+        };
+      final container = await _pumpCowrite(tester, ai: ai);
 
-    await tester.tap(find.text('Saran menulis'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Saran menulis'));
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('Try: I ran to buy a souvenir.'), findsOneWidget);
-    expect(find.text('ignored'), findsNothing);
-  });
+      expect(find.text('💡 Coba tulis "I order a cup of coffee."'), findsOneWidget);
+      expect(find.textContaining('Try'), findsNothing);
+      expect(container.read(learningFlowControllerProvider).cowriteTranscript, isEmpty);
+    },
+  );
+
+  testWidgets(
+    '"Saran menulis" from an older Worker that still prefixes English instructions '
+    'is normalized to the Indonesian instruction',
+    (tester) async {
+      final ai = _FakeAiWorkerService()
+        ..handler = (transcript, remaining, requestSuggestion) => const CowriteTurnResult(
+              aiTurn: 'ignored',
+              feedback: null,
+              hasError: false,
+              wordsUsedCorrectly: [],
+              suggestion: 'Try to write: "I ran to buy a souvenir."',
+              aiUsedWords: [],
+            );
+      await _pumpCowrite(tester, ai: ai);
+
+      await tester.tap(find.text('Saran menulis'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('💡 Coba tulis "I ran to buy a souvenir."'), findsOneWidget);
+      expect(find.text('ignored'), findsNothing);
+    },
+  );
 
   testWidgets(
     'once all words are used, the finish banner replaces the composer; "Selesai" '
@@ -372,4 +415,436 @@ void main() {
       expect(find.text('Gagal mengirim giliran. Coba lagi.'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Phase 1: submitting a bare word or fragment shows user-visible feedback, '
+    'does not add a chat bubble or call the Worker, and preserves the draft in TextField',
+    (tester) async {
+      var workerCalled = false;
+      final ai = _FakeAiWorkerService()
+        ..handler = (transcript, remainingWords, requestSuggestion) async {
+          workerCalled = true;
+          return const CowriteTurnResult(
+            aiTurn: 'Great, what happened next?',
+            feedback: 'Bagus!',
+            hasError: false,
+            wordsUsedCorrectly: ['run'],
+            suggestion: null,
+            aiUsedWords: [],
+          );
+        };
+      await _pumpCowrite(tester, ai: ai);
+
+      // 1. Submit bare word "run"
+      await tester.enterText(find.byType(TextField), 'run');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCalled, isFalse);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsOneWidget);
+      // Draft is still in the TextField so the student can edit and resubmit.
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'run',
+      );
+      expect(find.text('Great, what happened next?'), findsNothing);
+
+      // 2. Student edits draft into a full sentence and sends again.
+      await tester.enterText(find.byType(TextField), 'I ran to the store.');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCalled, isTrue);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsNothing);
+      expect(find.text('I ran to the store.'), findsOneWidget);
+      expect(find.text('Great, what happened next?'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets(
+    'Bug A: after single or repeated local rejections (e.g. "run", then "the souvenir"), '
+    'the composer TextField remains focused, clickable, and editable so the student can '
+    'immediately submit a valid sentence',
+    (tester) async {
+      var workerCallCount = 0;
+      final ai = _FakeAiWorkerService()
+        ..handler = (transcript, remainingWords, requestSuggestion) async {
+          workerCallCount++;
+          return const CowriteTurnResult(
+            aiTurn: 'What did the cat do next?',
+            feedback: 'Kalimat yang bagus!',
+            hasError: false,
+            wordsUsedCorrectly: ['run'],
+            suggestion: null,
+            aiUsedWords: [],
+          );
+        };
+      final container = await _pumpCowrite(tester, ai: ai);
+
+      // 1. Focus TextField, type bare target word "run", tap Send.
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'run');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      final textField1 = tester.widget<TextField>(find.byType(TextField));
+      expect(workerCallCount, 0);
+      expect(container.read(learningFlowControllerProvider).isSendingTurn, isFalse);
+      expect(container.read(learningFlowControllerProvider).cowriteTranscript, isEmpty);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsOneWidget);
+      expect(textField1.controller?.text, 'run');
+      expect(textField1.enabled, isTrue);
+      expect(textField1.focusNode?.hasFocus, isTrue);
+
+      // 2. Repeated local rejection: tap TextField again, enter fragment "the souvenir", tap Send.
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'the souvenir');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      final textField2 = tester.widget<TextField>(find.byType(TextField));
+      expect(workerCallCount, 0);
+      expect(container.read(learningFlowControllerProvider).isSendingTurn, isFalse);
+      expect(container.read(learningFlowControllerProvider).cowriteTranscript, isEmpty);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsOneWidget);
+      expect(textField2.controller?.text, 'the souvenir');
+      expect(textField2.enabled, isTrue);
+      expect(textField2.focusNode?.hasFocus, isTrue);
+
+      // 3. Immediately tap/edit TextField to a valid sentence and submit.
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      expect(tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus, isTrue);
+      await tester.enterText(find.byType(TextField), 'The cat will attack the toy and run.');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCallCount, 1);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsNothing);
+      expect(find.text('The cat will attack the toy and run.'), findsOneWidget);
+      expect(find.text('What did the cat do next?'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'an ordinary reply without a target word ("Okay.") is sent as a normal turn, not rejected',
+    (tester) async {
+      var workerCallCount = 0;
+      final ai = _FakeAiWorkerService()
+        ..handler = (transcript, remainingWords, requestSuggestion) {
+          workerCallCount++;
+          return const CowriteTurnResult(
+            aiTurn: 'Then the door creaked open.',
+            feedback: null,
+            hasError: false,
+            wordsUsedCorrectly: [],
+            suggestion: null,
+            aiUsedWords: [],
+          );
+        };
+      await _pumpCowrite(tester, ai: ai);
+
+      await tester.enterText(find.byType(TextField), 'Okay.');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCallCount, 1);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsNothing);
+      expect(find.text('Okay.'), findsOneWidget);
+      expect(find.text('Then the door creaked open.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'bot target-word usage lights a pill only through the application-forced fallback '
+    '(after 3 missed student turns) — never from an ordinary AI turn — and never '
+    'credits student mastery',
+    (tester) async {
+      final ai = _FakeAiWorkerService()
+        ..handler = ((transcript, remainingWords, requestSuggestion) =>
+            const CowriteTurnResult(
+              // Incidentally contains a target word: must NOT light the pill.
+              aiTurn: 'Then she bought a lovely souvenir at the shop.',
+              feedback: 'Kalimatmu sudah benar.',
+              hasError: false,
+              wordsUsedCorrectly: [],
+              suggestion: null,
+              aiUsedWords: ['souvenir'],
+            ))
+        ..forcedHandler = (forcedWord) => CowriteTurnResult(
+              aiTurn: 'Everyone in the shop talked about the $forcedWord.',
+              feedback: null,
+              hasError: false,
+              wordsUsedCorrectly: const [],
+              suggestion: null,
+              aiUsedWords: [forcedWord],
+            );
+      final container = await _pumpCowrite(tester, ai: ai);
+      final usedPills = find.descendant(of: find.byType(Wrap), matching: find.byIcon(Icons.check));
+
+      for (var i = 0; i < 2; i++) {
+        await tester.enterText(find.byType(TextField), 'She walked into the shop.');
+        await tester.tap(find.byIcon(Icons.send));
+        await tester.pumpAndSettle();
+      }
+      expect(usedPills, findsNothing);
+      expect(container.read(learningFlowControllerProvider).consecutiveMissedStudentTurns, 2);
+
+      await tester.enterText(find.byType(TextField), 'She walked into the shop.');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      final flowState = container.read(learningFlowControllerProvider);
+      expect(flowState.allWordsUsedCorrectly, hasLength(1));
+      final forcedWord = flowState.allWordsUsedCorrectly.single;
+      // The forced bot bubble replaces the ordinary one (6th chat item; may be
+      // below the fold of the test viewport, so asserted via state).
+      expect(
+        flowState.cowriteTranscript.last.text,
+        'Everyone in the shop talked about the $forcedWord.',
+      );
+      expect(flowState.cowriteTranscript, hasLength(6));
+      expect(usedPills, findsOneWidget);
+      expect(flowState.independentWordsUsedCorrectly, isEmpty);
+      expect(flowState.consecutiveMissedStudentTurns, 0);
+    },
+  );
+
+  testWidgets(
+    'Post-response keyboard input: after sending a valid turn and receiving the Worker response, '
+    'the focused composer retains an active TextInputConnection and accepts direct keyboard input '
+    'across multiple consecutive turns',
+    (tester) async {
+      var workerCallCount = 0;
+      final ai = _FakeAiWorkerService()
+        ..handler = (transcript, remainingWords, requestSuggestion) async {
+          workerCallCount++;
+          return CowriteTurnResult(
+            aiTurn: 'AI reply #$workerCallCount: What happened next?',
+            feedback: workerCallCount == 1 ? 'Perhatikan bentuk lampau.' : null,
+            hasError: workerCallCount == 1,
+            wordsUsedCorrectly: const [],
+            suggestion: null,
+            aiUsedWords: const [],
+          );
+        };
+      final container = await _pumpCowrite(tester, ai: ai);
+
+      // Turn 1: Focus composer, type, and click Send.
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      tester.testTextInput.enterText('one day a monster came and attack the village');
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      final textFieldAfterTurn1 = tester.widget<TextField>(find.byType(TextField));
+      expect(workerCallCount, 1);
+      expect(textFieldAfterTurn1.enabled, isTrue);
+      expect(textFieldAfterTurn1.autofillHints, isNull);
+      expect(textFieldAfterTurn1.focusNode?.hasFocus, isTrue);
+      expect(textFieldAfterTurn1.controller?.text, isEmpty);
+      expect(textFieldAfterTurn1.controller?.selection.isValid, isTrue);
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      // Turn 2: Without tapping TextField again (simulating typing on the physical keyboard
+      // while the composer shows a blinking caret), type directly via testTextInput.
+      tester.testTextInput.enterText('The villagers tried to run to the hill.');
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'The villagers tried to run to the hill.',
+      );
+
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCallCount, 2);
+      expect(tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus, isTrue);
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      // Turn 3: Again type directly via testTextInput without re-tapping, then send.
+      tester.testTextInput.enterText('They found a safe cave behind the trees.');
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'They found a safe cave behind the trees.',
+      );
+
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCallCount, 3);
+      expect(tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus, isTrue);
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      // Turn 4: Confirm typing still inserts characters into the same composer.
+      tester.testTextInput.enterText('Finally the hero kept a small stone.');
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'Finally the hero kept a small stone.',
+      );
+
+      final transcript = container.read(learningFlowControllerProvider).cowriteTranscript;
+      expect(transcript, hasLength(6)); // 3 student turns + 3 AI turns, no duplicates
+    },
+  );
+
+  testWidgets(
+    'Post-rejection then valid send: after rejecting a bare target word ("run"), editing the '
+    'retained draft into a valid sentence, and receiving the Worker response, the composer '
+    'still accepts direct keyboard input',
+    (tester) async {
+      var workerCallCount = 0;
+      final ai = _FakeAiWorkerService()
+        ..handler = (transcript, remainingWords, requestSuggestion) async {
+          workerCallCount++;
+          return const CowriteTurnResult(
+            aiTurn: 'Suddenly, a brave knight appeared to help them.',
+            feedback: 'Coba gunakan bentuk lampau "attacked".',
+            hasError: true,
+            wordsUsedCorrectly: [],
+            suggestion: null,
+            aiUsedWords: [],
+          );
+        };
+      final container = await _pumpCowrite(tester, ai: ai);
+
+      // 1. Reject bare target word "run" locally.
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      tester.testTextInput.enterText('run');
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCallCount, 0);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, 'run');
+      expect(tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus, isTrue);
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+
+      // 2. Edit the retained draft directly via keyboard input into a valid sentence and submit.
+      tester.testTextInput.enterText('one day a monster came and attack the village');
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'one day a monster came and attack the village',
+      );
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+
+      expect(workerCallCount, 1);
+      expect(find.text(kBareOrFragmentTurnErrorMessage), findsNothing);
+      expect(find.text('one day a monster came and attack the village'), findsOneWidget);
+      expect(find.text('Suddenly, a brave knight appeared to help them.'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+      expect(tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus, isTrue);
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      // 3. Immediately type the next message via physical keyboard input without re-entering the screen.
+      tester.testTextInput.enterText('The people began to run toward the castle.');
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'The people began to run toward the castle.',
+      );
+      expect(container.read(learningFlowControllerProvider).cowriteTranscript, hasLength(2));
+    },
+  );
+
+  group('CW-02: feedback indicators', () {
+    CowriteTurnResult reply({
+      required String feedback,
+      List<String> words = const [],
+      bool hasError = false,
+    }) {
+      return CowriteTurnResult(
+        aiTurn: 'A cold wind blew through the market.',
+        feedback: feedback,
+        hasError: hasError,
+        wordsUsedCorrectly: words,
+        suggestion: null,
+        aiUsedWords: const [],
+      );
+    }
+
+    Future<void> sendWith(WidgetTester tester, CowriteTurnResult result, String text) async {
+      final ai = _FakeAiWorkerService()..handler = (transcript, remaining, s) => result;
+      await _pumpCowrite(tester, ai: ai);
+      await tester.enterText(find.byType(TextField), text);
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('validated use renders a green check, not a warning', (tester) async {
+      await sendWith(
+        tester,
+        reply(feedback: 'Tepat, "ran" dipakai untuk kejadian lampau.', words: const ['run']),
+        'I ran to the store.',
+      );
+
+      expect(find.byKey(const ValueKey('cowrite-feedback-positive')), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      expect(tester.widget<Icon>(find.byIcon(Icons.check_circle)).semanticLabel, 'Sudah tepat');
+      expect(find.byIcon(Icons.lightbulb), findsNothing);
+      expect(find.text('⚠️'), findsNothing);
+    });
+
+    testWidgets('an important problem renders an amber lightbulb', (tester) async {
+      await sendWith(
+        tester,
+        reply(
+          feedback: '"run" sudah tepat. Seharusnya "ran" karena kejadiannya lampau.',
+          words: const ['run'],
+          hasError: true,
+        ),
+        'Yesterday I run to the store.',
+      );
+
+      expect(find.byKey(const ValueKey('cowrite-feedback-needsImprovement')), findsOneWidget);
+      expect(find.byIcon(Icons.lightbulb), findsOneWidget);
+      expect(tester.widget<Icon>(find.byIcon(Icons.lightbulb)).semanticLabel, 'Perlu perbaikan');
+      expect(find.byIcon(Icons.check_circle), findsNothing);
+    });
+
+    testWidgets('no target word renders a neutral message indicator, even for praise text', (
+      tester,
+    ) async {
+      await sendWith(tester, reply(feedback: 'Kalimat yang bagus!'), 'We walked home slowly.');
+
+      expect(find.byKey(const ValueKey('cowrite-feedback-reminder')), findsOneWidget);
+      expect(find.byIcon(Icons.chat_bubble_outline), findsOneWidget);
+      expect(tester.widget<Icon>(find.byIcon(Icons.chat_bubble_outline)).semanticLabel, 'Pengingat');
+      expect(find.byIcon(Icons.check_circle), findsNothing);
+      expect(find.text('Kalimat yang bagus!'), findsOneWidget);
+    });
+
+    testWidgets('the indicator does not change the target-word pills (coverage)', (tester) async {
+      await sendWith(
+        tester,
+        reply(feedback: '"run" sudah tepat. Seharusnya "ran".', words: const ['run'], hasError: true),
+        'Yesterday I run to the store.',
+      );
+
+      // "run" is covered exactly as for a positive turn.
+      expect(
+        find.descendant(of: find.byType(Wrap), matching: find.byIcon(Icons.check)),
+        findsOneWidget,
+      );
+    });
+  });
 }
+

@@ -178,7 +178,120 @@ void main() {
     });
   });
 
+  group('AiWorkerService.cowriteForcedTurn', () {
+    test('sends the application-selected forcedWord and parses the forced turn', () async {
+      String? capturedBody;
+      final client = MockClient((request) async {
+        capturedBody = request.body;
+        return http.Response(
+          jsonEncode({
+            'aiTurn': 'A shop sold a tiny souvenir.',
+            'feedback': null,
+            'hasError': false,
+            'wordsUsedCorrectly': <String>[],
+            'suggestion': null,
+            'aiUsedWords': ['souvenir'],
+            'assessedStudentTurn': null,
+          }),
+          200,
+        );
+      });
+      final service = AiWorkerService(client: client, authService: _FakeAuthService('t'));
+
+      final result = await service.cowriteForcedTurn(
+        transcript: [
+          {'sender': 'siswa', 'text': 'We entered the museum.'},
+        ],
+        remainingWords: ['souvenir', 'button'],
+        forcedWord: 'souvenir',
+      );
+
+      expect(result.aiTurn, 'A shop sold a tiny souvenir.');
+      expect(result.aiUsedWords, ['souvenir']);
+      expect(result.wordsUsedCorrectly, isEmpty);
+      expect(jsonDecode(capturedBody!), {
+        'transcript': [
+          {'sender': 'siswa', 'text': 'We entered the museum.'},
+        ],
+        'remainingWords': ['souvenir', 'button'],
+        'requestSuggestion': false,
+        'forcedWord': 'souvenir',
+      });
+    });
+
+    test('throws AiWorkerException when the Worker could not validate the word (502)', () async {
+      final client = MockClient(
+        (request) async => http.Response(jsonEncode({'error': 'AI did not use it.'}), 502),
+      );
+      final service = AiWorkerService(client: client, authService: _FakeAuthService('t'));
+
+      expect(
+        () => service.cowriteForcedTurn(
+          transcript: [
+            {'sender': 'siswa', 'text': 'We entered the museum.'},
+          ],
+          remainingWords: ['souvenir'],
+          forcedWord: 'souvenir',
+        ),
+        throwsA(isA<AiWorkerException>()),
+      );
+    });
+  });
+
   group('AiWorkerService.cowriteTurn', () {
+    test(
+      'CW-02: throws AiWorkerException on the 502 the Worker returns when no '
+      'continuation was acceptable',
+      () async {
+        final client = MockClient(
+          (request) async => http.Response(
+            jsonEncode({'error': 'AI did not produce an acceptable story continuation.'}),
+            502,
+          ),
+        );
+        final service = AiWorkerService(client: client, authService: _FakeAuthService('t'));
+
+        expect(
+          () => service.cowriteTurn(
+            transcript: [
+              {'sender': 'siswa', 'text': 'We walked to the market.'},
+            ],
+            remainingWords: ['souvenir'],
+            requestSuggestion: false,
+          ),
+          throwsA(isA<AiWorkerException>()),
+        );
+      },
+    );
+
+    test('parses assessedStudentTurn when present (current Worker)', () async {
+      final client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'aiTurn': 'A bird sang.',
+            'feedback': null,
+            'hasError': false,
+            'wordsUsedCorrectly': <String>[],
+            'suggestion': null,
+            'aiUsedWords': <String>[],
+            'assessedStudentTurn': 'I ran fast.',
+          }),
+          200,
+        ),
+      );
+      final service = AiWorkerService(client: client, authService: _FakeAuthService('t'));
+
+      final result = await service.cowriteTurn(
+        transcript: [
+          {'sender': 'siswa', 'text': 'I ran fast.'},
+        ],
+        remainingWords: ['run'],
+        requestSuggestion: false,
+      );
+
+      expect(result.assessedStudentTurn, 'I ran fast.');
+    });
+
     test('returns every structured field on a well-formed 200 response', () async {
       Uri? capturedUri;
       String? capturedBody;
@@ -216,6 +329,8 @@ void main() {
       expect(result.wordsUsedCorrectly, ['run']);
       expect(result.suggestion, isNull);
       expect(result.aiUsedWords, isEmpty);
+      // An older deployed Worker omits assessedStudentTurn — still accepted.
+      expect(result.assessedStudentTurn, isNull);
       expect(capturedUri?.path, '/cowrite-turn');
       expect(jsonDecode(capturedBody!), {
         'transcript': [
@@ -223,7 +338,42 @@ void main() {
         ],
         'remainingWords': ['souvenir'],
         'requestSuggestion': false,
+        // Explicit app-decided language flag, false by default.
+        'studentTurnContainsIndonesian': false,
       });
+    });
+
+    test('sends studentTurnContainsIndonesian: true when the app flags the turn', () async {
+      String? capturedBody;
+      final client = MockClient((request) async {
+        capturedBody = request.body;
+        return http.Response(
+          jsonEncode({
+            'aiTurn': 'His friend laughed.',
+            'feedback': 'Coba tulis kalimatmu dalam bahasa Inggris, ya.',
+            'hasError': true,
+            'wordsUsedCorrectly': ['attack'],
+            'suggestion': null,
+            'aiUsedWords': <String>[],
+          }),
+          200,
+        );
+      });
+      final service = AiWorkerService(client: client, authService: _FakeAuthService('t'));
+
+      await service.cowriteTurn(
+        transcript: [
+          {'sender': 'siswa', 'text': 'aku attack temanku'},
+        ],
+        remainingWords: ['attack'],
+        requestSuggestion: false,
+        studentTurnContainsIndonesian: true,
+      );
+
+      expect(
+        (jsonDecode(capturedBody!) as Map<String, dynamic>)['studentTurnContainsIndonesian'],
+        isTrue,
+      );
     });
 
     test('returns a non-null suggestion when requested', () async {

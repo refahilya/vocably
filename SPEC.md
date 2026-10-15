@@ -435,36 +435,185 @@ persis** — yang membedakan cuma asal daftar kata targetnya:
   membentuk cerita baru menggunakan kata target.
 - Target words ditampilkan di atas percakapan; **ditandai terpakai/belum
   terpakai** seiring percakapan berjalan.
-- Percakapan berhenti otomatis begitu semua kata target sudah dipakai.
-- Setiap giliran siswa menulis, sistem beri feedback (grammar, typo, dsb) —
-  **lewat Cloudflare Worker** (endpoint `/cowrite-turn`, lihat
-  `DATA_MODEL.md` §10).
-- Ada opsi **"saran menulis"** kalau siswa bingung mau menulis apa (bagian
-  dari respons endpoint yang sama, lihat kontraknya di `DATA_MODEL.md`
-  §10.2).
+- Percakapan berhenti otomatis begitu semua kata target sudah dipakai
+  (tingkat sesi — lihat "Pemakaian kata oleh bot" di bawah).
+- **Kepemilikan keputusan:** aplikasi (Flutter client) yang memegang semua
+  keputusan Co-Write — penghitung giliran, kapan fallback jatuh tempo, kata
+  mana yang dipaksa (acak), validasi teks siswa & bot, update status kata,
+  tampil/tidaknya bubble bot, dan kapan sesi selesai. Worker hanya memegang
+  *prompt builder* dan validasi deterministik output model. Model AI hanya
+  menerima tugas generasi yang spesifik lalu mengembalikan teks — tidak
+  pernah memilih kata target, menghitung giliran, atau memutuskan selesainya
+  sesi. Detail kontrak di `DATA_MODEL.md` §10.2.
+- Setiap giliran siswa menulis, sistem beri feedback **dalam bahasa
+  Indonesia** atas **kalimat siswa saat ini saja** — lewat Cloudflare Worker
+  (`/cowrite-turn`). **Prioritasnya pemakaian kata target, bukan grammar
+  (CW-02):** (a) kata target dipakai sah → sebut kata itu dan apa yang tepat
+  dari pemakaiannya; (b) kata target dicoba tapi tidak sah → jelaskan
+  masalah sebenarnya secara singkat; (c) tidak ada kata target → dorongan
+  lembut dan konkret untuk memakai salah satu kata target di kalimat
+  berikutnya. Paling banyak **satu** masalah grammar/makna yang penting
+  boleh disebut; huruf kapital, tanda baca, apostrof, dan kesalahan kecil
+  yang tidak mengubah makna diabaikan (tidak membuat `hasError` dan tidak
+  disebut). Tidak ada kesalahan karangan dan tidak ada pujian generik tanpa
+  poin kosakata yang spesifik. Bila model mengklaim kata target tapi
+  validasi kode tidak mengkreditkan satu pun, feedback-nya diganti pesan
+  netral yang tetap (`Belum ada kata target yang terhitung di kalimat ini.
+  …`), supaya feedback tidak memuji pemakaian yang tidak sah.
+- **Indikator feedback (CW-02)** di bawah bubble siswa — ikon + warna +
+  label semantik, ditentukan **aplikasi** dari hasil validasi giliran itu
+  (bukan dari bunyi teks feedback): ✓ hijau **Sudah tepat** (ada kata target
+  yang tervalidasi dan tidak ada masalah penting), 💡 amber **Perlu
+  perbaikan** (ada masalah penting, atau kata target dicoba tapi tidak sah),
+  💬 biru **Pengingat** (tidak ada kata target, atau giliran berbahasa
+  Indonesia/campuran). Indikator hanya menggambarkan **satu giliran**, tidak
+  disimpan ke Firestore, dan tidak memengaruhi cakupan sesi, penghitung
+  fallback, maupun mastery.
+- Kalimat siswa saat ini dikirim ke model terpisah dari konteks cerita
+  sebelumnya, dan Worker mengembalikan `assessedStudentTurn`; client hanya
+  menempelkan feedback ke giliran yang memang baru dikirim (respons yang
+  tidak cocok atau datang setelah alur dimulai ulang dibuang).
+- Ada opsi **"saran menulis"** kalau siswa bingung mau menulis apa. Worker
+  mengembalikan **hanya kalimat contoh bahasa Inggris**; instruksinya
+  ditambahkan client dalam bahasa Indonesia: `Coba tulis "I order a cup of
+  coffee."` (bukan `Try to write ...`). Saran tidak bisa diminta saat giliran
+  sedang dikirim, dan giliran tidak bisa dikirim saat saran sedang dimuat.
 - **Definisi "mandiri":** giliran siswa dihitung mandiri kalau siswa menulis
-  kalimatnya **tanpa menekan "saran menulis"** pada giliran itu. Kata yang
-  dipakai pada giliran yang memakai saran **tidak** dihitung sebagai
-  "dipakai mandiri", meskipun kalimatnya benar secara gramatikal. Ini
-  berpengaruh langsung ke mastery (bagian 6).
-- Respons Worker menyertakan penilaian terstruktur (kata mana yang dipakai
-  dengan benar, dan apakah ada kesalahan) — bukan cuma teks feedback — supaya
-  perhitungan mastery tidak perlu menebak-nebak dari kalimat feedback.
-- **Giliran yang hanya berisi satu kata target saja (bukan kalimat)** tidak
-  dihitung sebagai "dipakai dengan benar" — mengetik "breakfast" sendirian
-  tidak boleh membuat kata itu tercatat terpakai. Ini bukan pemeriksaan tata
-  bahasa umum: kalimat pendek yang tetap berisi lebih dari satu kata (mis.
-  "the baby") tidak terkena aturan ini dan tetap dihitung selama benar.
-- **Kalau siswa sudah menyelesaikan lebih dari 3 giliran tanpa memakai
-  semua kata target, AI boleh memakai tepat satu kata target yang tersisa
-  di giliran AI berikutnya**, supaya percakapan tetap bisa berjalan menuju
-  selesai. Kelayakan ini ditentukan sepenuhnya oleh AI/Worker sendiri, tidak
-  oleh instruksi eksplisit dari client — lihat kontrak `aiUsedWords` di
-  `DATA_MODEL.md` §10.2. **Kata yang dipakai AI lewat mekanisme ini tidak
-  pernah dihitung sebagai "dipakai mandiri" oleh siswa** — tidak
-  berpengaruh ke mastery (bagian 6); efeknya hanya membuat kata itu
-  tercatat "terpakai" di atas, sehingga percakapan bisa berhenti otomatis
-  seperti biasa.
+  kalimatnya **tanpa menekan "saran menulis"** pada giliran itu **dan**
+  menulisnya dalam bahasa Inggris (bukan bahasa Indonesia/campuran — lihat
+  "Input berbahasa Indonesia" di bawah). Kata yang dipakai pada giliran yang
+  memakai saran, atau pada giliran berbahasa Indonesia/campuran, **tidak**
+  dihitung sebagai "dipakai mandiri", meskipun kalimatnya benar secara
+  gramatikal. Ini berpengaruh langsung ke mastery (bagian 6).
+- **Cakupan kata sesi vs. mastery mandiri** adalah dua hal berbeda:
+  - **Cakupan sesi** (`allWordsUsedCorrectly`, `wordUsedCorrectly` tingkat
+    sesi): kata target yang sudah terpakai sah dalam sesi — oleh siswa (mandiri,
+    bersaran, atau dalam kalimat campuran) maupun oleh bot lewat fallback.
+    Menggerakkan penanda kata dan berhentinya Fase 3; **tidak disimpan**
+    sebagai mastery.
+  - **Mastery mandiri** (`independentWordsUsedCorrectly` → disimpan sebagai
+    `cowriteWordsUsedCorrectly`): hanya kata yang dipakai siswa sendiri, sah,
+    tanpa saran, dalam kalimat berbahasa Inggris.
+- **Input berbahasa Indonesia / campuran:** aplikasi (bukan LLM) menentukan
+  secara deterministik apakah giliran siswa mengandung bahasa Indonesia
+  (`containsIndonesianWords` di `utils/cowrite_validator.dart`, dicerminkan
+  di Worker) dan mengirim hasilnya ke Worker sebagai
+  `studentTurnContainsIndonesian`.
+  - Feedback giliran itu berupa **satu kalimat singkat dan sopan berbahasa
+    Indonesia** yang mengingatkan siswa menulis dalam bahasa Inggris
+    (mis. "Coba tulis kalimatmu dalam bahasa Inggris, ya.") — bukan
+    pelajaran tata bahasa.
+  - Kata target yang dipakai **bermakna** di kalimat campuran (mis. `attack`
+    di "aku attack temanku", bila lolos validasi CW-05) dihitung untuk
+    **cakupan sesi** dan mereset penghitung giliran, tetapi **tidak** untuk
+    mastery mandiri. Giliran Indonesia tanpa kata target sah dihitung sebagai
+    giliran tanpa pemakaian kata (penghitung fallback bertambah seperti biasa).
+  - **Deteksi bersifat heuristik:** memakai daftar kata fungsi/pronomina/
+    partikel Indonesia yang tidak ambigu (huruf besar/kecil & tanda baca
+    dinormalisasi). Kata yang juga kata Inggris (`main`, `data`, `jam`,
+    `bank`, `ya`, …) tidak dipakai; kata yang mirip nama (`dan`, `ada`,
+    `dia`, `mau`, `apa`, `anda`) baru dihitung bila ada penanda lain; kata
+    berhuruf besar di tengah kalimat (nama diri) dan kata target diabaikan.
+    Kalimat Indonesia yang tidak memakai satu pun kata dalam daftar (mis.
+    hanya kata isi) tidak terdeteksi.
+- **Bot selalu berbahasa Inggris dan tetap di dalam cerita:** kalimat bot
+  (biasa maupun fallback) selalu berbahasa Inggris walaupun siswa menulis
+  dalam bahasa Indonesia, dan bot tidak pernah menjawab pertanyaan,
+  hitungan, atau permintaan di luar cerita — bot melanjutkan cerita dari
+  konteks sebelumnya. Worker menolak secara deterministik kalimat bot yang
+  terdeteksi berbahasa Indonesia dan mengulang generasi dalam batas yang
+  sama (maks. 2 generasi), tanpa mengubah penilaian giliran siswa.
+- **Pemakaian kata yang sah (CW-05):** Vocably menilai **kosakata**, bukan
+  kesempurnaan tata bahasa. Kata target dihitung dipakai dengan benar bila
+  siswa memakainya **secara bermakna, dengan makna yang dimaksud dapat
+  diterima**, di dalam kalimat/klausa yang menyampaikan sebuah ide.
+  - Kesalahan grammar, tense, atau subject-verb agreement **tidak otomatis
+    menggugurkan** kredit kata, begitu juga infleksi kata target yang salah
+    bila maknanya jelas — mis. "Yesterday the monster attack the village.",
+    "one day a monster came and attack the village", "The monsters attacks
+    the village." tetap memberi kredit untuk `attack`. Kesalahannya boleh
+    dijelaskan di feedback (dan `hasError`), tetapi tidak menghapus kredit.
+  - **Tidak** dihitung: kata lepas, daftar kata, fragmen tanpa ide; sekadar
+    menyebut kata ("I do not know the word attack."); kalimat tak bermakna;
+    atau pemakaian dengan makna yang salah/tidak dapat diterima.
+  - **Pembagian peran:** model AI menilai makna (`wordsUsedCorrectly`);
+    keputusan akhir ada di kode (`utils/cowrite_validator.dart`, dicerminkan
+    di Worker `src/cowriteValidator.ts`). Kata yang dilaporkan model
+    dipetakan ke kata target dasarnya — bentuk seperti `attacked`,
+    `attacks`, `Attack.`, `'attack'`, `"ATTACKS"` dipetakan ke `attack` — lalu
+    harus: termasuk kata target yang masih tersisa, benar-benar muncul di
+    teks siswa sebagai kata utuh atau infleksi yang valid, dan gilirannya
+    bukan kata lepas/fragmen/daftar kata.
+  - **Infleksi yang diterima** mengikuti aturan ejaan, bukan sufiks bebas:
+    `attacks`/`attacked`/`attacking` diterima, tetapi `attackked`,
+    `attackes`, `attackd` tidak; penggandaan konsonan hanya untuk akhiran
+    konsonan-vokal-konsonan (`stop` → `stopped`); bentuk tak beraturan dari
+    tabel (`said` → `say`, `bit` → `bite`), dan kata tak beraturan tidak
+    mendapat bentuk lampau reguler buatan (`be` ≠ `bed`, `see` ≠ `seed`).
+    Komparatif/superlatif (`taller`/`tallest` → `tall`) hanya dalam konteks
+    pembanding ("is taller", "taller than", "the tallest"); `lay` **tidak**
+    dihitung sebagai bentuk `lie`; substring/kata turunan seperti
+    `attacker`/`counterattack` untuk `attack` tidak dihitung; salah eja
+    (`atacked`) tidak dihitung.
+- **Kata lepas, daftar kata, dan fragmen** (`attack`, `attack, button,
+  ability`, `attack button completely`, `the button`, `button button`)
+  tidak pernah dihitung. Kalau input seperti itu **mengandung kata target**,
+  input ditolak lokal di client: tidak masuk `cowriteTranscript`, tidak
+  dikirim ke Worker, tidak memicu balasan bot, tidak mengubah penghitung,
+  siswa melihat pesan bahasa Indonesia (`turnError`), dan draf + fokus/koneksi
+  papan ketik kolom teks tetap aktif. Kalimat sah tetap diterima walau
+  semua katanya kata target (`Birds fly.`), begitu juga subjek demonstratif
+  (`This works.`). Balasan biasa **tanpa** kata target (`Okay.`) **tidak**
+  ditolak — dikirim sebagai giliran biasa dan dihitung sebagai giliran
+  tanpa pemakaian kata target.
+- **Fallback tiga giliran (dimiliki aplikasi):** client menyimpan penghitung
+  `consecutiveMissedStudentTurns` = jumlah giliran siswa berturut-turut
+  (yang diterima & dinilai) tanpa pemakaian kata target yang sah.
+  - Bertambah 1 untuk setiap giliran siswa tanpa kata target baru yang
+    tervalidasi; **reset ke 0** bila giliran siswa memakai minimal satu kata
+    target tersisa secara sah (termasuk giliran yang memakai saran), dan
+    bila giliran fallback berhasil. **Tidak** berubah oleh giliran AI, input
+    yang ditolak lokal, atau pengiriman yang gagal.
+  - Begitu penghitung mencapai **3** dan masih ada kata tersisa, aplikasi
+    menentukan kata tersisa, **memilih tepat satu secara acak**, lalu meminta
+    Worker membuat satu kalimat lanjutan cerita yang memakai kata itu
+    (mode `forcedWord`), berdasarkan pesan siswa terakhir. Balasan bot
+    biasa untuk giliran itu dibuang dan diganti balasan fallback.
+  - Kata baru ditandai terpakai **hanya setelah** kata itu terdeteksi di teks
+    yang dihasilkan (bukan dari klaim `aiUsedWords` model). Kalau Worker
+    gagal (maks. 2 kali generasi di Worker, lalu 502) atau teksnya tidak
+    lolos validasi, tidak ada kata yang ditandai, balasan bot biasa yang
+    ditampilkan, dan penghitung tetap ≥ 3 sehingga giliran siswa berikutnya
+    yang juga tanpa kata target memicu fallback lagi.
+  - Siklus ini berulang setiap tiga giliran tanpa kata target, satu kata per
+    siklus, sampai semua kata terpakai.
+- **Pemakaian kata oleh bot:** kata target yang dipakai bot dengan benar
+  lewat fallback di atas **dihitung terpakai di tingkat sesi**
+  (`allWordsUsedCorrectly` / `wordUsedCorrectly`) — memperbarui penanda kata
+  dan bisa menyelesaikan sesi. Kata target yang **kebetulan** muncul di
+  balasan bot biasa **tidak** dihitung; kata itu tetap tersisa, tetap bisa
+  dipakai siswa, dan tetap bisa dipilih fallback berikutnya — sehingga prosa
+  AI tidak bisa mengatur jadwal kata target. **Pemakaian bot tidak pernah
+  dihitung sebagai pemakaian mandiri siswa** dan tidak pernah tersimpan di
+  `cowriteWordsUsedCorrectly` / mastery (bagian 6). Konsekuensinya: kata yang
+  sudah dipakai bot lewat fallback tidak lagi tersisa untuk sesi itu, jadi
+  siswa tidak mendapat kredit mandiri untuk kata itu di sesi tersebut.
+- **Selesai:** kalau giliran siswa sendiri menghabiskan kata terakhir, sesi
+  selesai tanpa bubble bot tambahan; kalau giliran fallback yang
+  menghabiskannya, bubble bot itu tetap tampil. Tombol "✓ Selesai" dijaga
+  dari ketukan ganda, dan giliran baru tidak bisa dikirim setelah semua kata
+  terpakai.
+- **Kelanjutan cerita oleh bot:** tepat satu kalimat **berbahasa Inggris**,
+  menambahkan kejadian atau perkembangan baru; berhubungan dengan kalimat
+  siswa terakhir **bila kalimat itu bagian dari cerita** (bila bukan —
+  pertanyaan, hitungan, permintaan, obrolan — bot tidak menanggapinya dan
+  melanjutkan cerita dari konteks sebelumnya), tidak mengulang/
+  memparafrasekan kalimat siswa, dan tidak memakai kata target tersisa
+  kecuali pada giliran fallback. Worker mengulang generasi sekali bila
+  balasan mengulang kalimat siswa, memakai kata target tersisa, atau
+  terdeteksi berbahasa Indonesia (deteksi kode, bukan prompt saja). Kualitas
+  naratif sebenarnya tetap hanya bisa dinilai lewat uji langsung dengan
+  model asli.
 - Hasil fase ini juga dipakai untuk update mastery status (bagian 6).
 
 ## 6. State Machine: Status Kata
@@ -488,7 +637,13 @@ Dua variabel independen per kata per siswa:
    dipelajari, berlabel `difficult`, dan bisa dinaikkan di sesi berikutnya.
 2. **Naik ke `mastered`** hanya kalau di satu sesi yang sama kata itu
    dijawab benar di cloze test **DAN** dipakai mandiri tanpa kesalahan di
-   co-write (definisi "mandiri" di 5.3).
+   co-write (definisi "mandiri" di 5.3). **"Tanpa kesalahan"** berarti makna
+   dan pemakaian kosakata targetnya dapat diterima (lihat "Pemakaian kata
+   yang sah" di 5.3), **bukan** seluruh kalimat bebas kesalahan tata bahasa
+   — kesalahan grammar/tense/infleksi boleh diberi feedback tetapi tidak
+   otomatis menggugurkan kredit kosakata. Kata yang dipakai bot (fallback
+   tiga giliran) hanya dihitung terpakai di tingkat sesi dan **tidak pernah**
+   memenuhi syarat ini.
 3. **`mastered` bersifat permanen — tidak bisa turun jadi `difficult`.**
    Kalau siswa mempelajari ulang kata yang sudah `mastered` dan kali ini
    salah di cloze dan/atau co-write, statusnya **tetap `mastered`**.

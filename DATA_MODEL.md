@@ -432,7 +432,9 @@ dan otomatis unik per pasangan).
 >    dinaikkan di sesi berikutnya.
 > 2. **Naik ke `mastered`** hanya kalau di satu sesi yang sama kata itu
 >    benar di cloze test **DAN** dipakai mandiri tanpa kesalahan di
->    co-write (lihat definisi "mandiri" di §4).
+>    co-write (lihat definisi "mandiri" di §4). "Tanpa kesalahan" = makna
+>    dan pemakaian kosakata targetnya dapat diterima, bukan kalimat yang
+>    sempurna secara tata bahasa (CW-05, §10.2; `SPEC.md` §5.3).
 > 3. **`mastered` bersifat permanen — tidak bisa turun.** Kalau siswa
 >    mempelajari ulang kata yang sudah `mastered` dan kali ini salah di
 >    cloze dan/atau co-write, statusnya **tetap `mastered`**. Penelitian
@@ -507,7 +509,7 @@ Pembelajaran tab "per sesi" (SPEC §3.6).
 | `storyTranslation` | string \| null | terjemahan cerita (bahasa Indonesia, **tanpa penanda** — penanda hanya relevan di teks Inggris), ditimpa dengan pola yang sama |
 | `clozeTestResult` | map | `{ [wordId]: boolean }` — benar/salah per kata (dihitung di client, tanpa AI). **Satu entri per kata target**, karena by design hanya ada satu blank per kata (lihat catatan penanda) |
 | `cowriteTranscript` | array\<map\> | list giliran: `{ sender: "siswa" \| "ai", text: string, feedback: string \| null, usedSuggestion: boolean }` |
-| `cowriteWordsUsedCorrectly` | array\<string\> | wordId yang berhasil dipakai **mandiri** tanpa kesalahan — diisi client dari field terstruktur respons `/cowrite-turn` (§10.2), bukan hasil parsing teks feedback |
+| `cowriteWordsUsedCorrectly` | array\<string\> | wordId yang berhasil dipakai **mandiri** tanpa kesalahan (= dipakai bermakna dengan makna yang dapat diterima; kesalahan tata bahasa di kalimat tidak menggugurkan; mandiri = tanpa saran menulis **dan** dalam kalimat berbahasa Inggris, bukan Indonesia/campuran; kata yang dipakai bot tidak pernah masuk) — diisi client dari field terstruktur respons `/cowrite-turn` (§10.2), bukan hasil parsing teks feedback |
 | `startedAt` | Timestamp | diisi saat dokumen pertama kali dibuat (generate pertama di Fase 1) |
 | `completedAt` | Timestamp \| null | `null` kalau sesi belum selesai |
 
@@ -609,7 +611,22 @@ Pembelajaran tab "per sesi" (SPEC §3.6).
 > Karena itu tiap giliran di `cowriteTranscript` menyimpan
 > `usedSuggestion: boolean` — kata yang dipakai pada giliran dengan
 > `usedSuggestion == true` **tidak boleh** masuk `cowriteWordsUsedCorrectly`,
-> meskipun kalimatnya benar secara gramatikal.
+> meskipun kalimatnya benar secara gramatikal. Hal yang sama berlaku untuk
+> giliran **berbahasa Indonesia/campuran** (ditentukan deterministik oleh
+> client, `containsIndonesianWords`): kata sah di giliran itu (mis. `attack`
+> di "aku attack temanku") hanya masuk cakupan sesi, **tidak** masuk
+> `cowriteWordsUsedCorrectly`. Status bahasa giliran **tidak disimpan** di
+> transcript (tidak ada field baru, tidak ada perubahan skema) — hanya
+> memengaruhi state client saat sesi berjalan.
+>
+> **Pemakaian kata oleh bot (fallback tiga giliran, §10.2):** kata yang
+> dipakai bot lewat fallback yang dipilih aplikasi dihitung terpakai di
+> tingkat sesi (bisa menyelesaikan Fase 3) tetapi **tidak pernah** masuk
+> `cowriteWordsUsedCorrectly`. Penghitung giliran
+> (`consecutiveMissedStudentTurns`) hanya hidup di state client dan **tidak
+> disimpan** di Firestore; giliran bot fallback tersimpan sebagai entri
+> `sender: "ai"` biasa di `cowriteTranscript` (tanpa field tambahan) — tidak
+> ada perubahan skema maupun Security Rules untuk fitur ini.
 
 ## 5. `targetWordSets`
 
@@ -872,50 +889,205 @@ Yesterday I [[run|ran]] to the park and bought two [[souvenir|souvenirs]].
 
 #### `POST /cowrite-turn` — Fase 3 (SPEC §5.3)
 
-**Input:** transcript sejauh ini + daftar kata target yang belum terpakai +
-flag apakah giliran ini memakai fitur "saran menulis".
+**Kepemilikan keputusan.** Flutter client memegang semua keputusan Co-Write
+(penghitung giliran, kapan fallback jatuh tempo, pemilihan kata acak, update
+status kata, tampil/tidaknya bubble bot, selesainya sesi). Worker memegang
+*prompt builder* ketiga mode di bawah dan validasi deterministik output
+model (`src/cowriteValidator.ts`, cermin dari `lib/utils/cowrite_validator.dart`).
+Model tidak pernah memilih kata target, menghitung giliran, atau memutuskan
+selesai — client menentukan mode lewat request.
 
-**Output:**
+**Input (JSON):**
 
 | Field | Tipe | Keterangan |
 |---|---|---|
-| `aiTurn` | string | kalimat giliran AI berikutnya |
-| `feedback` | string \| null | feedback untuk giliran siswa sebelumnya (grammar, typo, dsb) — teks bebas untuk ditampilkan ke siswa |
-| `hasError` | boolean | **terstruktur** — `true` kalau giliran siswa sebelumnya mengandung kesalahan |
-| `wordsUsedCorrectly` | array\<string\> | **terstruktur** — kata target (bentuk dasar) yang dipakai siswa dengan benar di giliran tersebut |
-| `suggestion` | string \| null | isi "saran menulis", hanya diisi kalau client memintanya |
-| `aiUsedWords` | array\<string\> | **terstruktur** (Milestone 7 Phase 2 Stage 8) — kata target sisa (bentuk dasar) yang dipakai AI sendiri di `aiTurn` giliran ini, lewat mekanisme fallback di bawah; array kosong di kondisi normal |
+| `transcript` | array\<{sender: "siswa"\|"ai", text}\> | percakapan sejauh ini. Untuk mode giliran biasa & `forcedWord`, **entri terakhir wajib giliran siswa saat ini** (400 kalau tidak) |
+| `remainingWords` | array\<string\> | kata target (bentuk dasar) yang belum terpakai di tingkat sesi |
+| `requestSuggestion` | boolean | `true` = mode saran menulis |
+| `forcedWord` | string (opsional) | mode fallback: kata yang **dipilih client** (harus anggota `remainingWords`; tidak boleh digabung dengan `requestSuggestion`) |
+| `studentTurnContainsIndonesian` | boolean (opsional, default `false`; 400 bila bukan boolean) | **diputuskan client** secara deterministik (`containsIndonesianWords`): giliran siswa terakhir berbahasa Indonesia/campuran. Worker tidak pernah mengklasifikasi ulang; dipakai mode 1 untuk meminta pengingat bahasa |
+
+**Tiga mode:**
+
+1. **Giliran biasa** (`requestSuggestion: false`, tanpa `forcedWord`). Worker
+   mengirim ke model `storySoFar` (transcript tanpa entri terakhir) dan
+   `currentStudentTurn` (entri terakhir) **secara terpisah**, supaya feedback
+   hanya menilai kalimat saat ini. Model mengembalikan `wordsUsedCorrectly`
+   (diputuskan lebih dulu), `hasError` (hanya untuk masalah **penting**:
+   bentuk/makna kata target yang salah, atau kesalahan grammar/pilihan kata
+   yang mengubah makna; kapital, tanda baca, apostrof, dan kesalahan kecil
+   tidak dihitung), `feedback` (bahasa Indonesia, hanya tentang kalimat saat
+   ini, dengan prioritas CW-02: kata target yang sah disebut secara spesifik
+   → kata target yang dicoba tapi tidak sah dijelaskan masalahnya → tanpa
+   kata target diberi dorongan memakai salah satu kata target; paling banyak
+   satu masalah penting; tanpa kesalahan karangan dan tanpa pujian generik),
+   dan `aiTurn` (satu kalimat
+   lanjutan **berbahasa Inggris** yang menambah kejadian baru, tidak mengulang
+   kalimat siswa, **tidak** memakai kata target tersisa, dan tidak menjawab
+   pertanyaan/hitungan/permintaan di luar cerita — bila giliran siswa bukan
+   bagian cerita, cerita dilanjutkan dari `storySoFar`). Payload ke model juga
+   memuat `studentTurnContainsIndonesian` dari client; bila `true`, `feedback`
+   wajib **satu kalimat singkat dan sopan berbahasa Indonesia** yang
+   mengingatkan siswa menulis dalam bahasa Inggris (tanpa pelajaran tata
+   bahasa), sedangkan `wordsUsedCorrectly` tetap dinilai seperti biasa.
+   Rubrik `wordsUsedCorrectly`
+   (CW-05): kata target yang dipakai **bermakna, dengan makna yang dimaksud
+   dapat diterima**; kesalahan grammar/tense/agreement dan infleksi kata
+   target yang salah **tidak** menggugurkan kredit (dilaporkan lewat
+   `hasError`/`feedback`); kata lepas, daftar, fragmen, sekadar menyebut kata,
+   kalimat tak bermakna, atau makna yang salah tidak dihitung. Worker menyaring
+   `wordsUsedCorrectly` dengan `validateStudentTargetWords` (bentuk yang
+   dilaporkan model seperti `attacked`, `Attack.`, `"ATTACKS"` dipetakan ke
+   kata dasar `attack`, lalu kata itu wajib masih tersisa dan muncul di teks
+   siswa sebagai kata utuh/infleksi yang valid). Maksimal 2
+   generasi: diulang bila JSON rusak/bentuk salah, `aiTurn` kosong, `aiTurn`
+   mengulang kalimat siswa (`isEchoOfStudentTurn`), `aiTurn` memakai kata
+   target tersisa, atau `aiTurn` terdeteksi berbahasa Indonesia
+   (`containsIndonesianWords`). **Penilaian giliran siswa (`feedback`, `hasError`,
+   `wordsUsedCorrectly`) diambil dari percobaan pertama yang bentuknya valid
+   dan dipertahankan**; retry hanya mengganti `aiTurn`, sehingga tidak pernah
+   menghapus kredit kosakata siswa. Bila model mengklaim kata
+   (`wordsUsedCorrectly` mentah tidak kosong) tetapi validasi tidak
+   mengkreditkan satu pun, dan giliran bukan berbahasa Indonesia/campuran,
+   `feedback` diganti teks tetap `UNCREDITED_CLAIM_FEEDBACK` ("Belum ada kata
+   target yang terhitung di kalimat ini. …"; client punya salinan identik,
+   `kCowriteUncreditedClaimFeedback`). **Bila tidak ada percobaan yang
+   menghasilkan `aiTurn` yang dapat diterima, Worker menjawab 502** (CW-02) —
+   `aiTurn` yang bentuk JSON-nya valid tetapi tidak dapat diterima (mengulang
+   siswa, memakai kata target tersisa, berbahasa Indonesia) tidak pernah
+   dikembalikan; client memperlakukannya sebagai giliran gagal (giliran
+   siswa dibatalkan, "Gagal mengirim giliran. Coba lagi.").
+   `aiUsedWords` selalu `[]` — giliran biasa **tidak pernah** menyelesaikan
+   kata target. `assessedStudentTurn` = teks siswa persis yang dinilai.
+2. **Giliran fallback** (`forcedWord`). Model diminta satu kalimat lanjutan
+   dari `currentStudentTurn` yang **memakai `forcedWord`** dengan benar dan
+   tidak memakai kata tersisa lain, berbahasa Inggris, dan tetap di dalam
+   cerita. Worker menerima hasil hanya bila `forcedWord` terdeteksi di
+   `aiTurn` (kata utuh/infleksi), tidak ada kata tersisa lain, bukan
+   pengulangan kalimat siswa, dan tidak terdeteksi berbahasa Indonesia;
+   maksimal 2 generasi,
+   lalu **502** — Worker tidak pernah melaporkan kata yang belum tervalidasi.
+   Sukses: `aiUsedWords = [forcedWord]`, field penilaian kosong/null.
+3. **Saran menulis** (`requestSuggestion: true`). Model mengembalikan satu
+   kalimat bahasa Inggris; Worker membuang awalan instruksi ("Try to
+   write:", "You could write:", "Coba tulis") dan tanda kutip
+   (`extractSuggestedSentence`), diulang sekali bila kalimat tidak memakai
+   kata tersisa atau berupa fragmen. `aiTurn` = `""`. Instruksi berbahasa
+   Indonesia (`Coba tulis "..."`) ditambahkan client
+   (`lib/utils/cowrite_suggestion.dart`), bukan model.
+
+**Output (semua mode, bentuk sama):**
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `aiTurn` | string | kalimat giliran AI (mode 1 & 2); `""` di mode saran |
+| `feedback` | string \| null | feedback bahasa Indonesia untuk **giliran siswa saat ini** (mode 1 saja) |
+| `hasError` | boolean | **terstruktur** — `true` kalau giliran siswa saat ini mengandung masalah **penting** (mode 1); hanya dipakai client untuk indikator tampilan feedback |
+| `wordsUsedCorrectly` | array\<string\> | **terstruktur** — kata target (bentuk dasar) yang dipakai siswa secara bermakna di giliran saat ini (kesalahan tata bahasa tidak menggugurkan), sudah disaring kode (mode 1) |
+| `suggestion` | string \| null | kalimat saran bahasa Inggris tanpa instruksi (mode 3 saja) |
+| `aiUsedWords` | array\<string\> | **terstruktur** — `[forcedWord]` setelah validasi di mode 2; selalu `[]` di mode 1 & 3 |
+| `assessedStudentTurn` | string \| null | teks siswa yang dinilai (mode 1); `null` di mode lain. **Opsional bagi client** — Worker yang lebih lama tidak mengirimnya |
 
 > **Kenapa `wordsUsedCorrectly` harus terstruktur:** aturan mastery di §3
-> bergantung pada "dipakai mandiri tanpa kesalahan". Kalau satu-satunya
+> bergantung pada "dipakai mandiri tanpa kesalahan" (= makna & pemakaian
+> kosakata dapat diterima, bukan kalimat sempurna secara tata bahasa — kesalahan
+> tata bahasa cukup dilaporkan lewat `hasError`/`feedback`). Kalau satu-satunya
 > keluaran adalah teks feedback bebas, client harus menebak maknanya
 > dengan parsing string — tidak mungkin andal. `wordsUsedCorrectly`
-> (setelah difilter aturan "mandiri" di bawah) yang langsung mengisi
-> `learningSessions.cowriteWordsUsedCorrectly`.
+> (setelah divalidasi ulang client dan difilter aturan "mandiri" di bawah)
+> yang langsung mengisi `learningSessions.cowriteWordsUsedCorrectly`.
 >
-> **Catatan tentang `hasError`:** field ini divalidasi di client
-> (`AiWorkerService.cowriteTurn()`, tipe wajib `boolean`) tapi **saat ini
-> tidak dibaca oleh logic apa pun** di client — bukan `hasError` yang
-> mengisi `cowriteWordsUsedCorrectly`, hanya `wordsUsedCorrectly`. Ini
-> kesenjangan implementasi yang diketahui, bukan desain yang disengaja;
-> jangan berasumsi `hasError` punya efek apa pun di client sampai ada
-> keputusan eksplisit untuk memakainya atau menghapusnya dari kontrak.
+> **Catatan tentang `hasError` (CW-02):** field ini divalidasi di client
+> (`AiWorkerService.cowriteTurn()`, tipe wajib `boolean`) dan **hanya**
+> dipakai untuk indikator tampilan feedback (`classifyCowriteFeedback`,
+> `lib/utils/cowrite_feedback.dart`): ✓ "Sudah tepat" = ada kata
+> tervalidasi kode **dan** `hasError == false`; 💡 "Perlu perbaikan" =
+> ada kata tervalidasi dengan `hasError == true`, atau kata target muncul di
+> teks tapi tidak dikreditkan; 💬 "Pengingat" = tidak ada kata target, atau
+> giliran berbahasa Indonesia/campuran. Hasilnya disimpan di field
+> **in-memory** `CowriteTurn.feedbackKind`, yang **tidak** ditulis
+> `toMap()` — bentuk `cowriteTranscript` di Firestore tidak berubah.
+> `hasError` tidak pernah mengisi `cowriteWordsUsedCorrectly`, cakupan
+> sesi, penghitung fallback, atau mastery; itu tetap hanya dari
+> `wordsUsedCorrectly` yang divalidasi.
 >
 > **Aturan "mandiri" ditegakkan di client, bukan Worker:** kalau giliran itu
 > memakai "saran menulis", client **tidak memasukkan** kata dari
 > `wordsUsedCorrectly` ke `cowriteWordsUsedCorrectly`, dan mencatat
 > `usedSuggestion: true` di transcript (§4).
 >
-> **`aiUsedWords` (Milestone 7 Phase 2 Stage 8 — fallback giliran):** kalau
-> siswa sudah menyelesaikan lebih dari 3 giliran tanpa memakai semua kata
-> target, Worker **boleh** memakai tepat satu kata target sisa di
-> `aiTurn`-nya sendiri — kelayakannya dihitung sepenuhnya di dalam prompt
-> Worker (menghitung entri `"siswa"` di transcript yang sudah dikirim
-> setiap panggilan), tanpa field request baru. Client menggabungkan kata
-> di `aiUsedWords` ke daftar kata-terpakai sesi yang menggerakkan tampilan
-> "kata terpakai" dan kondisi berhenti otomatis Fase 3, tapi **tidak
-> pernah** ke `cowriteWordsUsedCorrectly` — kata yang dipakai AI sendiri
-> tidak boleh pernah terhitung sebagai penguasaan mandiri siswa.
+> **Alur client per giliran (`LearningFlowController.sendTurn`):**
+> 1. Input yang **mengandung kata target** tapi hanya berupa kata lepas,
+>    pengulangan, fragmen determiner/preposisi, atau daftar kata
+>    (`shouldRejectStudentTurnLocally`) ditolak lokal: tidak masuk
+>    `cowriteTranscript`, tidak memanggil Worker, tidak ada giliran AI,
+>    penghitung tidak berubah, `turnError` berbahasa Indonesia, draf & fokus
+>    `TextField` dipertahankan. Balasan biasa tanpa kata target (`"Okay."`)
+>    tetap dikirim sebagai giliran biasa.
+> 2. Giliran siswa ditampilkan langsung, lalu mode 1 dipanggil dengan
+>    `remainingWords` sebelum giliran ini. Respons dibuang bila alur sudah
+>    dimulai ulang (`startFlow`) selama menunggu, dan diperlakukan sebagai
+>    gagal kirim (giliran di-rollback) bila `assessedStudentTurn` ada tetapi
+>    tidak sama dengan teks yang dikirim.
+> 3. `validateStudentTargetWords` (eligible = kata tersisa sebelum giliran)
+>    menentukan kata siswa yang sah; semuanya masuk cakupan sesi
+>    (`allWordsUsedCorrectly`). Kata itu juga masuk
+>    `independentWordsUsedCorrectly` **hanya** bila giliran tidak memakai
+>    saran **dan** `containsIndonesianWords` (dihitung client sebelum
+>    memanggil Worker dan dikirim sebagai `studentTurnContainsIndonesian`)
+>    bernilai `false`.
+> 4. `consecutiveMissedStudentTurns`: reset ke 0 bila ada kata sah baru,
+>    selain itu +1. Giliran AI, input yang ditolak lokal, dan pengiriman yang
+>    gagal tidak mengubahnya.
+> 5. Kalau tidak ada kata tersisa → sesi selesai, tanpa bubble AI. Kalau
+>    penghitung ≥ `kCowriteFallbackMissThreshold` (3) → client memilih **tepat
+>    satu** kata tersisa secara acak (`selectFallbackWord`, sumber acak
+>    `cowriteFallbackRandomProvider`) dan memanggil mode 2. Kata itu ditandai
+>    terpakai **hanya** bila terdeteksi di teks `aiTurn` hasil mode 2
+>    (`validateBotTargetWords` dengan eligible = `[forcedWord]`; klaim
+>    `aiUsedWords` tidak dipakai), dan penghitung direset ke 0. Kalau mode 2
+>    gagal/tidak lolos, `aiTurn` mode 1 yang ditampilkan, tidak ada kata yang
+>    ditandai, dan penghitung tetap ≥ 3 (giliran tanpa kata target berikutnya
+>    mencoba fallback lagi). Selain itu `aiTurn` mode 1 ditampilkan dan
+>    **tidak pernah** menandai kata, walau kebetulan memuat kata target.
+>
+> **Tingkat sesi vs mastery mandiri:** `allWordsUsedCorrectly` (state client;
+> penanda kata + kondisi berhenti otomatis Fase 3 — `wordUsedCorrectly`
+> tingkat sesi) berisi semua kata yang sah terpakai dalam sesi:
+> - oleh siswa: mandiri, bersaran, atau di giliran berbahasa Indonesia/campuran;
+> - oleh bot lewat mode 2.
+>
+> `independentWordsUsedCorrectly` hanya berisi kata siswa yang mandiri (tanpa
+> saran, berbahasa Inggris). Kata dari mode 2, giliran bersaran, dan giliran
+> berbahasa Indonesia/campuran **tidak pernah** masuk ke sana, sehingga tidak
+> pernah tersimpan di `cowriteWordsUsedCorrectly` atau menaikkan mastery. Kata yang
+> sudah dipakai bot keluar dari `remainingWords`, jadi siswa tidak bisa lagi
+> mendapat kredit mandiri untuk kata itu di sesi yang sama.
+>
+> **Saran menulis & konkurensi:** saran tidak bisa diminta saat giliran
+> sedang dikirim, dan giliran tidak bisa dikirim saat saran sedang dimuat
+> (client & UI sama-sama menahannya). "✓ Selesai" dijaga
+> `isCompletingCowrite` sehingga ketukan ganda tidak menulis dua kali.
+>
+> **Kompatibilitas dengan Worker yang lebih lama:** sejak 2026-10-16 Worker
+> produksi sudah versi baru (`0bec79ee`, `PROJECT_STATE.md` §5t). Catatan ini
+> tetap berlaku untuk Worker lama (mis. versi 2026-08-30 bila di-rollback), yang
+> mengabaikan `forcedWord` dan `studentTurnContainsIndonesian`, serta tidak
+> mengirim `assessedStudentTurn`. Client baru tetap aman:
+> - `assessedStudentTurn` opsional, dan awalan saran berbahasa Inggris dibuang client.
+> - Respons fallback dari Worker lama biasanya tidak lolos validasi teks,
+>   sehingga tidak ada kata yang ditandai. Kalau aturan fallback lama di Worker
+>   itu kebetulan memakai kata yang sama, kata itu ditandai karena memang
+>   terdeteksi di teks.
+> - Pemisahan mastery untuk giliran Indonesia/campuran sepenuhnya di client,
+>   jadi tetap berlaku.
+> - Indikator feedback (CW-02) dihitung di client, jadi tetap berlaku. Client
+>   juga mengganti feedback dengan `kCowriteUncreditedClaimFeedback` bila
+>   klaim kata dari Worker lama ditolak validasi client.
+>
+> Fallback baru, pengingat bahasa, aturan "bot selalu berbahasa Inggris",
+> prioritas feedback CW-02, dan penolakan (502) `aiTurn` yang tidak dapat
+> diterima hanya berfungsi dengan Worker baru (sudah ter-deploy 2026-10-16).
 
 #### `POST /translate` — terjemahan makna (§2)
 

@@ -17,6 +17,22 @@ abstract final class LearningSessionPhase {
   static const String selesai = 'selesai';
 }
 
+/// How a student turn's feedback is presented (CW-02). Display-only: it is
+/// derived in app code from the code-validated result of that one turn
+/// (`classifyCowriteFeedback`), never from the wording of the feedback, and
+/// it never feeds coverage or mastery.
+enum CowriteFeedbackKind {
+  /// A target word was validly used and no important problem was reported.
+  positive,
+
+  /// An important problem was reported, or a target word was attempted but
+  /// not credited.
+  needsImprovement,
+
+  /// No target word was used, or the turn was Indonesian/mixed-language.
+  reminder,
+}
+
 /// One turn in `learningSessions.cowriteTranscript` (`DATA_MODEL.md` §4).
 class CowriteTurn {
   const CowriteTurn({
@@ -24,6 +40,7 @@ class CowriteTurn {
     required this.text,
     required this.feedback,
     required this.usedSuggestion,
+    this.feedbackKind,
   });
 
   /// `"siswa"` or `"ai"`.
@@ -31,6 +48,11 @@ class CowriteTurn {
   final String text;
   final String? feedback;
   final bool usedSuggestion;
+
+  /// In-memory only: deliberately **not** written by [toMap] or read by
+  /// [fromMap], so the persisted `cowriteTranscript` shape is unchanged.
+  /// `null` for AI turns and for turns loaded from Firestore.
+  final CowriteFeedbackKind? feedbackKind;
 
   factory CowriteTurn.fromMap(Map<String, dynamic> data) {
     return CowriteTurn(

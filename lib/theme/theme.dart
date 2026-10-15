@@ -41,9 +41,14 @@ abstract final class AppColors {
   static const Color error = Color(0xFFC62828);
   static const Color errorBackground = Color(0xFFFCE4EC);
 
-  /// Feedback grammar di co-write.
+  /// Feedback co-write "perlu perbaikan" (ikon bohlam).
   static const Color warning = Color(0xFFFFA000);
   static const Color warningBackground = Color(0xFFFFF8E1);
+
+  /// Feedback co-write netral: pengingat memakai kata target / menulis
+  /// dalam bahasa Inggris (ikon pesan).
+  static const Color info = Color(0xFF1565C0);
+  static const Color infoBackground = Color(0xFFE3F2FD);
 
   /// Dot penanda kata `difficult` (§5.3) — solid, unlike the
   /// solid+background pairs above.
