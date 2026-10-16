@@ -257,8 +257,28 @@ keduanya dibutuhkan:
 - Daftar semua kata yang sudah dipelajari, dengan label `mastered` /
   `difficult`.
 - Bisa difilter/di-sort berdasarkan label tersebut.
-- Saat filter "difficult" aktif, ada opsi **"Pelajari Kembali"** untuk
-  langsung memulai sesi belajar baru dengan kata-kata difficult yang dipilih.
+- Saat filter "difficult" aktif, siswa **memilih sendiri** kata difficult
+  yang ingin dipelajari ulang, langsung di daftar itu (bukan layar
+  terpisah):
+  - Tiap kata punya checkbox; **awalnya tidak ada yang terpilih**.
+  - Ada hitungan langsung "N kata dipilih", serta tombol **Pilih Semua**
+    dan **Batalkan Pilihan**.
+  - Tombol **"Pelajari Kembali (N kata)"** memulai sesi baru hanya dengan
+    kata yang dipilih, dan nonaktif bila belum ada yang dipilih.
+  - **Tidak ada batas maksimal** jumlah kata per sesi.
+  - Kata yang tidak ditemukan di bundle kosakata tetap tampil dengan ID
+    mentahnya dan tetap bisa dipilih.
+  - Pilihan bertahan selama siswa masih di Riwayat (termasuk saat pindah
+    filter Semua/Mastered/Difficult atau tab, dan saat kembali dari sesi
+    belajar), lalu hilang ketika siswa meninggalkan Riwayat.
+  - Yang dikirim ke sesi hanya kata yang **masih** berlabel `difficult`
+    menurut data terbaru: kata yang sudah jadi `mastered` otomatis keluar
+    dari pilihan, sedangkan kata lain yang masih difficult tetap terpilih.
+  - Setelah kembali dari sesi (selesai, dibatalkan, atau ditinggal),
+    Riwayat memuat ulang datanya.
+  - Memilih kata atau memulai sesi tidak mengubah status mastery apa pun.
+  - Keputusan ini menggantikan keputusan Milestone 7 sebelumnya bahwa
+    semua kata difficult selalu dipelajari ulang sekaligus.
 
 **Tab "Per Sesi"**
 - Daftar sesi belajar, satu card per sesi: tanggal & jam, jumlah kata, dan
@@ -274,7 +294,7 @@ keduanya dibutuhkan:
 **"Pelajari Kembali" menjalankan 3 fase penuh** — baca cerita baru → cloze
 test → co-write, sama persis seperti sesi belajar biasa. Yang membedakan
 hanya asal kata-katanya (kata berlabel `difficult` yang dipilih siswa dari
-riwayat).
+riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 
 > **Koreksi dari versi sebelumnya:** dokumen lama menyebut re-learn masuk
 > "fase 2–3". Itu tidak mungkin — cloze test diturunkan dari cerita yang

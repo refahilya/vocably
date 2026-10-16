@@ -116,9 +116,19 @@ bawah app bar, style konsisten dengan stepper §3.1 tapi versi 2 opsi.
   (§5.3).
 - Filter/sort by label di atas list (dropdown atau segmented control, style
   konsisten dengan dropdown "Pilih Topik").
-- Saat filter "difficult" aktif, tombol **"Pelajari Kembali"** muncul (solid
-  navy, full-width di bawah atau floating action button) untuk memulai sesi
-  3 fase dengan kata-kata difficult yang dipilih.
+- Saat filter "difficult" aktif, daftar menjadi **dapat dipilih**
+  (`SPEC.md` §3.6):
+  - Tiap baris adalah `CheckboxListTile` dengan badge mastery di kiri dan
+    checkbox di kanan; awalnya tidak ada yang tercentang.
+  - Di atas daftar: teks "N kata dipilih" dan dua tombol teks, **Pilih
+    Semua** dan **Batalkan Pilihan** (dibungkus `Wrap` supaya tidak
+    overflow di lebar HP).
+  - Di bawah: tombol **"Pelajari Kembali (N kata)"** (`FilledButton` solid
+    navy, full-width), nonaktif dengan label "Pelajari Kembali" bila belum
+    ada yang dipilih.
+  - Filter Semua/Mastered tetap berupa daftar biasa tanpa checkbox. Bila
+    tidak ada kata difficult, hanya pesan "Tidak ada kata yang perlu
+    diulang" yang tampil, tanpa kontrol pilihan.
 
 **Tab "Per Sesi"**
 - List card vertikal, tiap card = satu sesi belajar: tanggal & jam (format

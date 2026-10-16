@@ -6,6 +6,7 @@ import '../models/vocab_bundle_entry.dart';
 import '../services/learning_progress_service.dart';
 import '../services/learning_session_service.dart';
 import '../utils/cefr_levels.dart';
+import '../utils/normalize_word.dart';
 import 'vocab_bundle_providers.dart';
 
 part 'history_providers.g.dart';
@@ -115,4 +116,76 @@ List<HistoryWordEntry> applyHistoryFilter(
           if (e.progress.masteryStatus == MasteryStatus.difficult) e,
       ],
   };
+}
+
+/// Normalized word IDs of every `difficult` row in [entries] — the only IDs
+/// a "Pelajari Kembali" session may contain. Unresolved rows
+/// ([HistoryWordEntry.entry] `null`) are included: eligibility comes from
+/// the progress record, not from the vocabulary bundle.
+Set<String> difficultWordIds(List<HistoryWordEntry> entries) {
+  return {
+    for (final e in entries)
+      if (e.progress.masteryStatus == MasteryStatus.difficult)
+        normalizeWord(e.progress.wordId),
+  };
+}
+
+/// The words a "Pelajari Kembali" session actually starts with: [selected]
+/// intersected with the **current** difficult rows of [entries], in list
+/// order, without duplicates. A selected word that has become `mastered`
+/// (or whose record is gone) is never returned.
+List<String> effectiveDifficultSelection({
+  required Set<String> selected,
+  required List<HistoryWordEntry> entries,
+}) {
+  final result = <String>[];
+  final seen = <String>{};
+  for (final e in entries) {
+    if (e.progress.masteryStatus != MasteryStatus.difficult) continue;
+    final id = normalizeWord(e.progress.wordId);
+    if (selected.contains(id) && seen.add(id)) result.add(id);
+  }
+  return result;
+}
+
+/// Riwayat "Per Kata" → Difficult: the student's chosen subset of
+/// difficult words for "Pelajari Kembali" (`SPEC.md` §3.6). Supersedes
+/// Milestone 7 Decision 2, under which every difficult word was relearned.
+///
+/// - Starts empty, and is keyed by `normalizeWord(wordId)`.
+/// - Auto-dispose and scoped per student: `HistoryScreen` keeps it alive
+///   for as long as Riwayat is open, so it survives filter and tab
+///   switches and the round trip through the learning flow. It's
+///   discarded when the student leaves Riwayat. It is never a global cart.
+/// - Stored IDs are pruned whenever History data updates, so a word that
+///   stopped being difficult (e.g. became `mastered`) drops out and the
+///   still-difficult selections are kept. Callers must still use
+///   [effectiveDifficultSelection] when starting a session, in case data
+///   changed after the last prune.
+@riverpod
+class HistoryDifficultSelection extends _$HistoryDifficultSelection {
+  @override
+  Set<String> build(String studentId) {
+    ref.listen(historyWordEntriesProvider(studentId), (_, next) {
+      final entries = next.value;
+      if (entries == null) return;
+      final eligible = difficultWordIds(entries);
+      if (state.every(eligible.contains)) return;
+      state = {for (final id in state) if (eligible.contains(id)) id};
+    });
+    return const {};
+  }
+
+  void toggle(String wordId) {
+    final id = normalizeWord(wordId);
+    state = state.contains(id) ? ({...state}..remove(id)) : {...state, id};
+  }
+
+  /// Adds every ID in [wordIds] (the current difficult rows); keeps any
+  /// existing selection.
+  void selectAll(Iterable<String> wordIds) {
+    state = {...state, for (final w in wordIds) normalizeWord(w)};
+  }
+
+  void clear() => state = const {};
 }

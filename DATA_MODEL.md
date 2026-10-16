@@ -586,6 +586,13 @@ Pembelajaran tab "per sesi" (SPEC §3.6).
 > berjalan identik dengan sesi biasa — yang membedakan hanya `sourceType`
 > dan asal `wordIds` (kata berlabel `difficult` yang dipilih siswa dari
 > Riwayat).
+>
+> Sejak 2026-10-16, `wordIds` sesi ini adalah **subset yang dicentang
+> siswa**, bukan semua kata difficult, dan hanya kata yang masih
+> `difficult` menurut data terbaru. Pilihan itu state UI in-memory
+> (`HistoryDifficultSelection`), **tidak disimpan ke Firestore** — tidak ada
+> perubahan skema atau rules. Tidak ada batas maksimal jumlah kata; rules
+> tetap hanya mewajibkan `wordIds.size() > 0`.
 
 > **Sesi yang ditinggal/tidak selesai — diputuskan di Milestone 7 (dulu
 > TBD di v6).** Sebuah dokumen bisa tertinggal selamanya di `currentPhase

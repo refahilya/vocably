@@ -492,3 +492,190 @@ abstract class _$HistoryFilter extends $Notifier<HistoryMasteryFilter> {
     return element.handleCreate(ref, build);
   }
 }
+
+/// Riwayat "Per Kata" → Difficult: the student's chosen subset of
+/// difficult words for "Pelajari Kembali" (`SPEC.md` §3.6). Supersedes
+/// Milestone 7 Decision 2, under which every difficult word was relearned.
+///
+/// - Starts empty, and is keyed by `normalizeWord(wordId)`.
+/// - Auto-dispose and scoped per student: `HistoryScreen` keeps it alive
+///   for as long as Riwayat is open, so it survives filter and tab
+///   switches and the round trip through the learning flow. It's
+///   discarded when the student leaves Riwayat. It is never a global cart.
+/// - Stored IDs are pruned whenever History data updates, so a word that
+///   stopped being difficult (e.g. became `mastered`) drops out and the
+///   still-difficult selections are kept. Callers must still use
+///   [effectiveDifficultSelection] when starting a session, in case data
+///   changed after the last prune.
+
+@ProviderFor(HistoryDifficultSelection)
+final historyDifficultSelectionProvider = HistoryDifficultSelectionFamily._();
+
+/// Riwayat "Per Kata" → Difficult: the student's chosen subset of
+/// difficult words for "Pelajari Kembali" (`SPEC.md` §3.6). Supersedes
+/// Milestone 7 Decision 2, under which every difficult word was relearned.
+///
+/// - Starts empty, and is keyed by `normalizeWord(wordId)`.
+/// - Auto-dispose and scoped per student: `HistoryScreen` keeps it alive
+///   for as long as Riwayat is open, so it survives filter and tab
+///   switches and the round trip through the learning flow. It's
+///   discarded when the student leaves Riwayat. It is never a global cart.
+/// - Stored IDs are pruned whenever History data updates, so a word that
+///   stopped being difficult (e.g. became `mastered`) drops out and the
+///   still-difficult selections are kept. Callers must still use
+///   [effectiveDifficultSelection] when starting a session, in case data
+///   changed after the last prune.
+final class HistoryDifficultSelectionProvider
+    extends $NotifierProvider<HistoryDifficultSelection, Set<String>> {
+  /// Riwayat "Per Kata" → Difficult: the student's chosen subset of
+  /// difficult words for "Pelajari Kembali" (`SPEC.md` §3.6). Supersedes
+  /// Milestone 7 Decision 2, under which every difficult word was relearned.
+  ///
+  /// - Starts empty, and is keyed by `normalizeWord(wordId)`.
+  /// - Auto-dispose and scoped per student: `HistoryScreen` keeps it alive
+  ///   for as long as Riwayat is open, so it survives filter and tab
+  ///   switches and the round trip through the learning flow. It's
+  ///   discarded when the student leaves Riwayat. It is never a global cart.
+  /// - Stored IDs are pruned whenever History data updates, so a word that
+  ///   stopped being difficult (e.g. became `mastered`) drops out and the
+  ///   still-difficult selections are kept. Callers must still use
+  ///   [effectiveDifficultSelection] when starting a session, in case data
+  ///   changed after the last prune.
+  HistoryDifficultSelectionProvider._({
+    required HistoryDifficultSelectionFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'historyDifficultSelectionProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyDifficultSelectionHash();
+
+  @override
+  String toString() {
+    return r'historyDifficultSelectionProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  HistoryDifficultSelection create() => HistoryDifficultSelection();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HistoryDifficultSelectionProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$historyDifficultSelectionHash() =>
+    r'4e9081dc94c7015700871ccce23934628cfb4006';
+
+/// Riwayat "Per Kata" → Difficult: the student's chosen subset of
+/// difficult words for "Pelajari Kembali" (`SPEC.md` §3.6). Supersedes
+/// Milestone 7 Decision 2, under which every difficult word was relearned.
+///
+/// - Starts empty, and is keyed by `normalizeWord(wordId)`.
+/// - Auto-dispose and scoped per student: `HistoryScreen` keeps it alive
+///   for as long as Riwayat is open, so it survives filter and tab
+///   switches and the round trip through the learning flow. It's
+///   discarded when the student leaves Riwayat. It is never a global cart.
+/// - Stored IDs are pruned whenever History data updates, so a word that
+///   stopped being difficult (e.g. became `mastered`) drops out and the
+///   still-difficult selections are kept. Callers must still use
+///   [effectiveDifficultSelection] when starting a session, in case data
+///   changed after the last prune.
+
+final class HistoryDifficultSelectionFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          HistoryDifficultSelection,
+          Set<String>,
+          Set<String>,
+          Set<String>,
+          String
+        > {
+  HistoryDifficultSelectionFamily._()
+    : super(
+        retry: null,
+        name: r'historyDifficultSelectionProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Riwayat "Per Kata" → Difficult: the student's chosen subset of
+  /// difficult words for "Pelajari Kembali" (`SPEC.md` §3.6). Supersedes
+  /// Milestone 7 Decision 2, under which every difficult word was relearned.
+  ///
+  /// - Starts empty, and is keyed by `normalizeWord(wordId)`.
+  /// - Auto-dispose and scoped per student: `HistoryScreen` keeps it alive
+  ///   for as long as Riwayat is open, so it survives filter and tab
+  ///   switches and the round trip through the learning flow. It's
+  ///   discarded when the student leaves Riwayat. It is never a global cart.
+  /// - Stored IDs are pruned whenever History data updates, so a word that
+  ///   stopped being difficult (e.g. became `mastered`) drops out and the
+  ///   still-difficult selections are kept. Callers must still use
+  ///   [effectiveDifficultSelection] when starting a session, in case data
+  ///   changed after the last prune.
+
+  HistoryDifficultSelectionProvider call(String studentId) =>
+      HistoryDifficultSelectionProvider._(argument: studentId, from: this);
+
+  @override
+  String toString() => r'historyDifficultSelectionProvider';
+}
+
+/// Riwayat "Per Kata" → Difficult: the student's chosen subset of
+/// difficult words for "Pelajari Kembali" (`SPEC.md` §3.6). Supersedes
+/// Milestone 7 Decision 2, under which every difficult word was relearned.
+///
+/// - Starts empty, and is keyed by `normalizeWord(wordId)`.
+/// - Auto-dispose and scoped per student: `HistoryScreen` keeps it alive
+///   for as long as Riwayat is open, so it survives filter and tab
+///   switches and the round trip through the learning flow. It's
+///   discarded when the student leaves Riwayat. It is never a global cart.
+/// - Stored IDs are pruned whenever History data updates, so a word that
+///   stopped being difficult (e.g. became `mastered`) drops out and the
+///   still-difficult selections are kept. Callers must still use
+///   [effectiveDifficultSelection] when starting a session, in case data
+///   changed after the last prune.
+
+abstract class _$HistoryDifficultSelection extends $Notifier<Set<String>> {
+  late final _$args = ref.$arg as String;
+  String get studentId => _$args;
+
+  Set<String> build(String studentId);
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<Set<String>, Set<String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Set<String>, Set<String>>,
+              Set<String>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, () => build(_$args));
+  }
+}

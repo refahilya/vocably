@@ -83,17 +83,19 @@ FilterChips and "+ Tambah topik baru" creator, saving only `topics` and
   - Resolved systematic pattern where story sentence order matched target-word input order.
   - Worker (`generateStory.ts`): Removed the `"in the same order the target words were given"` prompt constraint; instructed model to sequence words by narrative flow without following list order. Validated via `validateMarkers()` set-based invariant checks. Added 3 new tests in `generateStory.test.ts`.
   - Flutter (`cloze_test_screen.dart`, `cloze_blanks.dart`): Replaced predictable dropdown order with session-stable randomized permutation (`shuffleClozeOptions`), preserving canonical `state.wordIds` and key-based grading (`gradeClozeAnswers`). Added 9 new tests across `cloze_blanks_test.dart` and `cloze_test_screen_test.dart`.
-- **Co-Write Reliability Remediation — Phase 1 (2026-10-13) and Phase 2 (2026-10-15), uncommitted working tree in both repos; Worker side deployed as Worker version `0bec79ee` (deployed 2026-10-15T17:08Z UTC, §5t); Flutter side not hosted** (§5o, §5p):
+- **Co-Write Reliability Remediation — Phase 1 (2026-10-13) and Phase 2 (2026-10-15), committed in `2e175f1` (`vocably`) and `5bcb5e4` (`vocably-ai-worker`); Worker side deployed as Worker version `0bec79ee` (deployed 2026-10-15T17:08Z UTC, §5t); Flutter side not hosted** (§5o, §5p):
   - Deterministic student target-word validation and local rejection of target-word bare words/fragments/lists, with composer focus and keyboard retention (`cowrite_screen.dart`).
   - Phase 2: application-owned 3-consecutive-miss counter and one-word random fallback (bot usage validated from generated text, counted at session level only, never as student mastery); validator fixes (`Birds fly.`, `This works.`, `Okay.`, `said`/`bit`, comparatives, `lay`≠`lie`); feedback tied to the current student turn; Indonesian "Coba tulis" suggestions; anti-echo continuation with bounded retries.
   - CW-05 (§5q): credit for meaningful target-word use despite grammar or tense errors; model-reported surface forms mapped to base targets; spelling-rule inflections (no `attackked`); a retry never erases the first student assessment.
   - Indonesian/mixed-language input (§5r): deterministic app-side detection; a short "write in English" reminder; session coverage only, never independent mastery; the bot always writes in English and stays in the story.
   - CW-02 feedback (§5s): feedback prioritises current-turn target-word use; praise for rejected claims is replaced; a display-only ✓/💡/💬 indicator from validated results; a 502 instead of an unacceptable bot sentence.
 
-**Confirmed fresh (2026-10-15 verification, working tree, after §5s):**
+- **Difficult Words selection (§5u, 2026-10-16, uncommitted working tree, Flutter only):** students choose which difficult words to relearn (none selected initially, Pilih Semua / Batalkan Pilihan, "Pelajari Kembali (N kata)", no size cap); Riwayat re-fetches its data after the flow returns. Supersedes Milestone 7 Decision 2.
+
+**Confirmed fresh (2026-10-16 verification, working tree, after §5u):**
 - `flutter analyze`: clean (**0 issues**).
-- `flutter test --concurrency=1`: **467/467 passing** (100% of test suite).
-- `flutter build web --release --dart-define=WORKER_BASE_URL=...`: **succeeds** (re-run after §5s).
+- `flutter test --concurrency=1`: **484/484 passing** (100% of test suite).
+- `flutter build web --release --dart-define=WORKER_BASE_URL=...`: **succeeds** (re-run after §5u).
   (Note: `--wasm` is blocked by legacy JS interop in `flutter_tts: ^4.2.2`).
 - `vocably-ai-worker`: `npx vitest run --fileParallelism=false` **148/148 passing**, `npx tsc --noEmit` clean. The default parallel run can hit a Node out-of-memory error on this low-RAM machine.
 - `tools/vocab_import`: `npm test` **43/43 passing**.
@@ -809,9 +811,11 @@ decisions made explicit before implementation began:
    persisted phase forever; Riwayat "Per Sesi" shows it exactly like a
    finished one, no separate incomplete-state UI. No new query, no new
    index.
-2. **"Pelajari Kembali" relearns every word currently shown by the
+2. ~~**"Pelajari Kembali" relearns every word currently shown by the
    `difficult` filter** in Riwayat's "Per Kata" tab — no per-word
-   checkbox selection was added.
+   checkbox selection was added.~~ **Superseded 2026-10-16 (§5u):** the
+   student now picks which difficult words to relearn (none selected
+   initially, Pilih Semua / Batalkan Pilihan, no size cap).
 3. **`learningProgress` is written in two steps**, not once at the end:
    immediately after cloze-test submission (`LearningProgressService.
    recordClozeCompletion` — every session word becomes `learnedStatus:
@@ -877,7 +881,7 @@ decisions made explicit before implementation began:
   live:** `LearningCartScreen` (`sourceType: keranjangPelajari`),
   `TargetWordListScreen` (`sourceType: targetGuru`), and Riwayat's
   `_PerKataTab`'s "Pelajari Kembali" (`sourceType: pelajariUlangDifficult`,
-  Decision 2). Each "Segera hadir di Milestone berikutnya" caption is
+  Decision 2 — since superseded by per-word selection, §5u). Each "Segera hadir di Milestone berikutnya" caption is
   gone from exactly these three buttons — nothing else in Milestone 6's
   UI was touched.
 - **New pure utilities**, both fully unit-tested and free of any
@@ -1150,7 +1154,7 @@ Implemented **Phase 1 only** (plus three browser E2E follow-up bugfixes) of the 
    - **Follow-up fix for focused `TextField` stopping keyboard input after send/response cycles (`cowrite_screen.dart`):** During browser E2E testing, after several turns and submitting a valid sentence (`"one day a monster came and attack the village"`), the composer still visually showed its focused purple border and blinking caret, yet physical keyboard typing inserted no characters. Root cause traced to three interacting mechanisms in the Flutter Web composer lifecycle: (a) `_handleSend` did not `await controller.sendTurn(text)`, so when `isSendingTurn` transitioned `true -> false` (`TextField(enabled: false -> true)`), `_inputFocusNode.canRequestFocus` was toggled off during the in-flight request (closing `_textInputConnection`) and only restored on the post-response rebuild without any post-frame `EditableTextState.requestKeyboard()` call to reopen a fresh `TextInputConnection`; (b) `TextField`'s default non-null `autofillHints: const <String>[]` enabled `EngineAutofillForm` (`hasAutofillGroup == true` in `text_editing.dart`) on Flutter Web, wrapping the hidden `<textarea class="flt-text-editing">` in a `<form>` managed via `dormantForms` across `TextInput.updateConfig(readOnly: ...)` transitions; and (c) `_textController.clear()` set an invalid collapsed selection (`offset: -1`) while a custom `onTap: _activateComposerInput` hook interfered with `EditableText`'s built-in selection gesture detector. Fixed by making `_handleSend` `async` and awaiting `controller.sendTurn(text)`, clearing `_textController` with a valid `TextSelection.collapsed(offset: 0)`, scheduling `_scheduleComposerInputActivation()` (`addPostFrameCallback` -> `EditableTextState.requestKeyboard()`) after the post-response rebuild when `!afterState.allWordsUsed && !afterState.isSendingTurn`, setting `autofillHints: null` on the chat composer `TextField`, and removing the custom `onTap` override. Added 2 regression widget tests in `test/screens/cowrite_screen_test.dart` (12/12 passing). **Browser E2E retest in Chrome is still required to confirm the physical-keyboard fix live.**
 3. **Deferred from Phase 1:** the code-owned 3-consecutive-miss counter and forced bot word scheduler — **implemented in Phase 2 (§5p)**. Still deferred: operation-ID architecture and a full feedback UI redesign.
 
-### 5p. Co-Write Phase 2: Application-Owned Fallback, Validator Fixes, Feedback Association, Indonesian Suggestions (2026-10-15, working tree, NOT committed or deployed)
+### 5p. Co-Write Phase 2: Application-Owned Fallback, Validator Fixes, Feedback Association, Indonesian Suggestions (2026-10-15; committed in `2e175f1` / `5bcb5e4`; Worker side deployed in §5t)
 
 Authoritative requirements from the project owner (2026-10-15) replaced the earlier prompt-driven fallback. Root causes found and fixed:
 
@@ -1180,7 +1184,7 @@ Tests:
 
 **No Firestore schema or Security Rules change.** Not browser- or LLM-E2E tested.
 
-### 5q. CW-05: Reliable Target-Word Crediting (2026-10-15, working tree — implemented and locally tested; NOT committed; Worker side deployed in §5t)
+### 5q. CW-05: Reliable Target-Word Crediting (2026-10-15, working tree — implemented and locally tested; committed in `2e175f1` / `5bcb5e4`; Worker side deployed in §5t)
 
 **Requirement (project owner):** credit a target word when the student uses it meaningfully with an acceptable intended meaning, even with grammar or tense errors. Never credit on string presence alone. "Tanpa kesalahan" in the mastery rule means acceptable meaning and usage of the target word, not an error-free sentence.
 
@@ -1215,7 +1219,7 @@ Tests (run 2026-10-15):
 - Misspellings (`atacked`) and telegraphic all-target sentences (`Monster attack village.` when all three are targets) are still not credited.
 - *(Superseded 2026-10-16: the Worker is now deployed, §5t.)* At the time of writing, production ran the 2026-08-30 Worker, so the prompt fix (2) and retry fix (3) depended on that deployment. The deterministic fixes (1, 4) are client-side.
 
-### 5r. Co-Write: Indonesian / Mixed-Language Input and Session Coverage vs. Independent Mastery (2026-10-15, working tree — implemented and locally tested; NOT committed; Worker side deployed in §5t)
+### 5r. Co-Write: Indonesian / Mixed-Language Input and Session Coverage vs. Independent Mastery (2026-10-15, working tree — implemented and locally tested; committed in `2e175f1` / `5bcb5e4`; Worker side deployed in §5t)
 
 **Trigger:** manual testing ("aku attack temanku", "lalu aku tertawa hahaha", off-topic requests) followed by an audit.
 
@@ -1263,7 +1267,7 @@ Root causes found, and the fixes:
 - Whether the real model keeps every `aiTurn` in English, gives only a short reminder, and refuses off-topic requests is only prompt-contract tested and needs a live-model or browser check.
 - *(Superseded 2026-10-16: the Worker is now deployed, §5t.)* The 2026-08-30 Worker ignored the new flag and prompts.
 
-### 5s. CW-02 Feedback Accuracy, Turn Alignment, and Indicators (2026-10-15, working tree — audited, then implemented and locally tested; NOT committed; Worker side deployed in §5t)
+### 5s. CW-02 Feedback Accuracy, Turn Alignment, and Indicators (2026-10-15, working tree — audited, then implemented and locally tested; committed in `2e175f1` / `5bcb5e4`; Worker side deployed in §5t)
 
 CW-02: Co-Write feedback is sometimes irrelevant, excessive, delayed, about the wrong turn, or about trivial writing errors. A read-only audit first traced the real code in both working trees (`vocably` at `fa4d52c` + uncommitted §5p–§5r; `vocably-ai-worker` at `6239f7e` + uncommitted changes). The fix was then implemented on approval; see **Implementation** below.
 
@@ -1388,7 +1392,7 @@ flowchart TD
 Authorized by the project owner after their local manual E2E of CW-02, which they reported as satisfactory. Only the Cloudflare Worker was deployed: Flutter, Firebase Hosting and Firestore rules are untouched, and nothing was committed or pushed.
 
 **What was deployed:**
-- **Code:** the `vocably-ai-worker` **uncommitted working tree** on top of `6239f7e`, covering §5o–§5s Worker changes (`src/cowriteValidator.ts`, `src/handlers/cowriteTurn.ts`). The deployed code matches no Git commit until those changes are committed.
+- **Code:** the `vocably-ai-worker` **uncommitted working tree** on top of `6239f7e`, covering §5o–§5s Worker changes (`src/cowriteValidator.ts`, `src/handlers/cowriteTurn.ts`). Those changes were later committed as `5bcb5e4` (Worker) and `2e175f1` (Flutter).
 - **Worker:** `vocably-ai-worker` at `https://vocably-ai-worker.refahilyaa.workers.dev`.
 - **Version:** `0bec79ee-2958-475e-97fe-64ababf31c9c`, created 2026-10-15T17:08:04.518Z UTC, serving 100% of traffic. It replaces `cc325d6d-723d-4adf-a6b1-6d139fcdc2f4` (2026-08-30).
 - **Command:** `npx wrangler deploy --var "ALLOWED_ORIGINS:https://vocably-idn-en.web.app,https://vocably-idn-en.firebaseapp.com,http://localhost:5555"` (wrangler 4.127.0, OAuth login).
@@ -1410,6 +1414,60 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 | `wrangler deployments list` | `0bec79ee…` at 100% |
 
 **Not verified in production:** the CW-02 feedback content and the 502-on-unacceptable-continuation path. Both need an authenticated request with a Firebase ID token, which this environment doesn't have. They're covered by the local automated tests and the owner's local manual E2E; a live student-flow check against the production Worker is still pending.
+
+### 5u. Difficult Words: Choose Which Words to Relearn (2026-10-16, working tree — implemented and locally tested; NOT committed; Flutter only, nothing deployed)
+
+**Problem:** Riwayat → Per Kata → Difficult → "Pelajari Kembali" started one session with **every** difficult word (Milestone 7 Decision 2, §5j). The story uses one sentence per target word and has no size cap anywhere, so a long Difficult list meant one very long, failure-prone session. Abandoning it upgraded nothing.
+
+**Approved behavior (supersedes Decision 2):**
+- **Selection happens inline** in the Difficult view; there is no new screen or route.
+- **Rows:** each row is a `CheckboxListTile` with its mastery badge. Unresolved words (missing from every bundle) keep the raw-ID / "—" display and stay selectable.
+- **Initial state:** nothing is selected.
+- **Header:** shows a live "N kata dipilih" count, plus **Pilih Semua** (disabled when everything is selected) and **Batalkan Pilihan** (disabled at 0).
+- **Primary action:** "Pelajari Kembali (N kata)", disabled at 0, when it reads just "Pelajari Kembali".
+- **No session-size cap.**
+- **Empty Difficult list:** shows the existing "Tidak ada kata yang perlu diulang", with no bulk controls and no start action.
+- **Semua / Mastered:** unchanged read-only lists.
+
+**Selection state** (`lib/providers/history_providers.dart`):
+- `HistoryDifficultSelection`: an auto-dispose `@riverpod` notifier, family by `studentId`, holding a `Set<String>` keyed by `normalizeWord`, with `toggle`, `selectAll` and `clear`.
+- `HistoryScreen` (now a `ConsumerWidget`) keeps it alive with `ref.listen` for as long as Riwayat is open. It therefore survives filter switches, Per Kata ⇄ Per Sesi tab switches, and the trip through the learning flow, and is discarded when the student leaves Riwayat. It is never a global cart, and `LearningCart` is untouched.
+- **Eligibility:** `difficultWordIds` and `effectiveDifficultSelection` = selection ∩ the **current** difficult rows, in list order, without duplicates.
+  - The notifier prunes stored IDs whenever `historyWordEntriesProvider` updates. Words that left Difficult (mastered, or record gone) drop out, and still-difficult selections are kept.
+  - The start handler recomputes the effective selection from the latest History data and does nothing if it's empty.
+
+**Learning-flow integration** (`history_screen.dart` `_DifficultSelectionList._startRelearn`):
+- `startFlow(wordIds: <effective selection>, sourceType: pelajariUlangDifficult)`.
+- `LearningFlowController`, the Worker, the 3-phase flow, mastery rules and Firestore rules are unchanged.
+- Starting a flow writes nothing. Mastery is still written only by `recordClozeCompletion` (marks learned, never downgrades) and `recordCowriteCompletion` (upgrade only).
+
+**Stale-History fix (confirmed real):**
+- **Cause:** Riwayat stays mounted under the pushed flow, and nothing re-fetched its data, so newly mastered words still showed as Difficult on return.
+- **Fix:** when the flow's route is popped (completed via `CowriteScreen`'s `popUntil(first)`, cancelled, or abandoned), the handler invalidates **only** `learningProgressListProvider(studentId)` and `learningSessionListProvider(studentId)`. That re-fetches Per Kata (and with it the selection pruning) and Per Sesi.
+- **Scope:** only for flows started from Riwayat. Other entry points can't leave Riwayat mounted, because the nav shell builds only the selected destination.
+- **Proof:** with the two invalidations disabled, the regression test fails (progress fetched once, not re-fetched); with them restored, it passes.
+
+**Firestore:** no schema, rules, or data change. `wordIds` is simply the chosen subset.
+
+**Tests (run 2026-10-16):** `flutter test --concurrency=1` **484/484** (was 467); `flutter analyze` clean; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds.
+- `test/providers/history_providers_test.dart`, +9:
+  - eligibility helpers (unresolved included; intersection and order; mastered excluded; empty cases);
+  - notifier (starts empty; normalized toggle; `selectAll` without duplicates and `clear`; pruning on mastery change; pruning on record removal).
+- `test/screens/history_screen_test.dart`, +8:
+  - initial state empty and disabled;
+  - select/deselect with count and label;
+  - Pilih Semua (difficult only, unresolved included) and Batalkan;
+  - exact `wordIds` + `pelajariUlangDifficult`, with no mastery writes on start;
+  - unresolved word submitted by its ID;
+  - selection kept across Semua/Mastered (which have no checkboxes or start action);
+  - completed-flow refresh (mastered word leaves list and selection, still-difficult stays selected, Per Sesi re-fetched);
+  - abandoned flow writes nothing and keeps the selection.
+- Existing test updated: the Difficult filter test now expects the start action **disabled** initially (it used to start the flow with every word). The empty-Difficult test also checks that no bulk controls or start action appear.
+
+**Limitations:**
+- No browser check yet on a real phone width; the header uses `Wrap` so it can't overflow.
+- No session-size cap, by product decision. Very large selections still mean a long story, which the 45 s client timeout may not cover.
+- Observation, not verified: the pre-existing "Coba lagi" on a failed Per Kata load invalidates only `historyWordEntriesProvider`, not the underlying `learningProgressListProvider`, so it may not re-fetch a failed progress query (Riverpod 3 may retry on its own). Unchanged and out of scope.
 
 ## 6. Firebase / Firestore State
 
@@ -1436,7 +1494,7 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 **Outstanding:**
 
-1. **Commit the Co-Write Phase 1 + Phase 2 + CW-05 + Indonesian-input + CW-02 changes** (`vocably` and `vocably-ai-worker`), leaving the local-only `localhost:5000` origin out. The Worker code is **already deployed** (§5t) from the uncommitted working tree, so committing it will make the deployed code traceable. Then **run a live Chrome + real-LLM E2E retest against the production Worker**: the physical-keyboard composer fix; three missed turns → exactly one forced word; feedback matching the current sentence, prioritising target-word use (CW-02) with the ✓/💡/💬 indicators; continuations that don't echo the student; "Coba tulis" suggestions.
+1. **Co-Write work is committed** (`2e175f1`, `5bcb5e4`) and its Worker side is deployed (§5t). **Run a live Chrome + real-LLM E2E retest against the production Worker**: the physical-keyboard composer fix; three missed turns → exactly one forced word; feedback matching the current sentence, prioritising target-word use (CW-02) with the ✓/💡/💬 indicators; continuations that don't echo the student; "Coba tulis" suggestions.
 2. **Deploy Milestone 8's `firestore.rules` update** (`targetWordSets` guru create rule) — run `firebase deploy --only firestore:rules`.
 3. **Configure Firebase Hosting in `firebase.json`** — add `"hosting"` block with `public: "build/web"` and SPA rewrite rule.
 4. **Manually click through Milestone 8 and Co-Write end-to-end in the browser:**
@@ -1461,10 +1519,10 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 ## 9. Verification Status
 
-Run on 2026-10-15 against the uncommitted working trees (after the CW-02 feedback change, §5s):
+Flutter checks run on 2026-10-16 against the working tree after the Difficult Words selection change (§5u). Worker checks are from 2026-10-15/16 (§5s/§5t) and weren't re-run; the Worker is unaffected by §5u.
 
 - `flutter analyze`: **no issues (0 warnings/errors)**.
-- `flutter test --concurrency=1`: **467/467 passing** (100% of test suite).
+- `flutter test --concurrency=1`: **484/484 passing** (100% of test suite).
 - `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`: **succeeds** (`√ Built build\web`, JavaScript/CanvasKit). Note: `--wasm` is blocked by `flutter_tts: ^4.2.2` legacy JS interop.
 - `vocably-ai-worker/` tests: `npx vitest run --fileParallelism=false` **148/148 passing**, `npx tsc --noEmit` clean.
 - `tools/vocab_import` tests: 43/43 passing (last run 2026-10-13; not re-run, unaffected by this work).
@@ -1473,13 +1531,13 @@ Run on 2026-10-15 against the uncommitted working trees (after the CW-02 feedbac
 
 ## 10. Current Git State
 
-- **Flutter repo (`vocably/`):** branch `main`, at commit `fa4d52c` ("fix: shuffle cloze options per session"), with uncommitted Co-Write Phase 1 + Phase 2 + CW-05 + Indonesian-input (§5r) + CW-02 feedback (§5s) working-tree changes.
-- **`vocably-ai-worker/` (sibling repo):** branch `main`, at commit `6239f7e` ("fix: allow natural target-word order in generated stories"), with uncommitted Co-Write Phase 1 + Phase 2 + CW-05 + Indonesian-input (§5r) + CW-02 feedback (§5s) working-tree changes (including the new `src/cowriteValidator.ts` and `test/cowriteValidator.test.ts`). Separately, `wrangler.jsonc` has a **local-only** `http://localhost:5000` origin that must not be committed or deployed.
-- **Deployment:** the Worker is deployed as version `0bec79ee-2958-475e-97fe-64ababf31c9c` (2026-10-15T17:08:04Z UTC) **from the uncommitted working tree** on top of `6239f7e`, so the deployed code matches no commit (§5t). The Flutter app is not hosted, and its Co-Write changes run only locally.
+- **Flutter repo (`vocably/`):** branch `main` at `2e175f1` ("fix: improve Co-Write feedback and indicators"), level with `origin/main`. All Co-Write work (§5o–§5s) is committed there. **Uncommitted:** the Difficult Words selection change (§5u) and its doc updates.
+- **`vocably-ai-worker/` (sibling repo):** branch `main` at `5bcb5e4` ("fix: validate Co-Write feedback and bot replies"), level with `origin/main`. The only uncommitted change is the **local-only** `http://localhost:5000` origin in `wrangler.jsonc`, which must not be committed or deployed.
+- **Deployment:** the Worker runs version `0bec79ee-2958-475e-97fe-64ababf31c9c` (2026-10-15T17:08:04Z UTC, §5t). It was deployed from the working tree just before `5bcb5e4` was committed; the committed sources appear to be that same code, but this wasn't verified byte-for-byte. The Flutter app is not hosted, and §5u has nothing to deploy beyond a future web build.
 
 ## 11. Next Recommended Step
 
-1. Commit the Co-Write work across `vocably` and `vocably-ai-worker`, keeping the local-only `wrangler.jsonc` origin out of the commit. The Worker side is already deployed (§5t). Then run the live E2E checks in §7 item 1 against the production Worker.
+1. Review and commit the Difficult Words selection change (§5u), then check it in the browser at phone width. Run the live Co-Write E2E checks in §7 item 1 against the production Worker. The Co-Write work is already committed (`2e175f1` / `5bcb5e4`) and its Worker side deployed (§5t).
 2. Deploy the updated `firestore.rules` via `firebase deploy --only firestore:rules`.
 3. Configure Firebase Hosting in `firebase.json` and deploy web build.
 4. Perform manual browser E2E verification of Milestone 8 and Co-Write using the checklist in §7.

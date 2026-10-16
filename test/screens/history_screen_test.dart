@@ -7,8 +7,10 @@ import 'package:vocably/models/learning_session.dart';
 import 'package:vocably/models/vocab_bundle_entry.dart';
 import 'package:vocably/models/vocab_word.dart';
 import 'package:vocably/providers/history_providers.dart';
+import 'package:vocably/providers/learning_session_controller.dart';
 import 'package:vocably/providers/vocab_bundle_providers.dart';
 import 'package:vocably/screens/student/history/history_screen.dart';
+import 'package:vocably/screens/student/learning_flow/story_reading_screen.dart';
 import 'package:vocably/screens/student/history/session_detail_screen.dart';
 import 'package:vocably/services/learning_progress_service.dart';
 import 'package:vocably/services/learning_session_service.dart';
@@ -17,18 +19,46 @@ import 'package:vocably/utils/role.dart';
 
 class _FakeLearningProgressService extends LearningProgressService {
   List<LearningProgress> rows = [];
+  int fetchCalls = 0;
+
+  /// Any mastery write; must stay empty unless a test drives a real flow.
+  final writes = <String>[];
 
   @override
-  Future<List<LearningProgress>> fetchForStudent(String studentId) async =>
-      rows;
+  Future<List<LearningProgress>> fetchForStudent(String studentId) async {
+    fetchCalls++;
+    return rows;
+  }
+
+  @override
+  Future<void> recordClozeCompletion({
+    required String studentId,
+    required List<String> wordIds,
+    required String sessionId,
+  }) async {
+    writes.add('cloze:$wordIds');
+  }
+
+  @override
+  Future<void> recordCowriteCompletion({
+    required String studentId,
+    required Map<String, bool> clozeTestResult,
+    required List<String> cowriteWordsUsedCorrectly,
+    required String sessionId,
+  }) async {
+    writes.add('cowrite:${clozeTestResult.keys}');
+  }
 }
 
 class _FakeLearningSessionService extends LearningSessionService {
   List<LearningSession> sessions = [];
+  int fetchCalls = 0;
 
   @override
-  Future<List<LearningSession>> fetchForStudent(String studentId) async =>
-      sessions;
+  Future<List<LearningSession>> fetchForStudent(String studentId) async {
+    fetchCalls++;
+    return sessions;
+  }
 }
 
 /// Simulates a real Firestore failure (a bad document shape, a rules
@@ -173,21 +203,16 @@ void main() {
         expect(find.text('run'), findsNothing);
         expect(find.text('Pelajari Kembali'), findsOneWidget);
 
-        // Milestone 7: tapping it starts a re-learn flow with exactly the
-        // words currently shown by the `difficult` filter (Decision 2 — no
-        // per-word checkbox selection).
+        // Milestone 7 Decision 2 (relearn every difficult word) is
+        // superseded: nothing is selected initially, so the action is
+        // disabled until the student picks words (see the selection group).
         final relearnButton = tester.widget<FilledButton>(
           find.ancestor(
             of: find.text('Pelajari Kembali'),
             matching: find.byType(FilledButton),
           ),
         );
-        expect(relearnButton.onPressed, isNotNull);
-
-        await tester.tap(find.text('Pelajari Kembali'));
-        await tester.pumpAndSettle();
-
-        expect(find.text('Baca Cerita'), findsOneWidget);
+        expect(relearnButton.onPressed, isNull);
       },
     );
 
@@ -222,6 +247,253 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Tidak ada kata yang perlu diulang'), findsOneWidget);
+        // No misleading bulk controls or start action on an empty list.
+        expect(find.text('Pilih Semua'), findsNothing);
+        expect(find.text('Batalkan Pilihan'), findsNothing);
+        expect(find.textContaining('Pelajari Kembali'), findsNothing);
+      },
+    );
+  });
+
+  group('HistoryScreen — Difficult word selection for "Pelajari Kembali"', () {
+    VocabBundleEntry bundleEntry(String word, String translation) {
+      return VocabBundleEntry(
+        word: word,
+        meanings: [VocabMeaning(pos: 'noun', translation: translation)],
+        cefrLevel: 'A1',
+        topics: const [],
+      );
+    }
+
+    late _FakeLearningProgressService progressService;
+    late _FakeLearningSessionService sessionService;
+    late _FakeVocabBundleService bundleService;
+
+    setUp(() {
+      progressService = _FakeLearningProgressService()
+        ..rows = [
+          _progress(wordId: 'run', masteryStatus: MasteryStatus.mastered),
+          _progress(wordId: 'souvenir', masteryStatus: MasteryStatus.difficult),
+          _progress(wordId: 'attack', masteryStatus: MasteryStatus.difficult),
+          // In no bundle: shown by its raw ID, still selectable.
+          _progress(wordId: 'ghostword', masteryStatus: MasteryStatus.difficult),
+        ];
+      sessionService = _FakeLearningSessionService();
+      bundleService = _FakeVocabBundleService()
+        ..byLevel = {
+          'A1': [
+            bundleEntry('run', 'lari'),
+            bundleEntry('souvenir', 'oleh-oleh'),
+            bundleEntry('attack', 'serang'),
+          ],
+        };
+    });
+
+    Future<ProviderContainer> openDifficult(WidgetTester tester) async {
+      await _pumpHistory(
+        tester,
+        progressService: progressService,
+        sessionService: sessionService,
+        bundleService: bundleService,
+      );
+      await tester.tap(find.text('Difficult'));
+      await tester.pumpAndSettle();
+      return ProviderScope.containerOf(tester.element(find.byType(HistoryScreen)));
+    }
+
+    bool isChecked(WidgetTester tester, String word) {
+      return tester
+              .widget<CheckboxListTile>(
+                find.ancestor(of: find.text(word), matching: find.byType(CheckboxListTile)),
+              )
+              .value ==
+          true;
+    }
+
+    FilledButton relearnButton(WidgetTester tester) => tester.widget<FilledButton>(
+      find.ancestor(
+        of: find.textContaining('Pelajari Kembali'),
+        matching: find.byType(FilledButton),
+      ),
+    );
+
+    testWidgets('nothing is selected initially and the start action is disabled', (tester) async {
+      await openDifficult(tester);
+
+      expect(find.byType(CheckboxListTile), findsNWidgets(3));
+      for (final w in ['souvenir', 'attack', 'ghostword']) {
+        expect(isChecked(tester, w), isFalse);
+      }
+      expect(find.text('0 kata dipilih'), findsOneWidget);
+      expect(find.text('Pelajari Kembali'), findsOneWidget);
+      expect(relearnButton(tester).onPressed, isNull);
+      expect(
+        tester.widget<TextButton>(find.widgetWithText(TextButton, 'Batalkan Pilihan')).onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('individual words can be selected and deselected; count and label follow', (
+      tester,
+    ) async {
+      await openDifficult(tester);
+
+      await tester.tap(find.text('souvenir'));
+      await tester.pumpAndSettle();
+      expect(isChecked(tester, 'souvenir'), isTrue);
+      expect(find.text('1 kata dipilih'), findsOneWidget);
+      expect(find.text('Pelajari Kembali (1 kata)'), findsOneWidget);
+      expect(relearnButton(tester).onPressed, isNotNull);
+
+      await tester.tap(find.text('attack'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pelajari Kembali (2 kata)'), findsOneWidget);
+
+      await tester.tap(find.text('souvenir'));
+      await tester.pumpAndSettle();
+      expect(isChecked(tester, 'souvenir'), isFalse);
+      expect(find.text('1 kata dipilih'), findsOneWidget);
+    });
+
+    testWidgets('Pilih Semua selects every difficult word (incl. unresolved); Batalkan clears', (
+      tester,
+    ) async {
+      final container = await openDifficult(tester);
+
+      await tester.tap(find.text('Pilih Semua'));
+      await tester.pumpAndSettle();
+      expect(container.read(historyDifficultSelectionProvider('student-1')), {
+        'souvenir',
+        'attack',
+        'ghostword',
+      });
+      expect(find.text('3 kata dipilih'), findsOneWidget);
+      expect(find.text('Pelajari Kembali (3 kata)'), findsOneWidget);
+      // The mastered word is never selected.
+      expect(
+        container.read(historyDifficultSelectionProvider('student-1')).contains('run'),
+        isFalse,
+      );
+
+      await tester.tap(find.text('Batalkan Pilihan'));
+      await tester.pumpAndSettle();
+      expect(find.text('0 kata dipilih'), findsOneWidget);
+      expect(relearnButton(tester).onPressed, isNull);
+    });
+
+    testWidgets(
+      'starting passes exactly the selected words with sourceType pelajariUlangDifficult',
+      (tester) async {
+        final container = await openDifficult(tester);
+
+        await tester.tap(find.text('attack'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Pelajari Kembali (1 kata)'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Baca Cerita'), findsOneWidget);
+        final flow = container.read(learningFlowControllerProvider);
+        expect(flow.wordIds, ['attack']);
+        expect(flow.sourceType, LearningSessionSourceType.pelajariUlangDifficult);
+        // Starting a flow writes no mastery data by itself.
+        expect(progressService.writes, isEmpty);
+      },
+    );
+
+    testWidgets('a selected unresolved word stays selectable and is submitted by its ID', (
+      tester,
+    ) async {
+      final container = await openDifficult(tester);
+
+      expect(find.text('ghostword'), findsOneWidget); // raw-ID display kept
+      await tester.tap(find.text('ghostword'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pelajari Kembali (1 kata)'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(learningFlowControllerProvider).wordIds, ['ghostword']);
+    });
+
+    testWidgets('selection survives switching to Semua and Mastered and back', (tester) async {
+      await openDifficult(tester);
+      await tester.tap(find.text('attack'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Semua'));
+      await tester.pumpAndSettle();
+      // Semua and Mastered stay plain lists: no checkboxes, no start action.
+      expect(find.byType(CheckboxListTile), findsNothing);
+      expect(find.textContaining('Pelajari Kembali'), findsNothing);
+      expect(find.text('run'), findsOneWidget);
+
+      await tester.tap(find.text('Mastered'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CheckboxListTile), findsNothing);
+
+      await tester.tap(find.text('Difficult'));
+      await tester.pumpAndSettle();
+      expect(isChecked(tester, 'attack'), isTrue);
+      expect(find.text('1 kata dipilih'), findsOneWidget);
+    });
+
+    testWidgets(
+      'returning from a completed flow refreshes History: a newly mastered word '
+      'leaves the list and the selection, a still-difficult one stays selected',
+      (tester) async {
+        final container = await openDifficult(tester);
+        await tester.tap(find.text('souvenir'));
+        await tester.tap(find.text('attack'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Pelajari Kembali (2 kata)'));
+        await tester.pumpAndSettle();
+        final progressFetchesBefore = progressService.fetchCalls;
+        final sessionFetchesBefore = sessionService.fetchCalls;
+
+        // The flow completes: "souvenir" was mastered, "attack" wasn't.
+        progressService.rows = [
+          _progress(wordId: 'run', masteryStatus: MasteryStatus.mastered),
+          _progress(wordId: 'souvenir', masteryStatus: MasteryStatus.mastered),
+          _progress(wordId: 'attack', masteryStatus: MasteryStatus.difficult),
+          _progress(wordId: 'ghostword', masteryStatus: MasteryStatus.difficult),
+        ];
+        // CowriteScreen pops back to the first route on completion.
+        Navigator.of(tester.element(find.byType(StoryReadingScreen))).popUntil((r) => r.isFirst);
+        await tester.pumpAndSettle();
+
+        expect(progressService.fetchCalls, greaterThan(progressFetchesBefore));
+        // Per Sesi is refetched so it can show the new session.
+        await tester.tap(find.text('Per Sesi'));
+        await tester.pumpAndSettle();
+        expect(sessionService.fetchCalls, greaterThan(sessionFetchesBefore));
+        await tester.tap(find.text('Per Kata'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Difficult'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('souvenir'), findsNothing);
+        expect(isChecked(tester, 'attack'), isTrue);
+        expect(container.read(historyDifficultSelectionProvider('student-1')), {'attack'});
+        expect(find.text('Pelajari Kembali (1 kata)'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'abandoning a started flow changes nothing: no mastery writes, words stay '
+      'difficult and selected',
+      (tester) async {
+        await openDifficult(tester);
+        await tester.tap(find.text('souvenir'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Pelajari Kembali (1 kata)'));
+        await tester.pumpAndSettle();
+
+        Navigator.of(tester.element(find.byType(StoryReadingScreen))).pop();
+        await tester.pumpAndSettle();
+
+        expect(progressService.writes, isEmpty);
+        expect(find.text('souvenir'), findsOneWidget);
+        expect(isChecked(tester, 'souvenir'), isTrue);
+        expect(find.text('Pelajari Kembali (1 kata)'), findsOneWidget);
       },
     );
   });

@@ -6,6 +6,7 @@ import '../../../models/learning_session.dart';
 import '../../../providers/history_providers.dart';
 import '../../../providers/learning_session_controller.dart';
 import '../../../theme/theme.dart';
+import '../../../utils/normalize_word.dart';
 import '../../../utils/session_date_format.dart';
 import '../../../widgets/mastery_badge.dart';
 import '../learning_flow/story_reading_screen.dart';
@@ -20,13 +21,20 @@ import 'session_detail_screen.dart';
 /// via tests with fake services (see `test/screens/history_screen_test.dart`)
 /// until then; the empty-state UI is what a real signed-in student will
 /// actually see.
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key, required this.profile});
 
   final AppUser profile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Keeps the auto-dispose difficult-word selection alive for as long as
+    // Riwayat is open, so it survives filter/tab switches and the round
+    // trip through the learning flow, and is discarded when the student
+    // leaves Riwayat. Listening (not watching) avoids rebuilding the tabs
+    // on every toggle.
+    ref.listen(historyDifficultSelectionProvider(profile.uid), (_, _) {});
+
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -90,9 +98,9 @@ class _EmptyMessage extends StatelessWidget {
   }
 }
 
-/// "Per Kata" tab (`SPEC.md` §3.6): filterable-by-mastery word list, with
-/// a "Pelajari Kembali" action surfaced only under the `difficult` filter
-/// — present but inert, since it launches Milestone 7's 3-phase flow.
+/// "Per Kata" tab (`SPEC.md` §3.6): filterable-by-mastery word list. Under
+/// the `difficult` filter, rows are selectable and "Pelajari Kembali"
+/// starts the 3-phase flow with only the selected words.
 class _PerKataTab extends ConsumerWidget {
   const _PerKataTab({required this.studentId});
 
@@ -156,11 +164,9 @@ class _PerKataTab extends ConsumerWidget {
                           ? 'Tidak ada kata yang perlu diulang'
                           : 'Tidak ada kata dengan label ini.',
                     )
-                  : _PerKataList(
-                      studentId: studentId,
-                      entries: filtered,
-                      showRelearnAction: filter == HistoryMasteryFilter.difficult,
-                    ),
+                  : filter == HistoryMasteryFilter.difficult
+                  ? _DifficultSelectionList(studentId: studentId, entries: filtered)
+                  : _PerKataList(entries: filtered),
             ),
           ],
         );
@@ -169,21 +175,80 @@ class _PerKataTab extends ConsumerWidget {
   }
 }
 
-class _PerKataList extends ConsumerWidget {
-  const _PerKataList({
-    required this.studentId,
-    required this.entries,
-    required this.showRelearnAction,
-  });
+/// Semua / Mastered: a plain, read-only word list.
+class _PerKataList extends StatelessWidget {
+  const _PerKataList({required this.entries});
+
+  final List<HistoryWordEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      itemCount: entries.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final item = entries[index];
+        return ListTile(
+          leading: MasteryBadge(masteryStatus: item.progress.masteryStatus),
+          title: Text(item.entry?.word ?? item.progress.wordId),
+          subtitle: Text(item.entry?.primaryMeaning.translation ?? '—'),
+        );
+      },
+    );
+  }
+}
+
+/// Difficult: selectable rows, a live count, "Pilih Semua" / "Batalkan
+/// Pilihan", and "Pelajari Kembali (N kata)" (`SPEC.md` §3.6). This
+/// supersedes Milestone 7 Decision 2, under which every difficult word was
+/// relearned. Nothing is selected initially, and there's no session-size
+/// cap. Unresolved rows (no bundle entry) keep their raw-ID display and
+/// stay selectable.
+class _DifficultSelectionList extends ConsumerWidget {
+  const _DifficultSelectionList({required this.studentId, required this.entries});
 
   final String studentId;
+
+  /// The current difficult rows (already filtered).
   final List<HistoryWordEntry> entries;
-  final bool showRelearnAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selection = ref.watch(historyDifficultSelectionProvider(studentId));
+    final notifier = ref.read(historyDifficultSelectionProvider(studentId).notifier);
+    final effective = effectiveDifficultSelection(selected: selection, entries: entries);
+    final eligibleIds = difficultWordIds(entries);
+    final count = effective.length;
+
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            children: [
+              Text('$count kata dipilih', style: AppTextStyles.body),
+              Wrap(
+                spacing: AppSpacing.xs,
+                children: [
+                  TextButton(
+                    onPressed: count == eligibleIds.length
+                        ? null
+                        : () => notifier.selectAll(eligibleIds),
+                    child: const Text('Pilih Semua'),
+                  ),
+                  TextButton(
+                    onPressed: count == 0 ? null : notifier.clear,
+                    child: const Text('Batalkan Pilihan'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -191,42 +256,59 @@ class _PerKataList extends ConsumerWidget {
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final item = entries[index];
-              return ListTile(
-                leading: MasteryBadge(masteryStatus: item.progress.masteryStatus),
+              final id = normalizeWord(item.progress.wordId);
+              return CheckboxListTile(
+                value: selection.contains(id),
+                onChanged: (_) => notifier.toggle(id),
+                secondary: MasteryBadge(masteryStatus: item.progress.masteryStatus),
                 title: Text(item.entry?.word ?? item.progress.wordId),
                 subtitle: Text(item.entry?.primaryMeaning.translation ?? '—'),
               );
             },
           ),
         ),
-        // "Pelajari Kembali" (`SPEC.md` §3.6) relearns **every** word
-        // currently shown under the `difficult` filter — per the project
-        // owner's Milestone 7 Decision 2, no per-word checkbox selection
-        // was added; the mastery filter itself is the selection.
-        if (showRelearnAction)
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  ref
-                      .read(learningFlowControllerProvider.notifier)
-                      .startFlow(
-                        studentId: studentId,
-                        wordIds: [for (final item in entries) item.progress.wordId],
-                        sourceType: LearningSessionSourceType.pelajariUlangDifficult,
-                      );
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const StoryReadingScreen()));
-                },
-                child: const Text('Pelajari Kembali'),
-              ),
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: count == 0 ? null : () => _startRelearn(context, ref),
+              child: Text(count == 0 ? 'Pelajari Kembali' : 'Pelajari Kembali ($count kata)'),
             ),
           ),
+        ),
       ],
     );
+  }
+
+  /// Starts the flow with the effective selection, recomputed from the
+  /// latest History data so a stale tap can't submit an ineligible word.
+  /// When the flow's route is popped (finished, cancelled, or abandoned),
+  /// the History data is re-fetched: the flow may have changed mastery or
+  /// added a session. The selection provider then prunes words that are no
+  /// longer difficult. Starting a flow writes nothing by itself.
+  Future<void> _startRelearn(BuildContext context, WidgetRef ref) async {
+    final latest = ref.read(historyWordEntriesProvider(studentId)).value ?? entries;
+    final wordIds = effectiveDifficultSelection(
+      selected: ref.read(historyDifficultSelectionProvider(studentId)),
+      entries: latest,
+    );
+    if (wordIds.isEmpty) return;
+
+    ref
+        .read(learningFlowControllerProvider.notifier)
+        .startFlow(
+          studentId: studentId,
+          wordIds: wordIds,
+          sourceType: LearningSessionSourceType.pelajariUlangDifficult,
+        );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const StoryReadingScreen()));
+
+    if (!context.mounted) return;
+    ref.invalidate(learningProgressListProvider(studentId));
+    ref.invalidate(learningSessionListProvider(studentId));
   }
 }
 

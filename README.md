@@ -9,20 +9,21 @@ This project also serves as a research instrument for a bachelor's thesis, incor
 
 ---
 
-## Current Status (Updated: 2026-10-15)
+## Current Status (Updated: 2026-10-16)
 
-- **Milestones 1–8:** Complete and committed (`main` at `fa4d52c`).
-- **Co-Write remediation Phase 1 + Phase 2:** Implemented and automated-test verified in the **uncommitted working tree** of this repo and `vocably-ai-worker`, **not committed**. The **Worker side is deployed** (version `0bec79ee`, 2026-10-16, from the uncommitted working tree; see `PROJECT_STATE.md` §5t). The Flutter side isn't hosted. Covers the application-owned three-turn fallback, deterministic target-word validation, feedback tied to the current turn, and Indonesian writing suggestions. CW-05 (same working tree) credits meaningful target-word use even with grammar or tense errors, maps model-reported surface forms to base targets, and stops a retry from erasing a student's credit. Indonesian/mixed-language handling (same working tree) classifies each student turn deterministically: an Indonesian or mixed turn gets a short "write in English" reminder and earns session coverage only, never independent mastery; the bot always continues in English and stays in the story. CW-02 (same working tree):
+- **Milestones 1–8:** Complete and committed. `main` is at `2e175f1`, which includes the Co-Write work below.
+- **Difficult Words selection (working tree, not committed):** in Riwayat → Per Kata → Difficult, students tick the difficult words to relearn. Nothing is selected initially; there are Pilih Semua / Batalkan Pilihan and "Pelajari Kembali (N kata)", with no size cap. Riwayat reloads after the session. See `PROJECT_STATE.md` §5u.
+- **Co-Write remediation Phase 1 + Phase 2:** Implemented, automated-test verified, and **committed** in this repo (`2e175f1`) and `vocably-ai-worker` (`5bcb5e4`). The **Worker side is deployed** (version `0bec79ee`, 2026-10-16, from the working tree just before that commit; see `PROJECT_STATE.md` §5t). The Flutter side isn't hosted. Covers the application-owned three-turn fallback, deterministic target-word validation, feedback tied to the current turn, and Indonesian writing suggestions. CW-05 (same working tree) credits meaningful target-word use even with grammar or tense errors, maps model-reported surface forms to base targets, and stops a retry from erasing a student's credit. Indonesian/mixed-language handling (same working tree) classifies each student turn deterministically: an Indonesian or mixed turn gets a short "write in English" reminder and earns session coverage only, never independent mastery; the bot always continues in English and stays in the story. CW-02 (same working tree):
   - Feedback puts the current turn's target-word use ahead of minor grammar.
   - Praise for a word that validation rejected is replaced with a neutral message.
   - Feedback shows a ✓, 💡 or 💬 indicator derived from validated results. It's display-only, not persisted, and doesn't affect mastery.
   - The Worker returns 502 rather than an unacceptable bot sentence.
 
   See `SPEC.md` §5.3 and `PROJECT_STATE.md` §5p–§5s. Browser and real-LLM end-to-end testing is still pending.
-- **Test Suite:** **467 / 467 tests passing** (`flutter test --concurrency=1`).
+- **Test Suite:** **484 / 484 tests passing** (`flutter test --concurrency=1`).
 - **Static Analysis:** Clean (**0 issues**, `flutter analyze`).
 - **Production Build:** `flutter build web --release` succeeds (JavaScript/CanvasKit output).
-- **Sibling Worker:** Separate repository [`vocably-ai-worker`](https://github.com/refahilya/vocably-ai-worker.git) running the Cloudflare Workers proxy for LLM endpoints (**148 / 148 tests passing** locally). Deployed 2026-10-16 as version `0bec79ee-2958-475e-97fe-64ababf31c9c` from its uncommitted working tree, including all Co-Write Worker work; production CORS, auth and routing smoke tests passed.
+- **Sibling Worker:** Separate repository [`vocably-ai-worker`](https://github.com/refahilya/vocably-ai-worker.git) running the Cloudflare Workers proxy for LLM endpoints (**148 / 148 tests passing** locally). Deployed 2026-10-16 as version `0bec79ee-2958-475e-97fe-64ababf31c9c` from its working tree just before commit `5bcb5e4`, including all Co-Write Worker work; production CORS, auth and routing smoke tests passed.
 - **Firebase Hosting:** Web hosting configuration in `firebase.json` is pending implementation before deployment.
 
 ---

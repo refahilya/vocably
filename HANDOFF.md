@@ -30,33 +30,43 @@ repository code & tests  >  git state  >  verified deployment state  >  HANDOFF.
 Verify any claim here that matters to your task against the source,
 `git log`/`git status`, and deployment state before relying on it.
 
-## 2. Current Project Position (2026-10-15)
+## 2. Current Project Position (2026-10-16)
 
 - **Milestones 1–8 are complete and committed** (`1f2b606` for
   Milestone 8). Post-Milestone-8 fixes are committed: `56ded8b`,
   `34a9c4b`, and the cloze positional-leakage fix `fa4d52c` (Flutter) /
-  `6239f7e` (Worker).
+  `6239f7e` (Worker). The Co-Write work is committed as `2e175f1` (Flutter)
+  / `5bcb5e4` (Worker), both pushed.
 - **Deployment reality:**
   - The Flutter web app is **not hosted**: `firebase.json` has no
     `"hosting"` block.
   - **The Worker is deployed** as version `0bec79ee-2958-475e-97fe-64ababf31c9c`
     (2026-10-15T17:08Z UTC), including all Co-Write Worker work (Phase
-    1/2, CW-05, Indonesian input, CW-02). It was deployed **from the
-    uncommitted working tree**, so the deployed code matches no commit
-    (`PROJECT_STATE.md` §5t).
+    1/2, CW-05, Indonesian input, CW-02). It was deployed from the
+    working tree just before `5bcb5e4` was committed; the committed
+    sources appear to match it, though this wasn't verified
+    byte-for-byte (`PROJECT_STATE.md` §5t).
   - Milestone 8's `firestore.rules` change is committed but not deployed.
-- **Co-Write remediation is implemented in uncommitted working trees in
-  both repos, and is NOT committed.**
+- **Co-Write remediation is committed** (`2e175f1` / `5bcb5e4`).
   - The Worker side is deployed. The Flutter side runs only locally,
     because nothing is hosted.
   - Automated tests pass.
   - The owner reported a satisfactory local manual E2E of CW-02.
   - Production verification covered CORS, auth and routing only, with
     no authenticated Co-Write request.
+- **Difficult Words selection (2026-10-16, uncommitted working tree,
+  Flutter only, `PROJECT_STATE.md` §5u):** in Riwayat → Per Kata →
+  Difficult the student ticks which words to relearn.
+  - Nothing is selected initially; there are Pilih Semua / Batalkan
+    Pilihan and "Pelajari Kembali (N kata)", with no size cap.
+  - Only words still `difficult` are submitted, with
+    `pelajariUlangDifficult`.
+  - Riwayat re-fetches its data when the flow returns.
+  - This supersedes Milestone 7 Decision 2.
 
 | | |
 |---|---|
-| **Confirmed** (run 2026-10-15 on the working trees) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **467/467**; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
+| **Confirmed** (Flutter run 2026-10-16 on the working tree after §5u; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **484/484**; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
 | **Worker deployment** (2026-10-16) | `0bec79ee-2958-475e-97fe-64ababf31c9c` at 100%, confirmed via `wrangler deployments list`; production CORS, auth and routing smoke tests passed (`PROJECT_STATE.md` §5t) |
 | **Not verified** | Chrome E2E of Co-Write against the production Worker (incl. the Bug A physical-keyboard fix); real-LLM output quality in production (feedback accuracy, non-echo continuations, forced-word sentences). The owner reported a satisfactory **local** manual CW-02 E2E |
 | **Known gaps** | No `"hosting"` block; Milestone 8 rules undeployed; student demographics (class/NISN) not in `users`; Placement Test / Pre-Post-Test instruments are placeholders (TBD) |
@@ -207,11 +217,8 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 
 ## 6. Repositories & Deployment Inventory
 
-- **`vocably`:** `main` at `fa4d52c`, plus uncommitted changes —
-  - Code: `lib/utils/cowrite_validator.dart` (new), `lib/utils/cowrite_suggestion.dart` (new), `lib/providers/learning_session_controller.dart` (+ `.g.dart`), `lib/services/ai_worker_service.dart`, `lib/screens/student/learning_flow/cowrite_screen.dart`
-  - Tests: `test/utils/cowrite_validator_test.dart` (new), `test/providers/learning_session_controller_test.dart`, `test/screens/cowrite_screen_test.dart`, `test/services/ai_worker_service_test.dart`
-  - Docs: the `.md` files at the repo root
-- **`vocably-ai-worker`:** `main` at `6239f7e`, plus uncommitted changes to `src/cowriteValidator.ts` (new), `src/handlers/cowriteTurn.ts`, `test/cowriteValidator.test.ts` (new), `test/handlers/cowriteTurn.test.ts`, `README.md`.
+- **`vocably`:** `main` at `2e175f1`, level with `origin/main`, which includes all Co-Write work. Uncommitted (§5u): `lib/providers/history_providers.dart` (+ `.g.dart`), `lib/screens/student/history/history_screen.dart`, `test/providers/history_providers_test.dart`, `test/screens/history_screen_test.dart`, and the root `.md` docs.
+- **`vocably-ai-worker`:** `main` at `5bcb5e4`, level with `origin/main`. The only uncommitted change is the local-only `wrangler.jsonc` origin.
   **`wrangler.jsonc` carries a local-only `http://localhost:5000` entry in
   `ALLOWED_ORIGINS` — never stage, commit, or deploy it.** Never print or
   commit `.dev.vars`.
@@ -219,7 +226,7 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
   - **Current:** `0bec79ee-2958-475e-97fe-64ababf31c9c`,
     2026-10-15T17:08:04Z UTC, at 100%. It replaced `cc325d6d…`
     (2026-08-30).
-  - **How:** deployed from the uncommitted working tree with
+  - **How:** deployed from the working tree (committed afterwards as `5bcb5e4`) with
     `npx wrangler deploy --var "ALLOWED_ORIGINS:<web.app>,<firebaseapp.com>,http://localhost:5555"`,
     so the local-only `localhost:5000` origin was **not** deployed.
   - **A plain `wrangler deploy` from this working copy would deploy it.**
@@ -243,7 +250,9 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 - The **prompt-only** approach to `/generate-story` `usedForm`
   integrity — no code-level morphology validator there.
 - **No resume behavior** for abandoned learning sessions (Milestone 7
-  Decision 1). **The learning cart clears only after the first successful
+  Decision 1). **Difficult relearn uses only the student's ticked,
+  still-difficult words**; Decision 2 (relearn every difficult word) was
+  superseded on 2026-10-16 (§5u). **The learning cart clears only after the first successful
   `/generate-story`** (Decision 4).
 
 ## 8. Known Issues / Limitations
@@ -259,6 +268,8 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 | Cloudflare native Rate Limiting binding availability unresolved (in-memory fallback in use) | Pre-existing |
 | `--wasm` build fails (`flutter_tts` legacy JS interop) | Use the JS build |
 | Research respondent prep: demographics, data cleanup, instruments | Pending |
+| Difficult relearn has no session-size cap (product decision). A very large selection means a long one-sentence-per-word story, which the 45 s story timeout may not cover | By design; revisit if it causes failures |
+| Per Kata "Coba lagi" after a failed load invalidates only `historyWordEntriesProvider`, not `learningProgressListProvider`, so it may not re-fetch a failed progress query. Not verified (Riverpod 3 may retry on its own) | Observation only, out of scope of §5u |
 
 ## 9. Next-Step Gate
 
