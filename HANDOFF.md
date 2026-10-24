@@ -30,7 +30,7 @@ repository code & tests  >  git state  >  verified deployment state  >  HANDOFF.
 Verify any claim here that matters to your task against the source,
 `git log`/`git status`, and deployment state before relying on it.
 
-## 2. Current Project Position (2026-10-16)
+## 2. Current Project Position (2026-10-24)
 
 - **Milestones 1–8 are complete and committed** (`1f2b606` for
   Milestone 8). Post-Milestone-8 fixes are committed: `56ded8b`,
@@ -54,7 +54,7 @@ Verify any claim here that matters to your task against the source,
   - The owner reported a satisfactory local manual E2E of CW-02.
   - Production verification covered CORS, auth and routing only, with
     no authenticated Co-Write request.
-- **Difficult Words selection (2026-10-16, uncommitted working tree,
+- **Difficult Words selection (2026-10-16, committed in `6423dd2`,
   Flutter only, `PROJECT_STATE.md` §5u):** in Riwayat → Per Kata →
   Difficult the student ticks which words to relearn.
   - Nothing is selected initially; there are Pilih Semua / Batalkan
@@ -63,13 +63,39 @@ Verify any claim here that matters to your task against the source,
     `pelajariUlangDifficult`.
   - Riwayat re-fetches its data when the flow returns.
   - This supersedes Milestone 7 Decision 2.
+- **Research pretest/posttest — Milestone 1 (2026-10-24, committed,
+  `PROJECT_STATE.md` §5v):** the app-safe instrument bank
+  `assets/research/instrument_v1.json` is built and validated from the
+  researcher's PDF by `tools/research/bin/build_instrument.js`.
+  - It has 80 items (A2/B1/B2/C1 × 20) with opaque option IDs and a
+    separate `dont_know` choice, and **no answer key**.
+  - The private key is written only to an explicit path outside the repo
+    and OneDrive. It was generated on 2026-10-24 in a local folder outside
+    both, and verified against a fresh build from the PDF (contents never
+    displayed).
+  - Assessment screens, Firestore persistence, rules, posttest eligibility
+    and export are **not implemented**.
+  - The placement test is deferred and is not a prerequisite.
+  - Expert validation and the non-respondent pilot are pending.
+  - Planned sample: 35–40 students.
+- **Research pretest/posttest — Milestone 2a (2026-10-24, committed,
+  NOT deployed, `PROJECT_STATE.md` §5w):** Firebase Emulator config plus
+  Firestore security rules for `researchParticipants`,
+  `researchAssessmentResults` and `researchInstrument` (`DATA_MODEL.md` §6b).
+  - **70/70** rules tests pass against the local emulator (demo project
+    `demo-vocably-test`; `cd tools/research && npm run test:rules`; Java 21+
+    via a portable JDK in `%USERPROFILE%\.vocably-dev`).
+  - Band and authorization come only from researcher-controlled records,
+    never `users.cefrLevel`. No Flutter code changed.
+  - Deploying `firestore.rules` now includes these rules. They fail closed
+    until trusted tooling seeds `researchInstrument` and participants.
 
 | | |
 |---|---|
-| **Confirmed** (Flutter run 2026-10-16 on the working tree after §5u; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **484/484**; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
+| **Confirmed** (Flutter and research checks re-run 2026-10-25 on the final research M1/M2a tree, just before it was committed; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **486/486**; `tools/research` `npm test` 46 passing + 2 skipped (env-gated PDF/key checks) and `npm run test:rules` **70/70** on the local Firestore Emulator; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
 | **Worker deployment** (2026-10-16) | `0bec79ee-2958-475e-97fe-64ababf31c9c` at 100%, confirmed via `wrangler deployments list`; production CORS, auth and routing smoke tests passed (`PROJECT_STATE.md` §5t) |
 | **Not verified** | Chrome E2E of Co-Write against the production Worker (incl. the Bug A physical-keyboard fix); real-LLM output quality in production (feedback accuracy, non-echo continuations, forced-word sentences). The owner reported a satisfactory **local** manual CW-02 E2E |
-| **Known gaps** | No `"hosting"` block; Milestone 8 rules undeployed; student demographics (class/NISN) not in `users`; Placement Test / Pre-Post-Test instruments are placeholders (TBD) |
+| **Known gaps** | No `"hosting"` block; Milestone 8 rules undeployed; student demographics (class/NISN) not in `users`; Placement Test deferred (scoring TBD); Pre-/Post-Test instrument bank (§5v) and emulator-tested rules (§5w, undeployed) exist, but the assessment feature and researcher tooling are not implemented; data-retention policy not yet finalised |
 
 ## 3. Co-Write — Authoritative Behavior (Phase 2)
 
@@ -217,7 +243,7 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 
 ## 6. Repositories & Deployment Inventory
 
-- **`vocably`:** `main` at `2e175f1`, level with `origin/main`, which includes all Co-Write work. Uncommitted (§5u): `lib/providers/history_providers.dart` (+ `.g.dart`), `lib/screens/student/history/history_screen.dart`, `test/providers/history_providers_test.dart`, `test/screens/history_screen_test.dart`, and the root `.md` docs.
+- **`vocably`:** `main`, which includes all Co-Write work, the Difficult Words selection (§5u, `6423dd2`) and research Milestones 1/2a (§5v/§5w, commit `feat: add research instrument bank and secure assessment rules`; see `git log`). Local Git's OpenSSL CA bundle doesn't trust this network's TLS certificate; `git -c http.sslBackend=schannel <fetch|push>` (Windows certificate store, still verified) works per command without changing config.
 - **`vocably-ai-worker`:** `main` at `5bcb5e4`, level with `origin/main`. The only uncommitted change is the local-only `wrangler.jsonc` origin.
   **`wrangler.jsonc` carries a local-only `http://localhost:5000` entry in
   `ALLOWED_ORIGINS` — never stage, commit, or deploy it.** Never print or
@@ -236,8 +262,11 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
     content isn't verified in production, because that needs a Firebase ID
     token.
 - **Firebase:** project `vocably-idn-en`. Hosting is not configured.
-  Milestone 8 rules are undeployed. No Firestore emulator is available in
-  this environment (no Java).
+  Milestone 8 rules are undeployed (and `firestore.rules` now also holds
+  the undeployed research rules, §5w). A local Firestore Emulator is
+  configured (`firebase.json` `emulators`, demo project only). It needs
+  Java 21+: the system JDKs (1.8/17/19) are too old, so the rules-test
+  runner uses a portable JDK 21 in `%USERPROFILE%\.vocably-dev`.
 
 ## 7. Do Not Modify Without Explicit Project-Owner Approval
 
@@ -267,16 +296,19 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 | CW-02 residual gaps: (1) **partial contradictions** aren't detected, e.g. the model claims two words, one is rejected, and the feedback still praises it; (2) feedback that praises a word the model *didn't* claim can't be caught without parsing text, though the indicator then shows amber or blue, never green; (3) attempt detection misses misspellings (`atacked` → shown as a reminder); (4) feedback waits for the fallback call; (5) assessment is still sampled at temperature 0.7 together with the continuation; (6) a 502 for an unacceptable continuation makes the student resend a turn that might have earned credit | Implemented and locally tested (`PROJECT_STATE.md` §5s); needs live testing |
 | Cloudflare native Rate Limiting binding availability unresolved (in-memory fallback in use) | Pre-existing |
 | `--wasm` build fails (`flutter_tts` legacy JS interop) | Use the JS build |
-| Research respondent prep: demographics, data cleanup, instruments | Pending |
+| Research respondent prep (35–40 students): demographics, data cleanup, pretest/posttest feature (instrument bank done, §5v) | Pending |
 | Difficult relearn has no session-size cap (product decision). A very large selection means a long one-sentence-per-word story, which the 45 s story timeout may not cover | By design; revisit if it causes failures |
 | Per Kata "Coba lagi" after a failed load invalidates only `historyWordEntriesProvider`, not `learningProgressListProvider`, so it may not re-fetch a failed progress query. Not verified (Riverpod 3 may retry on its own) | Observation only, out of scope of §5u |
 
 ## 9. Next-Step Gate
 
-1. Project-owner review of the Co-Write Phase 1 + 2 diffs in both repos.
-2. Commit, keeping `wrangler.jsonc`'s local-only origin out of the
-   commit, and deploy the Worker. Confirm with `npx wrangler deployments
-   list`.
+1. Confirm the research Milestone 1 extraction comparison report was
+   reviewed against the PDF, then delete it; keep a private backup of the
+   answer key. §5v and §5w are committed; the next research milestone
+   (M2b) needs explicit approval.
+2. Any future Worker deploy must keep `wrangler.jsonc`'s local-only
+   origin out (reuse the `--var ALLOWED_ORIGINS` override). Co-Write is
+   already committed and deployed.
 3. Live Chrome + real-LLM E2E of Co-Write (`PROJECT_STATE.md` §7 item 1).
 4. Deploy Milestone 8 `firestore.rules`; configure Firebase Hosting;
    manual Milestone 8 E2E.

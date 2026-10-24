@@ -31,3 +31,13 @@ migrate_working_dir/
 /tools/vocab_import/node_modules/
 /tools/vocab_import/input/*.csv
 /tools/vocab_import/output/
+
+# --- Research instrument tooling (tools/research/, dev-side only) ---
+# The private answer key (*.private.json) and the extraction comparison
+# report (*.private.md) contain correct answers. build_instrument.js refuses
+# to write them inside this repository, inside any Git working tree or
+# inside OneDrive at all; these patterns are a second line of defence in
+# case one is ever copied in by hand.
+*.private.json
+*.private.md
+/tools/research/node_modules/

@@ -300,15 +300,56 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 > "fase 2–3". Itu tidak mungkin — cloze test diturunkan dari cerita yang
 > dibuat di Fase 1, jadi tanpa Fase 1 tidak ada sumber blank sama sekali.
 
-### 3.7 Pre-Test & Post-Test (Placeholder — Modul Riset)
+### 3.7 Pre-Test & Post-Test (Modul Riset)
 
-> **Status: TBD sepenuhnya.** Bagian ini hanya konsep & entry point untuk
-> sekarang. **Jangan tentukan/implementasikan instrumen, tipe soal, atau
-> skema penilaian apa pun** — instrumennya masih disusun dan belum
-> divalidasi oleh peneliti (kamu). Cukup siapkan ruang arsitektur (routing,
-> entry point di dashboard, struktur data placeholder di
-> `DATA_MODEL.md` §6b) supaya instrumen final bisa dipasang tanpa
-> perombakan sistem.
+> **Status:** **instrumen sudah dirancang; fitur di aplikasi belum
+> dibangun.** Sumber tunggal instrumen adalah PDF peneliti
+> `Rancangan_Instrumen_Pretest_Vocably.pdf` (soal, opsi, kunci, rubrik,
+> prosedur) — PDF itu memuat kunci jawaban sehingga **tidak** disimpan di
+> repo. **Validasi ahli dan uji coba pada siswa non-responden masih belum
+> dilakukan**, jadi instrumen belum boleh disebut valid/reliabel. Bank soal
+> aman-app (`assets/research/instrument_v1.json`, tanpa kunci) sudah
+> di-generate lewat `tools/research/` (Milestone 1 modul riset). Security
+> rules riset sudah ditulis dan diuji di Firestore Emulator lokal (Milestone
+> 2a, `DATA_MODEL.md` §6b) tapi **belum di-deploy**. Layar tes, penyimpanan
+> jawaban dari app, tooling peneliti, dan ekspor **belum ada** — entry point di
+> dashboard masih membuka layar placeholder. Placement Test (3.1)
+> **ditunda** dan bukan prasyarat pengembangan modul ini.
+
+**Ketentuan instrumen (dari PDF; jangan diubah atau diparafrasekan):**
+
+- 4 band — A2, B1, B2, C1 — masing-masing **20 butir** pilihan ganda (total
+  80). Tiap butir: kata bahasa Inggris + kelas katanya, 4 opsi arti bahasa
+  Indonesia (a–d: 1 kunci + 3 pengecoh), dan opsi "Saya tidak tahu kata
+  ini". Siswa mengerjakan 20 butir dari band yang ditetapkan untuknya.
+- **Pretest dan posttest memakai 20 butir yang sama** untuk tiap siswa.
+- **Treatment:** 4 sesi belajar, masing-masing 5 dari 20 kata target band
+  itu, lewat alur 3 fase biasa (Storyfier Reading → Cloze → Co-Write).
+- **Posttest dilakukan segera setelah sesi treatment ke-4**, dengan jeda
+  yang sama untuk semua siswa.
+- Rencana sampel: **35–40 siswa**.
+
+**Perilaku yang wajib dipenuhi app (direncanakan — belum diimplementasi):**
+
+- Urutan butir dan urutan opsi a–d diacak per siswa dan per tahap; pretest
+  dan posttest diacak **independen**; "Saya tidak tahu kata ini" selalu
+  terakhir.
+- Yang disimpan adalah **ID opsi (opaque) dan teks opsi yang dipilih**,
+  bukan huruf yang tampil.
+- Satu jawaban wajib dipilih sebelum lanjut (termasuk "tidak tahu");
+  jawaban disimpan bertahap; percobaan yang terputus dilanjutkan dengan
+  urutan yang sama.
+- **Tidak ada feedback benar/salah, skor, atau kunci** yang ditampilkan ke
+  siswa.
+
+**Skoring — dilakukan offline oleh peneliti dengan kunci privat, bukan di
+app:** B (opsi kunci) = 1; S (pengecoh) = 0; T ("tidak tahu") = 0, dicatat
+terpisah; K (tidak menjawab/data hilang) = 0, jumlahnya dilaporkan. Skor
+maks 20. Gain = Post − Pre (boleh negatif). N-gain = (Post − Pre) ÷ (20 −
+Pre), **tidak dihitung bila Pre = 20**. Siswa yang tidak mengikuti pretest
+atau posttest dikeluarkan dari analisis berpasangan (jumlah & alasan
+dilaporkan); gangguan teknis yang membuat tes tidak bisa dilanjutkan →
+siswa mengulang tes dan kejadiannya dicatat.
 
 - **Tujuan:** modul ini murni untuk kebutuhan **pengambilan data penelitian
   skripsi** — mengukur kemampuan kosakata siswa sebelum (Pre-Test) dan
@@ -321,16 +362,16 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
   |---|---|---|
   | Tujuan | Personalisasi konten belajar (tentukan `cefrLevel`) | Pengukuran data penelitian (kemampuan sebelum/sesudah) |
   | Sifat | Bagian dari mekanisme aplikasi, dipakai siswa manapun | Instrumen riset skripsi, terikat desain penelitian pretest-posttest |
-  | Kapan diambil | Ditawarkan sekali sebelum dashboard pertama, bisa diambil/diulang kapan saja lewat dashboard | Pre-Test di awal (sebelum mulai belajar), Post-Test di akhir periode penelitian |
+  | Kapan diambil | Ditawarkan sekali sebelum dashboard pertama, bisa diambil/diulang kapan saja lewat dashboard | Pre-Test di awal (sebelum sesi treatment pertama), Post-Test segera setelah sesi treatment ke-4 |
   | Hasil dipakai untuk | Menentukan level/kata yang ditampilkan ke siswa | Data analisis skripsi (dibandingkan pre vs post) |
   | Collection | `placementTestResults` | `researchAssessmentResults` |
 
 - **Posisi di UI:** section tersendiri di layar "Belajar", **di bawah** dua
   card utama (3.2) — terpisah secara visual & struktural, bukan bagian dari
   card Level maupun destinasi Riwayat.
-- Untuk sekarang: tampilkan entry point placeholder saja (lihat
-  `DESIGN_REFERENCE.md` §5.5) — isi soal/instrumen menyusul setelah
-  divalidasi.
+- Untuk sekarang: entry point masih placeholder (lihat
+  `DESIGN_REFERENCE.md` §5.5). Layar tes dibangun di milestone berikutnya
+  memakai bank soal yang sudah ada.
 
 ## 4. Alur Guru
 
@@ -720,13 +761,15 @@ sebagai dua field independen di data model (bukan satu enum gabungan), lihat
 
 ## 8. Daftar Fungsional Ringkas
 
-**Siswa:** placement test (entry point saja, penilaian TBD), riwayat
+**Siswa:** placement test (entry point saja, penilaian TBD — ditunda), riwayat
 pembelajaran (dua tab: per kata & per sesi), jelajah & cari kosakata (3 mode:
 abjad/tema/POS), memilih kosakata, tambah/kurang kata di keranjang pelajari,
 generate story dari judul/tema (berkali-kali, cerita saat "Selanjutnya"
 ditekan yang dipakai), cloze test, co-write dengan AI, feedback saat
 co-write, saran menulis saat co-write, pelajari ulang kata difficult (3 fase
-penuh), pre-test & post-test (entry point saja, instrumen TBD).
+penuh), pre-test & post-test (entry point masih placeholder; instrumen sudah
+dirancang di PDF peneliti dan bank soalnya tersedia sebagai aset, layar tes
+belum dibangun).
 
 **Guru:** tambah kata baru ke bank kosakata (dengan deteksi duplikat &
 opsi tambah makna baru), edit topik kata yang sudah ada (pilih dari

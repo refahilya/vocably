@@ -1,0 +1,2105 @@
+{
+  "schemaVersion": 1,
+  "instrumentId": "vocably-pretest-posttest",
+  "instrumentVersion": "v1",
+  "status": "Instrument design complete. Expert validation and the non-respondent pilot are pending; the instrument is not yet validated or shown to be reliable.",
+  "source": {
+    "title": "Rancangan Instrumen Pretest–Posttest Kosakata (Vocably)",
+    "fileName": "Rancangan_Instrumen_Pretest_Vocably.pdf",
+    "sha256": "b2cb2ad065bcd0b4903e2d413e671c92153c59fb782cc8c3ae1610543fb38916"
+  },
+  "bands": [
+    "A2",
+    "B1",
+    "B2",
+    "C1"
+  ],
+  "itemsPerBand": 20,
+  "optionOrder": "Options are stored in the source reference order. Item order and the order of the four substantive options are shuffled at runtime (independently for pretest and posttest); the \"tidak tahu\" choice is always shown last.",
+  "dontKnowOption": {
+    "id": "dont_know",
+    "text": "Saya tidak tahu kata ini"
+  },
+  "items": [
+    {
+      "id": "A2-01",
+      "band": "A2",
+      "number": 1,
+      "word": "climate",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_b392a7e4d317",
+          "text": "Cuaca"
+        },
+        {
+          "id": "opt_d56410d01fb7",
+          "text": "Iklim"
+        },
+        {
+          "id": "opt_54535080ee77",
+          "text": "Kemarau"
+        },
+        {
+          "id": "opt_2b146cfee409",
+          "text": "Musim"
+        }
+      ]
+    },
+    {
+      "id": "A2-02",
+      "band": "A2",
+      "number": 2,
+      "word": "audience",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_12b5630c183c",
+          "text": "Audit"
+        },
+        {
+          "id": "opt_27298e548ede",
+          "text": "Pelanggan"
+        },
+        {
+          "id": "opt_ddbe5d8b2547",
+          "text": "Selebriti"
+        },
+        {
+          "id": "opt_1bb67271386e",
+          "text": "Penonton"
+        }
+      ]
+    },
+    {
+      "id": "A2-03",
+      "band": "A2",
+      "number": 3,
+      "word": "task",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_753e9d522de1",
+          "text": "Catatan"
+        },
+        {
+          "id": "opt_00eef89600bc",
+          "text": "Tugas"
+        },
+        {
+          "id": "opt_5b3a5ae53d6f",
+          "text": "Jadwal"
+        },
+        {
+          "id": "opt_9a4f335a0f1f",
+          "text": "Berkas"
+        }
+      ]
+    },
+    {
+      "id": "A2-04",
+      "band": "A2",
+      "number": 4,
+      "word": "comfortable",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_cef87fc9bd37",
+          "text": "Nyaman"
+        },
+        {
+          "id": "opt_7a48a80e420d",
+          "text": "Aman"
+        },
+        {
+          "id": "opt_e70a74aad9c6",
+          "text": "Lelah"
+        },
+        {
+          "id": "opt_d9cd16acce43",
+          "text": "Mahal"
+        }
+      ]
+    },
+    {
+      "id": "A2-05",
+      "band": "A2",
+      "number": 5,
+      "word": "disaster",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_ee59fb21eb14",
+          "text": "Wabah"
+        },
+        {
+          "id": "opt_0072f947209c",
+          "text": "Kerusakan"
+        },
+        {
+          "id": "opt_0ed434def4d5",
+          "text": "Bencana"
+        },
+        {
+          "id": "opt_d4dbfb75cec2",
+          "text": "Kecelakaan"
+        }
+      ]
+    },
+    {
+      "id": "A2-06",
+      "band": "A2",
+      "number": 6,
+      "word": "advertisement",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_58936af2d57c",
+          "text": "Berita"
+        },
+        {
+          "id": "opt_a368b93b4986",
+          "text": "Peringatan"
+        },
+        {
+          "id": "opt_2ca40f84ffde",
+          "text": "Tontonan"
+        },
+        {
+          "id": "opt_3a59d12fe4dc",
+          "text": "Iklan"
+        }
+      ]
+    },
+    {
+      "id": "A2-07",
+      "band": "A2",
+      "number": 7,
+      "word": "engineer",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_ba78501e927e",
+          "text": "Arsitek"
+        },
+        {
+          "id": "opt_13acc45fd229",
+          "text": "Insinyur"
+        },
+        {
+          "id": "opt_f6c7970e2217",
+          "text": "Perawat"
+        },
+        {
+          "id": "opt_801e399e188e",
+          "text": "Pelukis"
+        }
+      ]
+    },
+    {
+      "id": "A2-08",
+      "band": "A2",
+      "number": 8,
+      "word": "crowded",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_0312304f5e97",
+          "text": "Ramai"
+        },
+        {
+          "id": "opt_a8e2a36ba629",
+          "text": "Sempit"
+        },
+        {
+          "id": "opt_ff12781fe19b",
+          "text": "Gelap"
+        },
+        {
+          "id": "opt_0b92c6d29e3c",
+          "text": "Sepi"
+        }
+      ]
+    },
+    {
+      "id": "A2-09",
+      "band": "A2",
+      "number": 9,
+      "word": "disease",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_e8887d7ef28a",
+          "text": "Guncangan"
+        },
+        {
+          "id": "opt_f1907d15436a",
+          "text": "Cacat"
+        },
+        {
+          "id": "opt_2a9063e78603",
+          "text": "Badai"
+        },
+        {
+          "id": "opt_94a8ec8a2008",
+          "text": "Penyakit"
+        }
+      ]
+    },
+    {
+      "id": "A2-10",
+      "band": "A2",
+      "number": 10,
+      "word": "government",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_dc394610bc51",
+          "text": "Pengusaha"
+        },
+        {
+          "id": "opt_567a88493c3d",
+          "text": "Pengembang"
+        },
+        {
+          "id": "opt_e040c8f8b93a",
+          "text": "Pemerintah"
+        },
+        {
+          "id": "opt_69e872376bbf",
+          "text": "Perintah"
+        }
+      ]
+    },
+    {
+      "id": "A2-11",
+      "band": "A2",
+      "number": 11,
+      "word": "employee",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_b57b3106655d",
+          "text": "Pemilik"
+        },
+        {
+          "id": "opt_e47473b52ee5",
+          "text": "Pelamar"
+        },
+        {
+          "id": "opt_4bff54d31744",
+          "text": "Pensiunan"
+        },
+        {
+          "id": "opt_05726a3f58c0",
+          "text": "Karyawan"
+        }
+      ]
+    },
+    {
+      "id": "A2-12",
+      "band": "A2",
+      "number": 12,
+      "word": "curly",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_08dba2b15ee4",
+          "text": "Tebal"
+        },
+        {
+          "id": "opt_01bfb25074f6",
+          "text": "Keriting"
+        },
+        {
+          "id": "opt_408ee83fd879",
+          "text": "Lurus"
+        },
+        {
+          "id": "opt_5a428aeb0470",
+          "text": "Panjang"
+        }
+      ]
+    },
+    {
+      "id": "A2-13",
+      "band": "A2",
+      "number": 13,
+      "word": "continent",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_191290da0bb3",
+          "text": "Wilayah"
+        },
+        {
+          "id": "opt_63f718f67343",
+          "text": "Kontingen"
+        },
+        {
+          "id": "opt_c0119e26a887",
+          "text": "Benua"
+        },
+        {
+          "id": "opt_152efdd48ebd",
+          "text": "Pesisir"
+        }
+      ]
+    },
+    {
+      "id": "A2-14",
+      "band": "A2",
+      "number": 14,
+      "word": "lawyer",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_12c46d5b5a6d",
+          "text": "Pengawas"
+        },
+        {
+          "id": "opt_e137a366366a",
+          "text": "Pengacara"
+        },
+        {
+          "id": "opt_956e1dcd8228",
+          "text": "Penyidik"
+        },
+        {
+          "id": "opt_cce2a5e79a2f",
+          "text": "Hakim"
+        }
+      ]
+    },
+    {
+      "id": "A2-15",
+      "band": "A2",
+      "number": 15,
+      "word": "salary",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_99b57bb8258c",
+          "text": "Gaji"
+        },
+        {
+          "id": "opt_f215c261e53e",
+          "text": "Harga"
+        },
+        {
+          "id": "opt_66e80e4199c8",
+          "text": "Tabungan"
+        },
+        {
+          "id": "opt_1f5de3fbc431",
+          "text": "Pajak"
+        }
+      ]
+    },
+    {
+      "id": "A2-16",
+      "band": "A2",
+      "number": 16,
+      "word": "awful",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_35326235183c",
+          "text": "Sangat mengagumkan"
+        },
+        {
+          "id": "opt_93997dbd5172",
+          "text": "Sangat jauh"
+        },
+        {
+          "id": "opt_fe2d46e4039a",
+          "text": "Sangat buruk"
+        },
+        {
+          "id": "opt_22e0c00f7b22",
+          "text": "Sangat lambat"
+        }
+      ]
+    },
+    {
+      "id": "A2-17",
+      "band": "A2",
+      "number": 17,
+      "word": "valley",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_785abd735b82",
+          "text": "Lembah"
+        },
+        {
+          "id": "opt_b646a74b3ae5",
+          "text": "Gang"
+        },
+        {
+          "id": "opt_85a1f373e382",
+          "text": "Bukit"
+        },
+        {
+          "id": "opt_80ab583842c8",
+          "text": "Selancar"
+        }
+      ]
+    },
+    {
+      "id": "A2-18",
+      "band": "A2",
+      "number": 18,
+      "word": "author",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_1f1904a2c5ab",
+          "text": "Penerbit"
+        },
+        {
+          "id": "opt_65d7c34a3894",
+          "text": "Pembaca"
+        },
+        {
+          "id": "opt_30b77aa309bf",
+          "text": "Penerjemah"
+        },
+        {
+          "id": "opt_17816f46ba2c",
+          "text": "Pengarang"
+        }
+      ]
+    },
+    {
+      "id": "A2-19",
+      "band": "A2",
+      "number": 19,
+      "word": "colleague",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_650882700ded",
+          "text": "Bawahan"
+        },
+        {
+          "id": "opt_3d1e83130147",
+          "text": "Tetangga"
+        },
+        {
+          "id": "opt_95841dbd2a2f",
+          "text": "Rekan"
+        },
+        {
+          "id": "opt_dbab7c87b89a",
+          "text": "Saudara"
+        }
+      ]
+    },
+    {
+      "id": "A2-20",
+      "band": "A2",
+      "number": 20,
+      "word": "ancient",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_fbf6c0f42916",
+          "text": "Kuno"
+        },
+        {
+          "id": "opt_f00b7d127ee2",
+          "text": "Asing"
+        },
+        {
+          "id": "opt_9ee118d30e1a",
+          "text": "Rapuh"
+        },
+        {
+          "id": "opt_482d5ffa85db",
+          "text": "Megah"
+        }
+      ]
+    },
+    {
+      "id": "B1-01",
+      "band": "B1",
+      "number": 1,
+      "word": "confident",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_30bfe42d4b1f",
+          "text": "Terus terang"
+        },
+        {
+          "id": "opt_697649a14c6d",
+          "text": "Percaya diri"
+        },
+        {
+          "id": "opt_9186a072a263",
+          "text": "Senang"
+        },
+        {
+          "id": "opt_7b8e874b246e",
+          "text": "Bersemangat"
+        }
+      ]
+    },
+    {
+      "id": "B1-02",
+      "band": "B1",
+      "number": 2,
+      "word": "policy",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_25418c6ae13f",
+          "text": "Syarat"
+        },
+        {
+          "id": "opt_c9c161980592",
+          "text": "Polisi"
+        },
+        {
+          "id": "opt_af877afe4dae",
+          "text": "Kebijakan"
+        },
+        {
+          "id": "opt_700e75718bca",
+          "text": "Profesi"
+        }
+      ]
+    },
+    {
+      "id": "B1-03",
+      "band": "B1",
+      "number": 3,
+      "word": "symptom",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_cfcf4027fa74",
+          "text": "Gejala"
+        },
+        {
+          "id": "opt_b3c004855b70",
+          "text": "Penyebab"
+        },
+        {
+          "id": "opt_299e79df30a4",
+          "text": "Obat"
+        },
+        {
+          "id": "opt_983813b133cb",
+          "text": "Akibat"
+        }
+      ]
+    },
+    {
+      "id": "B1-04",
+      "band": "B1",
+      "number": 4,
+      "word": "departure",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_b63c091ad577",
+          "text": "Tujuan"
+        },
+        {
+          "id": "opt_9c113ecbb2e1",
+          "text": "Bagasi"
+        },
+        {
+          "id": "opt_ec34490e4d33",
+          "text": "Departemen"
+        },
+        {
+          "id": "opt_1c71c93d3d60",
+          "text": "Keberangkatan"
+        }
+      ]
+    },
+    {
+      "id": "B1-05",
+      "band": "B1",
+      "number": 5,
+      "word": "cheerful",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_09caf785b808",
+          "text": "Ceria"
+        },
+        {
+          "id": "opt_e3404d9b2aaa",
+          "text": "Malu"
+        },
+        {
+          "id": "opt_e907177ecf3b",
+          "text": "Kesal"
+        },
+        {
+          "id": "opt_f3c66d537eec",
+          "text": "Cemas"
+        }
+      ]
+    },
+    {
+      "id": "B1-06",
+      "band": "B1",
+      "number": 6,
+      "word": "responsibility",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_51549e8257e6",
+          "text": "Rasa hormat"
+        },
+        {
+          "id": "opt_175b130efa18",
+          "text": "Tindak lanjut"
+        },
+        {
+          "id": "opt_5e532321fefe",
+          "text": "Tanggung jawab"
+        },
+        {
+          "id": "opt_6c478c66d89e",
+          "text": "Kerja sama"
+        }
+      ]
+    },
+    {
+      "id": "B1-07",
+      "band": "B1",
+      "number": 7,
+      "word": "treatment",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_1bc64e7ca0d0",
+          "text": "Pemeriksaan"
+        },
+        {
+          "id": "opt_25f718af5621",
+          "text": "Pencegahan"
+        },
+        {
+          "id": "opt_8cb0a91d5511",
+          "text": "Penurunan"
+        },
+        {
+          "id": "opt_81f96acbafe3",
+          "text": "Perawatan"
+        }
+      ]
+    },
+    {
+      "id": "B1-08",
+      "band": "B1",
+      "number": 8,
+      "word": "border",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_168407ad8c55",
+          "text": "Perbatasan"
+        },
+        {
+          "id": "opt_95b1ac483cb5",
+          "text": "Pelabuhan"
+        },
+        {
+          "id": "opt_fc6d732d3ef5",
+          "text": "Terowongan"
+        },
+        {
+          "id": "opt_80e4b1d3566b",
+          "text": "Bandara"
+        }
+      ]
+    },
+    {
+      "id": "B1-09",
+      "band": "B1",
+      "number": 9,
+      "word": "brave",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_7264a548feb2",
+          "text": "Patuh"
+        },
+        {
+          "id": "opt_ff1f0d1d70f9",
+          "text": "Takut"
+        },
+        {
+          "id": "opt_569a0cd01539",
+          "text": "Berani"
+        },
+        {
+          "id": "opt_95627a39f31c",
+          "text": "Penasaran"
+        }
+      ]
+    },
+    {
+      "id": "B1-10",
+      "band": "B1",
+      "number": 10,
+      "word": "employment",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_ccc2c4e77bb7",
+          "text": "Kemakmuran"
+        },
+        {
+          "id": "opt_808cec394a78",
+          "text": "Pekerjaan"
+        },
+        {
+          "id": "opt_eb2d358b8e71",
+          "text": "Pendidikan"
+        },
+        {
+          "id": "opt_23e539144668",
+          "text": "Hiburan"
+        }
+      ]
+    },
+    {
+      "id": "B1-11",
+      "band": "B1",
+      "number": 11,
+      "word": "breathe",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_78740e3e59c6",
+          "text": "Berkedip"
+        },
+        {
+          "id": "opt_94f281e1cb80",
+          "text": "Menelan"
+        },
+        {
+          "id": "opt_7cafc8b99ff3",
+          "text": "Bernapas"
+        },
+        {
+          "id": "opt_51e83d164019",
+          "text": "Menguap"
+        }
+      ]
+    },
+    {
+      "id": "B1-12",
+      "band": "B1",
+      "number": 12,
+      "word": "mud",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_d0e2d4957f19",
+          "text": "Pasir"
+        },
+        {
+          "id": "opt_daba5bed7df2",
+          "text": "Kerikil"
+        },
+        {
+          "id": "opt_7120d10014e2",
+          "text": "Debu"
+        },
+        {
+          "id": "opt_4987905ca0f7",
+          "text": "Lumpur"
+        }
+      ]
+    },
+    {
+      "id": "B1-13",
+      "band": "B1",
+      "number": 13,
+      "word": "cruel",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_8890f5fefc6c",
+          "text": "Pelit"
+        },
+        {
+          "id": "opt_0a468f3c2ad0",
+          "text": "Kejam"
+        },
+        {
+          "id": "opt_41fee3a3e983",
+          "text": "Ketat"
+        },
+        {
+          "id": "opt_293721824844",
+          "text": "Tegas"
+        }
+      ]
+    },
+    {
+      "id": "B1-14",
+      "band": "B1",
+      "number": 14,
+      "word": "convince",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_4eee90b46616",
+          "text": "Meyakinkan"
+        },
+        {
+          "id": "opt_b8c3b525710b",
+          "text": "Menyuruh"
+        },
+        {
+          "id": "opt_7f7e849181c3",
+          "text": "Menyimpulkan"
+        },
+        {
+          "id": "opt_7fc13b425350",
+          "text": "Menyarankan"
+        }
+      ]
+    },
+    {
+      "id": "B1-15",
+      "band": "B1",
+      "number": 15,
+      "word": "throat",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_aba95a215668",
+          "text": "Punggung"
+        },
+        {
+          "id": "opt_226c2879769e",
+          "text": "Tenggorokan"
+        },
+        {
+          "id": "opt_65e39c63f0ab",
+          "text": "Pinggang"
+        },
+        {
+          "id": "opt_1e5d52f06a1b",
+          "text": "Lidah"
+        }
+      ]
+    },
+    {
+      "id": "B1-16",
+      "band": "B1",
+      "number": 16,
+      "word": "flood",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_9424f4d337ab",
+          "text": "Banjir"
+        },
+        {
+          "id": "opt_a63934066906",
+          "text": "Longsor"
+        },
+        {
+          "id": "opt_2394fa95baae",
+          "text": "Kekeringan"
+        },
+        {
+          "id": "opt_1eb3cf49c236",
+          "text": "Badai"
+        }
+      ]
+    },
+    {
+      "id": "B1-17",
+      "band": "B1",
+      "number": 17,
+      "word": "pale",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_9ded10048561",
+          "text": "Kurus"
+        },
+        {
+          "id": "opt_428bdcdaba76",
+          "text": "Suram"
+        },
+        {
+          "id": "opt_a1815e3a89a2",
+          "text": "Sakit"
+        },
+        {
+          "id": "opt_8c2953db341f",
+          "text": "Pucat"
+        }
+      ]
+    },
+    {
+      "id": "B1-18",
+      "band": "B1",
+      "number": 18,
+      "word": "branch",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_c9cc7a013d73",
+          "text": "Akar"
+        },
+        {
+          "id": "opt_754ab69c8823",
+          "text": "Tebing"
+        },
+        {
+          "id": "opt_609d93b927d4",
+          "text": "Cabang"
+        },
+        {
+          "id": "opt_2ef83c0e3e83",
+          "text": "Teluk"
+        }
+      ]
+    },
+    {
+      "id": "B1-19",
+      "band": "B1",
+      "number": 19,
+      "word": "muscle",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_d83e01e5b5c9",
+          "text": "Tulang"
+        },
+        {
+          "id": "opt_9b5468ccc017",
+          "text": "Kulit"
+        },
+        {
+          "id": "opt_786c0da7217c",
+          "text": "Jantung"
+        },
+        {
+          "id": "opt_b098859fdc3f",
+          "text": "Otot"
+        }
+      ]
+    },
+    {
+      "id": "B1-20",
+      "band": "B1",
+      "number": 20,
+      "word": "earthquake",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_b7d86245d369",
+          "text": "Kecelakaan"
+        },
+        {
+          "id": "opt_2ba17c56dad0",
+          "text": "Gempa"
+        },
+        {
+          "id": "opt_e8cd976549b1",
+          "text": "Letusan"
+        },
+        {
+          "id": "opt_4beb7d6f2048",
+          "text": "Kebakaran"
+        }
+      ]
+    },
+    {
+      "id": "B2-01",
+      "band": "B2",
+      "number": 1,
+      "word": "wage",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_d21f9f7fac01",
+          "text": "Pajak"
+        },
+        {
+          "id": "opt_f79842e489ed",
+          "text": "Upah"
+        },
+        {
+          "id": "opt_512f3b58dc4d",
+          "text": "Ombak"
+        },
+        {
+          "id": "opt_ae1d16712e54",
+          "text": "Denda"
+        }
+      ]
+    },
+    {
+      "id": "B2-02",
+      "band": "B2",
+      "number": 2,
+      "word": "severe",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_89a4b7c6912d",
+          "text": "Beberapa"
+        },
+        {
+          "id": "opt_a851630770ce",
+          "text": "Mendadak"
+        },
+        {
+          "id": "opt_79a3ca524607",
+          "text": "Parah"
+        },
+        {
+          "id": "opt_73effb6d2f42",
+          "text": "Ringan"
+        }
+      ]
+    },
+    {
+      "id": "B2-03",
+      "band": "B2",
+      "number": 3,
+      "word": "acknowledge",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_0930ccc0eb27",
+          "text": "Mengakui"
+        },
+        {
+          "id": "opt_36c9e8b27cdc",
+          "text": "Mengenang"
+        },
+        {
+          "id": "opt_e57744439549",
+          "text": "Mengetahui"
+        },
+        {
+          "id": "opt_86121172bd9c",
+          "text": "Mengabaikan"
+        }
+      ]
+    },
+    {
+      "id": "B2-04",
+      "band": "B2",
+      "number": 4,
+      "word": "wise",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_df5b9028d120",
+          "text": "Sombong"
+        },
+        {
+          "id": "opt_0277cc1508fc",
+          "text": "Cerewet"
+        },
+        {
+          "id": "opt_0875ae592c30",
+          "text": "Pendiam"
+        },
+        {
+          "id": "opt_1ed83e7ebdc1",
+          "text": "Bijaksana"
+        }
+      ]
+    },
+    {
+      "id": "B2-05",
+      "band": "B2",
+      "number": 5,
+      "word": "inherit",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_2a0856e81c69",
+          "text": "Mewarisi"
+        },
+        {
+          "id": "opt_8a4b6bb54050",
+          "text": "Menyewa"
+        },
+        {
+          "id": "opt_e933e3ed757a",
+          "text": "Meniru"
+        },
+        {
+          "id": "opt_fb1513369c42",
+          "text": "Meminjam"
+        }
+      ]
+    },
+    {
+      "id": "B2-06",
+      "band": "B2",
+      "number": 6,
+      "word": "starve",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_8dc0b639db1f",
+          "text": "Permulaan"
+        },
+        {
+          "id": "opt_9b1277c34a38",
+          "text": "Kehausan"
+        },
+        {
+          "id": "opt_30a9f1cef872",
+          "text": "Keributan"
+        },
+        {
+          "id": "opt_9f43fd82e89a",
+          "text": "Kelaparan"
+        }
+      ]
+    },
+    {
+      "id": "B2-07",
+      "band": "B2",
+      "number": 7,
+      "word": "cite",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_1d424ab511e4",
+          "text": "Mengutip"
+        },
+        {
+          "id": "opt_b19be1b24bfa",
+          "text": "Menyisipkan"
+        },
+        {
+          "id": "opt_c509c53c124b",
+          "text": "Menyalin"
+        },
+        {
+          "id": "opt_d7e62d3a3343",
+          "text": "Mencabut"
+        }
+      ]
+    },
+    {
+      "id": "B2-08",
+      "band": "B2",
+      "number": 8,
+      "word": "anxious",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_a82273c8d810",
+          "text": "Agresif"
+        },
+        {
+          "id": "opt_7711febdcbda",
+          "text": "Terganggu"
+        },
+        {
+          "id": "opt_d93fe1b796e6",
+          "text": "Antusias"
+        },
+        {
+          "id": "opt_2f7d6d9d0962",
+          "text": "Cemas"
+        }
+      ]
+    },
+    {
+      "id": "B2-09",
+      "band": "B2",
+      "number": 9,
+      "word": "debt",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_b1dd3a4846bf",
+          "text": "Hadiah"
+        },
+        {
+          "id": "opt_ef65e5b04da8",
+          "text": "Bunga"
+        },
+        {
+          "id": "opt_e497a151c6f7",
+          "text": "Utang"
+        },
+        {
+          "id": "opt_270af622a63d",
+          "text": "Cicilan"
+        }
+      ]
+    },
+    {
+      "id": "B2-10",
+      "band": "B2",
+      "number": 10,
+      "word": "rural",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_2069f6c5d25e",
+          "text": "Pegunungan"
+        },
+        {
+          "id": "opt_32ac33152585",
+          "text": "Pedesaan"
+        },
+        {
+          "id": "opt_75956cc84a57",
+          "text": "Perkotaan"
+        },
+        {
+          "id": "opt_3aa14e5989d0",
+          "text": "Kepulauan"
+        }
+      ]
+    },
+    {
+      "id": "B2-11",
+      "band": "B2",
+      "number": 11,
+      "word": "enquiry",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_4fb5150869d3",
+          "text": "Penghargaan"
+        },
+        {
+          "id": "opt_69875a747b7a",
+          "text": "Permohonan"
+        },
+        {
+          "id": "opt_9cb2e021d32d",
+          "text": "Pertanyaan"
+        },
+        {
+          "id": "opt_94b8eae26e4b",
+          "text": "Pengumuman"
+        }
+      ]
+    },
+    {
+      "id": "B2-12",
+      "band": "B2",
+      "number": 12,
+      "word": "courage",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_a06a5d6daea6",
+          "text": "Keraguan"
+        },
+        {
+          "id": "opt_22c49e5158c1",
+          "text": "Keberanian"
+        },
+        {
+          "id": "opt_5a5d0220626d",
+          "text": "Kejujuran"
+        },
+        {
+          "id": "opt_25d3d7fee749",
+          "text": "Kesabaran"
+        }
+      ]
+    },
+    {
+      "id": "B2-13",
+      "band": "B2",
+      "number": 13,
+      "word": "revenue",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_d735edcd1f2b",
+          "text": "Pendapatan"
+        },
+        {
+          "id": "opt_4869ce6e425a",
+          "text": "Keuntungan"
+        },
+        {
+          "id": "opt_af14714e2851",
+          "text": "Pengeluaran"
+        },
+        {
+          "id": "opt_1ef121df9a86",
+          "text": "Pembaruan"
+        }
+      ]
+    },
+    {
+      "id": "B2-14",
+      "band": "B2",
+      "number": 14,
+      "word": "collapse",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_564cd2cafb25",
+          "text": "Retak"
+        },
+        {
+          "id": "opt_37836deba51c",
+          "text": "Runtuh"
+        },
+        {
+          "id": "opt_345b768261be",
+          "text": "Terbakar"
+        },
+        {
+          "id": "opt_fbe9e5d1a5bf",
+          "text": "Bergeser"
+        }
+      ]
+    },
+    {
+      "id": "B2-15",
+      "band": "B2",
+      "number": 15,
+      "word": "praise",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_c3e678426015",
+          "text": "Menyindir"
+        },
+        {
+          "id": "opt_61fbb36d9cf7",
+          "text": "Menghina"
+        },
+        {
+          "id": "opt_5c274fb18237",
+          "text": "Memuji"
+        },
+        {
+          "id": "opt_2caa873c8518",
+          "text": "Memarahi"
+        }
+      ]
+    },
+    {
+      "id": "B2-16",
+      "band": "B2",
+      "number": 16,
+      "word": "ashamed",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_6f4948470e41",
+          "text": "Kecewa"
+        },
+        {
+          "id": "opt_a2760bf27565",
+          "text": "Lega"
+        },
+        {
+          "id": "opt_8e294935c750",
+          "text": "Iri"
+        },
+        {
+          "id": "opt_d82fded572e0",
+          "text": "Malu"
+        }
+      ]
+    },
+    {
+      "id": "B2-17",
+      "band": "B2",
+      "number": 17,
+      "word": "purchase",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_6f3ceb3cd983",
+          "text": "Pembelian"
+        },
+        {
+          "id": "opt_202d29e6f617",
+          "text": "Pengejaran"
+        },
+        {
+          "id": "opt_cdebbf042fc9",
+          "text": "Tambahan"
+        },
+        {
+          "id": "opt_783a5c88d114",
+          "text": "Penjualan"
+        }
+      ]
+    },
+    {
+      "id": "B2-18",
+      "band": "B2",
+      "number": 18,
+      "word": "wound",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_c9bd9ee75e94",
+          "text": "Demam"
+        },
+        {
+          "id": "opt_ce2b57af68ca",
+          "text": "Luka"
+        },
+        {
+          "id": "opt_64d3c6e4ab49",
+          "text": "Pilek"
+        },
+        {
+          "id": "opt_49f3f2a42600",
+          "text": "Batuk"
+        }
+      ]
+    },
+    {
+      "id": "B2-19",
+      "band": "B2",
+      "number": 19,
+      "word": "insist",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_7110907ff8f7",
+          "text": "Mengeluh"
+        },
+        {
+          "id": "opt_5ad34891fd60",
+          "text": "Berjanji"
+        },
+        {
+          "id": "opt_f34c58fc1488",
+          "text": "Menyerah"
+        },
+        {
+          "id": "opt_6c3504e0ddd1",
+          "text": "Menegaskan"
+        }
+      ]
+    },
+    {
+      "id": "B2-20",
+      "band": "B2",
+      "number": 20,
+      "word": "sincere",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_083ff89b3084",
+          "text": "Munafik"
+        },
+        {
+          "id": "opt_f8b8341f6d60",
+          "text": "Licik"
+        },
+        {
+          "id": "opt_4601c4473d1e",
+          "text": "Tulus"
+        },
+        {
+          "id": "opt_b1be2849c2de",
+          "text": "Pelupa"
+        }
+      ]
+    },
+    {
+      "id": "C1-01",
+      "band": "C1",
+      "number": 1,
+      "word": "outbreak",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_4ed89f885a70",
+          "text": "Wabah"
+        },
+        {
+          "id": "opt_1499bb24ae14",
+          "text": "Penularan"
+        },
+        {
+          "id": "opt_fa78233da80f",
+          "text": "Peradangan"
+        },
+        {
+          "id": "opt_b2bd25ff2642",
+          "text": "Kekebalan"
+        }
+      ]
+    },
+    {
+      "id": "C1-02",
+      "band": "C1",
+      "number": 2,
+      "word": "coastal",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_f368e19f113b",
+          "text": "Pegunungan"
+        },
+        {
+          "id": "opt_935f7e64648f",
+          "text": "Pedalaman"
+        },
+        {
+          "id": "opt_74accaca1786",
+          "text": "Perkotaan"
+        },
+        {
+          "id": "opt_40c2d8e2f703",
+          "text": "Pesisir"
+        }
+      ]
+    },
+    {
+      "id": "C1-03",
+      "band": "C1",
+      "number": 3,
+      "word": "viable",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_698b2c89ad2e",
+          "text": "Mustahil"
+        },
+        {
+          "id": "opt_eead138506ec",
+          "text": "Berisiko"
+        },
+        {
+          "id": "opt_0c0cb4c5a60f",
+          "text": "Layak"
+        },
+        {
+          "id": "opt_2599e9b66ffb",
+          "text": "Rumit"
+        }
+      ]
+    },
+    {
+      "id": "C1-04",
+      "band": "C1",
+      "number": 4,
+      "word": "merchant",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_b305ccdf3266",
+          "text": "Pedagang"
+        },
+        {
+          "id": "opt_f9eca0b208d2",
+          "text": "Nelayan"
+        },
+        {
+          "id": "opt_d33c9a952601",
+          "text": "Pengrajin"
+        },
+        {
+          "id": "opt_955e780cf283",
+          "text": "Petani"
+        }
+      ]
+    },
+    {
+      "id": "C1-05",
+      "band": "C1",
+      "number": 5,
+      "word": "prescribe",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_b49f2b62fbc4",
+          "text": "Mengobati"
+        },
+        {
+          "id": "opt_4ac0d6aac552",
+          "text": "Meresepkan"
+        },
+        {
+          "id": "opt_5d1c2bd4913c",
+          "text": "Menyuntik"
+        },
+        {
+          "id": "opt_f2b98559237e",
+          "text": "Memeriksa"
+        }
+      ]
+    },
+    {
+      "id": "C1-06",
+      "band": "C1",
+      "number": 6,
+      "word": "pond",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_423e63178c94",
+          "text": "Kolam"
+        },
+        {
+          "id": "opt_712cb6db38d8",
+          "text": "Sumur"
+        },
+        {
+          "id": "opt_a49d29ff5060",
+          "text": "Rawa"
+        },
+        {
+          "id": "opt_e12d38d6bcdf",
+          "text": "Parit"
+        }
+      ]
+    },
+    {
+      "id": "C1-07",
+      "band": "C1",
+      "number": 7,
+      "word": "legitimate",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_f4e71cb661d3",
+          "text": "Mewah"
+        },
+        {
+          "id": "opt_88e9b8cba867",
+          "text": "Sah"
+        },
+        {
+          "id": "opt_602f777b769f",
+          "text": "Rahasia"
+        },
+        {
+          "id": "opt_62b697a3f9f4",
+          "text": "Palsu"
+        }
+      ]
+    },
+    {
+      "id": "C1-08",
+      "band": "C1",
+      "number": 8,
+      "word": "warehouse",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_a9ae9fbd20ba",
+          "text": "Bengkel"
+        },
+        {
+          "id": "opt_ce9cbf935d2d",
+          "text": "Toko"
+        },
+        {
+          "id": "opt_2cc0d948dc87",
+          "text": "Gudang"
+        },
+        {
+          "id": "opt_0ccad0fe9627",
+          "text": "Pasar"
+        }
+      ]
+    },
+    {
+      "id": "C1-09",
+      "band": "C1",
+      "number": 9,
+      "word": "kidney",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_66599c0210c2",
+          "text": "Usus"
+        },
+        {
+          "id": "opt_77ff608e5765",
+          "text": "Ginjal"
+        },
+        {
+          "id": "opt_52d9e739486c",
+          "text": "Paru-paru"
+        },
+        {
+          "id": "opt_79d5a9c83e8a",
+          "text": "Lambung"
+        }
+      ]
+    },
+    {
+      "id": "C1-10",
+      "band": "C1",
+      "number": 10,
+      "word": "dam",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_d4e4a2ff2fbc",
+          "text": "Jembatan"
+        },
+        {
+          "id": "opt_9b68938305cd",
+          "text": "Pelabuhan"
+        },
+        {
+          "id": "opt_2f09391e4c2c",
+          "text": "Menara"
+        },
+        {
+          "id": "opt_22a96dc9d9ff",
+          "text": "Bendungan"
+        }
+      ]
+    },
+    {
+      "id": "C1-11",
+      "band": "C1",
+      "number": 11,
+      "word": "intact",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_bd2fe89b1c70",
+          "text": "Kotor"
+        },
+        {
+          "id": "opt_c1e00f3f0489",
+          "text": "Kosong"
+        },
+        {
+          "id": "opt_40266451af65",
+          "text": "Utuh"
+        },
+        {
+          "id": "opt_0c47ceeaf2d7",
+          "text": "Berkarat"
+        }
+      ]
+    },
+    {
+      "id": "C1-12",
+      "band": "C1",
+      "number": 12,
+      "word": "expenditure",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_87cd0e4205c7",
+          "text": "Pengeluaran"
+        },
+        {
+          "id": "opt_a29449e9f4fa",
+          "text": "Penagihan"
+        },
+        {
+          "id": "opt_eea352a52749",
+          "text": "Pemasukan"
+        },
+        {
+          "id": "opt_2e3fdb0a892f",
+          "text": "Penghematan"
+        }
+      ]
+    },
+    {
+      "id": "C1-13",
+      "band": "C1",
+      "number": 13,
+      "word": "injection",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_de4e9916bbbe",
+          "text": "Kapsul"
+        },
+        {
+          "id": "opt_a8e1ad3ac9c5",
+          "text": "Perban"
+        },
+        {
+          "id": "opt_dac5963a829f",
+          "text": "Salep"
+        },
+        {
+          "id": "opt_674288137fa2",
+          "text": "Suntikan"
+        }
+      ]
+    },
+    {
+      "id": "C1-14",
+      "band": "C1",
+      "number": 14,
+      "word": "nest",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_1a544a80a771",
+          "text": "Telur"
+        },
+        {
+          "id": "opt_2c941ce59980",
+          "text": "Sarang"
+        },
+        {
+          "id": "opt_a6f75007acd3",
+          "text": "Kandang"
+        },
+        {
+          "id": "opt_bab9b79b8a10",
+          "text": "Bulu"
+        }
+      ]
+    },
+    {
+      "id": "C1-15",
+      "band": "C1",
+      "number": 15,
+      "word": "adjacent",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_64e49f0e2b79",
+          "text": "Berjauhan"
+        },
+        {
+          "id": "opt_4cc99418250a",
+          "text": "Bertumpuk"
+        },
+        {
+          "id": "opt_a1837b88a2ed",
+          "text": "Berseberangan"
+        },
+        {
+          "id": "opt_d5f779e46bcd",
+          "text": "Bersebelahan"
+        }
+      ]
+    },
+    {
+      "id": "C1-16",
+      "band": "C1",
+      "number": 16,
+      "word": "burden",
+      "pos": "noun",
+      "posLabel": "kata benda",
+      "options": [
+        {
+          "id": "opt_1f776fe8cd96",
+          "text": "Keuntungan"
+        },
+        {
+          "id": "opt_e73763ffa0d9",
+          "text": "Bantuan"
+        },
+        {
+          "id": "opt_888e9e949afd",
+          "text": "Beban"
+        },
+        {
+          "id": "opt_844286318123",
+          "text": "Hadiah"
+        }
+      ]
+    },
+    {
+      "id": "C1-17",
+      "band": "C1",
+      "number": 17,
+      "word": "bleed",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_c0089150f698",
+          "text": "Menggigil"
+        },
+        {
+          "id": "opt_4354088d0ee6",
+          "text": "Berdarah"
+        },
+        {
+          "id": "opt_d8e4d690e371",
+          "text": "Membengkak"
+        },
+        {
+          "id": "opt_f256306958c1",
+          "text": "Bernanah"
+        }
+      ]
+    },
+    {
+      "id": "C1-18",
+      "band": "C1",
+      "number": 18,
+      "word": "harvest",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_66c7e57fa16e",
+          "text": "Menanam"
+        },
+        {
+          "id": "opt_ac302b82627a",
+          "text": "Menyiram"
+        },
+        {
+          "id": "opt_2fb4c146a2c6",
+          "text": "Memanen"
+        },
+        {
+          "id": "opt_e1cc2c4d7e7e",
+          "text": "Memupuk"
+        }
+      ]
+    },
+    {
+      "id": "C1-19",
+      "band": "C1",
+      "number": 19,
+      "word": "fragile",
+      "pos": "adjective",
+      "posLabel": "kata sifat",
+      "options": [
+        {
+          "id": "opt_98dd3799cd71",
+          "text": "Rapuh"
+        },
+        {
+          "id": "opt_139e56e62f79",
+          "text": "Kuno"
+        },
+        {
+          "id": "opt_3343e9df94ac",
+          "text": "Ringan"
+        },
+        {
+          "id": "opt_043cbf76b16d",
+          "text": "Tajam"
+        }
+      ]
+    },
+    {
+      "id": "C1-20",
+      "band": "C1",
+      "number": 20,
+      "word": "deteriorate",
+      "pos": "verb",
+      "posLabel": "kata kerja",
+      "options": [
+        {
+          "id": "opt_6dc416209f71",
+          "text": "Membaik"
+        },
+        {
+          "id": "opt_e3ef6ab22c20",
+          "text": "Menyebar"
+        },
+        {
+          "id": "opt_fc65aa80394e",
+          "text": "Menghilang"
+        },
+        {
+          "id": "opt_4013b166b03c",
+          "text": "Memburuk"
+        }
+      ]
+    }
+  ]
+}

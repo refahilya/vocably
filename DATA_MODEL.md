@@ -48,7 +48,7 @@ lewat field `role`), `docId` = Firebase Auth `uid`.
 | `name` | string | |
 | `role` | string enum | `"siswa"` \| `"guru"` — **lihat alur assignment di bawah, ditegakkan lewat security rules, bukan server function** |
 | `createdAt` | Timestamp | |
-| `cefrLevel` | string enum \| null | **hanya untuk siswa** — hasil placement test (`A1`–`C2`, lihat catatan cakupan di §2), `null` kalau belum tes |
+| `cefrLevel` | string enum \| null | **hanya untuk siswa** — hasil placement test (`A1`–`C2`, lihat catatan cakupan di §2), `null` kalau belum tes. **Hanya untuk tampilan/personalisasi**: siswa boleh mengubahnya sendiri (§1 poin 5), jadi **tidak pernah** menentukan band riset maupun kelayakan tes (band riset ada di `researchParticipants`, §6b) |
 | `placementTestCompleted` | boolean | **hanya untuk siswa** — default `false` |
 | `placementTestPrompted` | boolean | **hanya untuk siswa** — default `false`; di-set `true` begitu tawaran placement test otomatis pernah ditampilkan sekali. **Ini mekanisme yang menegakkan aturan "kalau siswa menunda, tawaran tidak muncul lagi"** (SPEC §3.1) — tanpa field ini, aplikasi tidak punya cara membedakan "belum pernah ditawari" dari "sudah ditawari tapi ditunda", karena `placementTestCompleted` tetap `false` di kedua kasus |
 | `teacherCodeInput` | string \| absent | **hanya untuk guru** — kode akses yang diketik saat sign up, **disimpan permanen sebagai audit trail** (bukan field sementara). Lihat catatan di bawah |
@@ -62,8 +62,8 @@ lewat field `role`), `docId` = Firebase Auth `uid`.
 > **Catatan persiapan responden penelitian:** Skema `users` saat ini hanya
 > mencatat `name` dan `email`. Jika analisis kohort skripsi membutuhkan data
 > identifikasi spesifik (seperti kelas, NISN, atau asal sekolah), field ini
-> perlu ditambahkan ke skema dan form pendaftaran sebelum 60 siswa responden
-> didaftarkan.
+> perlu ditambahkan ke skema dan form pendaftaran sebelum 35–40 siswa
+> responden didaftarkan.
 
 > **Soal `teacherCodeInput` disimpan permanen:** di Firestore tidak ada
 > mekanisme "field yang divalidasi tapi tidak ikut tersimpan" — apa pun yang
@@ -474,7 +474,7 @@ sebagai jaminan bahwa data ini pasti sah.
 **Ini diterima sebagai keterbatasan arsitektur** — sepadan dengan trade-off
 yang sudah diterima di §10.5 untuk alasan yang sama (tidak ada billing untuk
 Cloud Functions/App Check yang bisa memvalidasi keaslian sisi server). Skala
-penelitian ini (~60 siswa di lingkungan kelas) membuat insentif untuk
+penelitian ini (~35–40 siswa di lingkungan kelas) membuat insentif untuk
 melakukan ini rendah, dan memperbaikinya butuh infrastruktur server yang
 saat ini di luar anggaran. Kalau validitas data ini kelak jadi masalah nyata
 saat analisis skripsi, mitigasi paling ringan adalah audit manual (mis. cari
@@ -725,28 +725,124 @@ update `users.cefrLevel` + `users.placementTestCompleted`.
 > satu-satunya jalan masuk berikutnya adalah entry point di dashboard, yang
 > selalu tersedia baik untuk mengambil pertama kali maupun mengambil ulang.
 
-## 6b. `researchAssessmentResults` — Status: TBD (placeholder)
+## 6b. Riset Pre/Post Test — `researchParticipants`, `researchAssessmentResults`, `researchInstrument` (M2a: rules + uji emulator; BELUM di-deploy)
 
 Collection untuk modul riset **Pre-Test & Post-Test** (SPEC §3.7) —
 **terpisah total dari `placementTestResults`** (tujuan, alur, dan
 kepemilikan data beda — lihat tabel perbandingan di `SPEC.md` §3.7).
 
-> **Instrumen belum divalidasi — jangan implementasikan isi soal/skoring.**
-> Skema di bawah sengaja generik supaya instrumen final bisa dipasang tanpa
-> redesign collection.
+> **Status (research Milestone 2a):** skema di bawah sudah **ditegakkan oleh
+> `firestore.rules`** dan diuji otomatis terhadap **Firestore Emulator
+> lokal** (`tools/research`, `npm run test:rules`, 70 test). **Rules ini
+> belum di-deploy ke produksi**, dan **belum ada kode Flutter** yang membaca
+> atau menulis collection ini (layar tes masih placeholder). Tooling peneliti
+> yang menulis `researchParticipants`/`researchInstrument` di produksi juga
+> **belum dibangun**. Placement test tetap ditunda.
+
+**Model kepercayaan (Spark, tanpa Cloud Functions):** dokumen
+`researchParticipants` dan `researchInstrument` **hanya** ditulis oleh
+tooling peneliti lokal (Admin SDK, melewati rules); client tidak pernah bisa
+menulisnya. Siswa sendiri yang membuat dan mengisi `researchAssessmentResults`
+miliknya, dengan setiap tulisan divalidasi rules. **Tidak pernah disimpan di
+dokumen yang bisa dibaca client:** kunci jawaban, penanda benar/salah, kode
+B/S/T/K, skor.
+
+### `researchParticipants/{uid}` — hanya tooling peneliti yang menulis
 
 | Field | Tipe | Keterangan |
 |---|---|---|
-| `studentId` | string | |
-| `type` | string enum | `"preTest"` \| `"postTest"` — satu collection untuk keduanya |
-| `responses` | map \| TBD | **placeholder generik** untuk jawaban/hasil — bentuk persis menunggu instrumen final. Sengaja tidak di-strict-type dulu |
-| `startedAt` | Timestamp | |
-| `completedAt` | Timestamp \| null | |
+| (docId) | uid Firebase | **Identitas yang bisa ditautkan ke orang** — tidak pernah diekspor |
+| `researchId` | string | ID pseudonim acak; satu-satunya ID di ekspor |
+| `band` | `"A2" \| "B1" \| "B2" \| "C1"` | Ditetapkan peneliti selama placement ditunda. **Bukan dari `users.cefrLevel`**, dan mapping level→band di PDF **tidak** diimplementasikan |
+| `bandSource` | string | mis. `"researcher_assigned"` |
+| `instrumentVersion` | string | `"v1"` |
+| `authorizedAttempts` | map `{preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. Posttest dibuka peneliti setelah sesi treatment ke-4; retake = peneliti menaikkan angka ini |
+| `cohort` | string | `study` / `pilot` / `test` |
+| `createdAt`, `updatedAt` | Timestamp | |
 
-> Kenapa satu collection dengan field `type`? Karena instrumennya
-> kemungkinan besar sama, cuma diambil di waktu berbeda. Kalau nanti
-> ternyata benar-benar berbeda bentuk, pertimbangkan pemisahan saat itu —
-> jangan dipisah dari awal tanpa kebutuhan konkret.
+Rules: pemilik boleh `get` dokumennya sendiri; tidak ada `list`; create /
+update / delete dari client **selalu ditolak**.
+
+### `researchInstrument/{version}_{band}` — data bank publik untuk rules
+
+`{ instrumentVersion, band, optionIds: {itemId: [4 ID opsi]}, optionTexts:
+{itemId: {optionId: teks}}, sourceBankSha256 }` — salinan data **publik** dari
+`assets/research/instrument_v1.json` (§6c), dibangun oleh
+`tools/research/lib/instrumentDocs.js`. **Tanpa kunci jawaban.** Dipakai rules
+lewat `get()` untuk memvalidasi ID opsi dan teks opsi (literal sebesar ini di
+dalam rules melampaui batas 1000 ekspresi per request). Client tidak boleh
+membaca maupun menulisnya. Kalau dokumennya tidak ada, pembuatan percobaan
+dan penyimpanan jawaban **gagal tertutup**. **Wajib di-seed oleh tooling
+peneliti sebelum rules ini di-deploy.**
+
+### `researchAssessmentResults/{uid}_{stage}_{n}` — satu percobaan tes
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `studentId` | string (uid) | Harus = `request.auth.uid` dan cocok dengan docId; tidak pernah diekspor |
+| `stage` | `"preTest" \| "postTest"` | |
+| `attemptNumber` | int ≥ 1 | Harus = `authorizedAttempts[stage]` milik peserta |
+| `band`, `instrumentVersion` | string | Harus = milik peserta |
+| `itemOrder` | list (20) | Urutan soal yang ditampilkan; tepat 20 butir band itu |
+| `optionOrder` | map itemId → list (4) | Urutan 4 opsi yang ditampilkan; tiap list = permutasi 4 ID opsi bank untuk butir itu. `dont_know` tidak termasuk (selalu tampil terakhir) |
+| `responses` | map itemId → `{optionId, optionText, displayPosition, answeredAt}` | `optionId` = ID opsi bank **atau** `"dont_know"` (posisi 5, teks "Saya tidak tahu kata ini"); `optionText` = teks bank persis; `answeredAt` = waktu server. **Butir yang tidak dijawab tidak punya entri** — ekspor nanti mengodekannya K |
+| `lastAnsweredItemId` | string \| null | Butir yang ditulis pada tulisan terakhir (pembantu rules) |
+| `status` | `"in_progress" \| "completed" \| "voided"` | `voided` hanya oleh tooling peneliti. "Tidak selesai" = tetap `in_progress` (tidak pernah otomatis `completed`) |
+| `startedAt`, `updatedAt`, `completedAt` | Timestamp | Semua = `request.time` (waktu server); `completedAt` null sampai selesai |
+| `voidReason`, `voidedAt` | string, Timestamp | Hanya tooling peneliti (insiden teknis) |
+
+Yang ditegakkan rules:
+- **Baca:** percobaan yang sudah ada hanya oleh UID yang tersimpan di
+  dalamnya (`studentId`); percobaan yang belum ada hanya kalau docId-nya
+  **persis** salah satu ID percobaan yang sedang diotorisasi untuk pemanggil
+  (untuk cek "ada percobaan untuk dilanjutkan?"). UID tidak pernah dipakai
+  sebagai regex atau prefix (audit keamanan 2026-10-24). Tidak ada `list`.
+- **Buat:** hanya kalau tahap itu diotorisasi (`authorizedAttempts`), nomor
+  percobaan = yang diotorisasi, band/versi = milik peserta, urutan soal &
+  opsi valid terhadap bank, `responses` kosong, status `in_progress`,
+  timestamp server, field persis sesuai daftar (field asing seperti `score`
+  / `isCorrect` ditolak). Posttest juga mensyaratkan pretest yang
+  diotorisasi sudah `completed`. Dokumen yang sudah ada tidak bisa ditimpa.
+- **Jawab:** satu jawaban baru per tulisan, untuk butir percobaan ini yang
+  **belum dijawab** (maju-saja: jawaban tersimpan tidak bisa diubah); ID
+  opsi harus salah satu opsi yang ditampilkan untuk butir itu (atau
+  `dont_know`), teks & posisi harus cocok; hanya selama `in_progress` dan
+  hanya pada percobaan yang saat ini diotorisasi (percobaan lama membeku).
+- **Selesai:** hanya kalau ke-20 butir sudah dijawab; `completedAt` waktu
+  server; setelah `completed` tidak ada perubahan apa pun.
+- **Hapus:** selalu ditolak.
+
+Yang **tidak** bisa dijamin rules (client tidak dipercaya): keacakan
+pengacakan, bahwa urutan yang tersimpan benar-benar yang ditampilkan,
+siapa yang sebenarnya menjawab / tanpa bantuan, dan jeda posttest — diawasi
+saat pelaksanaan dan ditandai saat ekspor.
+
+> **Retensi data (D5):** kebijakan retensi serta penghapusan/pengarsipan
+> data riset di Firestore **harus difinalkan sebelum pengambilan data
+> responden sungguhan**. Belum ada data riset di produksi.
+
+## 6c. Bank soal riset — aset statis, bukan Firestore (Milestone 1 modul riset)
+
+Soal Pre/Post Test dibaca dari **`assets/research/instrument_v1.json`**,
+bukan dari Firestore. File ini di-generate (dan divalidasi) dari PDF
+instrumen peneliti oleh `tools/research/bin/build_instrument.js` —
+jangan diedit manual. Skema lengkap & prosedurnya di
+`tools/research/README.md`; ringkasnya:
+
+| Field | Keterangan |
+|---|---|
+| `instrumentVersion` | `"v1"` |
+| `source` | judul, nama file, dan SHA-256 PDF sumber |
+| `dontKnowOption` | `{ id: "dont_know", text: "Saya tidak tahu kata ini" }` — pilihan terpisah, bukan salah satu opsi, tidak pernah jadi kunci |
+| `items[]` | 80 butir: `id` (`A2-01` … `C1-20`), `band`, `number`, `word`, `pos` (`noun`/`verb`/`adjective`), `posLabel`, `options[4]` berisi `{ id, text }` |
+
+- **ID opsi** = `opt_` + 12 hex dari SHA-256 (versi, ID butir, teks opsi) —
+  stabil antar-build, tidak mengungkap huruf maupun kebenaran opsi.
+- Opsi disimpan dalam urutan acuan PDF; pengacakan dilakukan saat runtime
+  (milestone berikutnya).
+- **Tanpa kunci jawaban** — tidak ada field correct/answer/key/letter/score.
+  Kunci privat (ID butir → ID opsi benar) hanya ditulis ke path eksplisit
+  di luar repo dan di luar OneDrive, dan tidak pernah dibaca oleh app.
 
 ## 7. Ringkasan Relasi
 
@@ -754,7 +850,8 @@ kepemilikan data beda — lihat tabel perbandingan di `SPEC.md` §3.7).
 users (siswa) ──1:N── learningProgress ──N:1── vocabWords
 users (siswa) ──1:N── learningSessions
 users (siswa) ──1:N── placementTestResults        (TBD)
-users (siswa) ──1:N── researchAssessmentResults    (TBD)
+users (siswa) ──1:1── researchParticipants ──1:N── researchAssessmentResults  (rules M2a, belum deploy)
+researchInstrument (data bank publik, per versi+band) ← dibaca rules lewat get()
 users (guru)  ──1:N── targetWordSets ──N:N── vocabWords (via wordIds)
 users (guru)  ──1:N── vocabWords (via addedByTeacherId, kalau source="guru")
 vocabWords    ──N:N── topics (via vocabWords.topics, merujuk ke topics.name)
@@ -777,7 +874,8 @@ kasih link auto-generate index saat query pertama gagal, cukup diikuti):
   order by `endAt` (lihat query di §5)
 - `topics` order by `name` asc (daftar pilihan topik di UI guru)
 - `vocabWords` filter by `updatedAt` range (query delta bundle, §11)
-- `researchAssessmentResults` filter by `studentId` + `type` (TBD)
+- `researchAssessmentResults` — **tidak butuh index**: dibaca per docId
+  deterministik (`{uid}_{stage}_{n}`), query `list` ditolak rules.
 
 > **Dihapus di v6:** index `vocabWords` untuk `cefrLevel + topics
 > array-contains` dan `cefrLevel + posList array-contains`. Ketiga mode
@@ -796,7 +894,8 @@ kompatibel untuk ditambah nanti:
 - Target per-siswa individual → isi `targetWordSets.targetStudentIds`
   dengan daftar `uid` alih-alih `[kAllStudents]`; query di §5 sudah
   menanganinya tanpa perubahan.
-- Placement Test & Pre-Test/Post-Test → skema §6 dan §6b sengaja generik.
+- Placement Test → skema §6 sengaja generik (masih ditunda). Pre/Post Test
+  → skema §6b sudah ditetapkan di rules (M2a).
 - Kode akses guru per-individu / single-use → tinggal tambah
   `maxUses`/`usedCount` di §2c, atau satu dokumen kode per guru.
 - Kalau suatu saat billing tersedia dan mau pindah ke Cloud Functions,
@@ -1125,8 +1224,11 @@ Dipanggil dari dua tempat:
 - **Cloze test** (SPEC §5.2) — tidak butuh AI; blank diturunkan dari
   penanda di `storyContent` dan pencocokan jawaban cuma perbandingan string
   di client.
-- **Skoring Placement Test / Pre-Test / Post-Test** — dihitung di client
-  (§6).
+- **Skoring Placement Test** — dihitung di client (§6), begitu metodenya
+  diputuskan (masih ditunda).
+- **Skoring Pre-Test / Post-Test** — **tidak** di app sama sekali:
+  dilakukan offline oleh peneliti dengan kunci jawaban privat yang tidak
+  pernah masuk app/Firestore/Worker (§6b, `tools/research/README.md`).
 - **Validasi kode akses guru** — Firestore Security Rules (§1).
 
 ### 10.4 Setup & Deploy (ringkas)
@@ -1151,7 +1253,7 @@ Development lokal: `npx wrangler dev`.
 - Cold start Workers praktis nol (beda dengan Cloud Functions Node.js yang
   bisa 2–5 detik saat idle) — ini keuntungan.
 - Kuota gratis (100.000 request/hari) jauh di atas kebutuhan skala skripsi
-  (~60 siswa × beberapa panggilan AI per sesi) — dan kalau lewat kuota,
+  (~35–40 siswa × beberapa panggilan AI per sesi) — dan kalau lewat kuota,
   request cuma gagal, tidak ada risiko tagihan mendadak seperti Blaze.
 
 ## 11. Distribusi Bank Kosakata sebagai Aset Statis (baru di v6)
@@ -1161,14 +1263,16 @@ Development lokal: `npx wrangler dev`.
 Firebase plan Spark membatasi **50.000 pembacaan dokumen per hari**, dan
 biayanya dihitung **per dokumen**, bukan per query. Bank kosakata berisi
 ~5.000 dokumen, kira-kira ~1.000 kata per level CEFR. Kalau browse membaca
-dari Firestore, satu siswa membuka satu level = ~1.000 pembacaan. 60 siswa
-× sekali saja = 60.000 → kuota habis sebelum jam istirahat, dan aplikasi
-berhenti melayani sampai reset harian. Itu belum menghitung perpindahan
+dari Firestore, satu siswa membuka satu level = ~1.000 pembacaan. 40 siswa
+(batas atas rencana sampel 35–40) × sekali saja = ~40.000 → sudah
+mendekati batas 50.000/hari dari satu kali buka saja, dan sekali pindah
+level atau buka ulang kuota habis, aplikasi berhenti melayani sampai reset
+harian. Itu belum menghitung perpindahan
 level, buka ulang, dan `get()` di dalam security rules yang juga dihitung
 sebagai pembacaan.
 
-Penulisan tidak bermasalah: ~20 tulis per sesi belajar × 60 siswa ≈
-1.200/hari, jauh di bawah batas 20.000.
+Penulisan tidak bermasalah: ~20 tulis per sesi belajar × 40 siswa ≈
+800/hari, jauh di bawah batas 20.000.
 
 ### 11.2 Pendekatan
 

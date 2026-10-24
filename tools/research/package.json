@@ -1,0 +1,16 @@
+{
+  "name": "vocably-research-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Developer-side research tooling for Vocably (pretest/posttest instrument bank + private answer key). Not part of the Flutter app; never shipped, never run at app runtime.",
+  "type": "commonjs",
+  "scripts": {
+    "build:instrument": "node bin/build_instrument.js",
+    "test": "node --test",
+    "test:rules": "node bin/run_rules_tests.js"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase": "12.19.0"
+  }
+}

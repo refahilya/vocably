@@ -19,9 +19,11 @@ membaca cerita yang di-generate AI, cloze test, lalu co-write cerita bersama
 AI — untuk sekumpulan kata target.
 
 Vocably juga berfungsi ganda sebagai **instrumen penelitian skripsi** —
-selain fitur belajar utama, ada modul Placement Test (personalisasi level) dan
-modul riset Pre-Test/Post-Test (pengukuran data penelitian) yang statusnya
-masih dalam perancangan — lihat bagian 10.
+selain fitur belajar utama, ada modul Placement Test (personalisasi level,
+**ditunda**) dan modul riset Pre-Test/Post-Test (pengukuran data
+penelitian). Instrumen Pre/Post Test sudah dirancang (PDF peneliti) dan bank
+soalnya sudah tersedia sebagai aset; fitur tesnya di aplikasi belum dibangun
+— lihat bagian 10.
 
 Ini adalah **pengembangan kedua** dari nol. Versi pertama (Flutter for Android,
 ~80% jadi) di-deprecate karena requirement berubah signifikan. Versi pertama
@@ -43,7 +45,7 @@ komponen disesuaikan untuk web, bukan disalin persis. Detail di
 - **Database & Auth:** Firebase (Firestore + Firebase Auth), **plan Spark
   (gratis)** — tidak perlu upgrade Blaze/billing account sama sekali.
 - **Deployment app:** Firebase Hosting via `web.app` (free tier). **Catatan audit:** konfigurasi blok `"hosting"` di `firebase.json` belum dibuat (baru ada `"firestore"`). Blok hosting dengan `public: "build/web"` dan SPA rewrite ke `/index.html` harus ditambahkan sebelum `firebase deploy`.
-- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (484 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
+- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (486 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
 - **Build web produksi:** `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`.
 - **AI proxy: Cloudflare Workers** (bukan Firebase Cloud Functions — diganti karena kendala billing/kartu kredit untuk Blaze plan). Ini **repo/project terpisah** dari Flutter app (TypeScript, deploy sendiri via `wrangler`, free tier tanpa kartu kredit, 100.000 request/hari). Satu-satunya alasan butuh proxy ini: **API key ChatGPT tidak boleh ada di client**. Worker ini yang menyimpan `OPENAI_API_KEY` dan meneruskan panggilan AI. Detail arsitektur lengkap di `DATA_MODEL.md` §10.
 - **AI generation:** ChatGPT API — **selalu dipanggil lewat Cloudflare Worker**. Endpoint yang tersedia: `POST /generate-story`, `POST /cowrite-turn`, `POST /translate` (kontrak lengkap di `DATA_MODEL.md` §10.2).
@@ -66,8 +68,8 @@ lib/
       vocab_browser/   # 3 mode: abjad, tema, POS — semua difilter di memori
       learning_flow/   # 3 fase: read, cloze, co-write
       history/         # 2 tab: per kata, per sesi
-      placement_test/  # scaffold saja untuk sekarang — lihat bagian 10
-      research_assessment/  # scaffold saja untuk sekarang — pre-test & post-test, lihat bagian 10
+      placement_test/  # scaffold saja (placement test ditunda) — lihat bagian 10
+      research_assessment/  # masih placeholder — layar pre-test & post-test belum dibangun, lihat bagian 10
     teacher/
       dashboard/
       target_words/
@@ -78,6 +80,11 @@ lib/
 
 assets/
   vocab/            # vocab_a1.json … vocab_c1.json — bundle bank kosakata (§11 DATA_MODEL)
+  research/         # instrument_v1.json — bank soal Pre/Post Test, TANPA kunci jawaban (bagian 10)
+
+tools/              # skrip sisi dev, tidak ikut ter-bundle ke app
+  vocab_import/     # pipeline CSV Oxford → Firestore + bundle aset (§7 Milestone 4)
+  research/         # PDF instrumen → bank soal aman-app + kunci privat; uji rules riset di emulator (bagian 10)
 
 # REPO TERPISAH (bukan bagian dari project Flutter di atas):
 vocably-ai-worker/   # Cloudflare Worker (TypeScript) — proxy AI, lihat DATA_MODEL.md §10
@@ -158,10 +165,16 @@ dulu kalau perlu penyesuaian.
   inkonsistensi di iterasi sebelumnya.
 - Kalau requirement dari `SPEC.md` ambigu, tanyakan dulu sebelum berasumsi.
 - **Jangan pernah mengasumsikan atau mengarang sistem skoring/algoritma
-  penentuan level untuk Placement Test, atau instrumen/skema soal untuk
-  Pre-Test/Post-Test** — keduanya berstatus TBD (lihat bagian 10). Kalau
-  diminta implementasi bagian ini, tanyakan dulu apakah metodenya sudah
-  diputuskan.
+  penentuan level untuk Placement Test** — masih TBD dan ditunda (lihat
+  bagian 10). **Instrumen Pre-Test/Post-Test tidak boleh dikarang, diubah,
+  atau diparafrasekan:** satu-satunya sumber adalah PDF peneliti
+  (`Rancangan_Instrumen_Pretest_Vocably.pdf`), dan bank soalnya hanya
+  di-generate ulang lewat `tools/research/bin/build_instrument.js`.
+- **Kunci jawaban Pre/Post Test tidak boleh masuk repo, aset Flutter, kode
+  app, Firestore, Worker, log, atau pesan test.** Bank aman-app
+  (`assets/research/instrument_v1.json`) sengaja tanpa kunci; kunci privat
+  hanya ditulis ke path eksplisit di luar repo & di luar OneDrive (lihat
+  `tools/research/README.md`).
 - **Jangan pernah memberi akun siswa izin tulis ke `vocabWords`.** Bank
   kosakata read-only total untuk siswa — lihat §8. Kalau ada task yang
   sepertinya butuh siswa menulis ke sana, itu tanda ada salah paham;
@@ -238,15 +251,18 @@ dulu kalau perlu penyesuaian.
 8. **Guru:** set target kata per sesi/waktu + Edit Kata (edit topik kata
    yang sudah ada). *(Selesai, committed di `1f2b606`).*
 
-> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**484 tests passing**, `flutter test --concurrency=1`; Worker **148 tests passing**, `npx vitest run --fileParallelism=false`). Perbaikan berikutnya di `main` dan working tree:
+> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**486 tests passing**, `flutter test --concurrency=1`; Worker **148 tests passing**, `npx vitest run --fileParallelism=false`; tooling riset **46 tests passing + 2 skipped**, `cd tools/research && npm test`; rules riset **70 tests passing** di Firestore Emulator lokal, `npm run test:rules`). Perbaikan berikutnya di `main` dan working tree:
 > - `56ded8b`: Pembersihan tombol logout ganda pada dashboard siswa.
 > - `34a9c4b`: Sanitasi feedback Co-Write untuk mencegah kebocoran marker terjemahan.
 > - `fa4d52c` (`vocably`) & `6239f7e` (`vocably-ai-worker`): Perbaikan kebocoran posisi kata target pada alur Storyfier → Cloze Test (committed; Worker-nya kini ikut ter-deploy dalam versi `0bec79ee` 2026-10-16).
 > - **Co-Write Phase 1 + Phase 2 (committed di `2e175f1` / Worker `5bcb5e4`; sisi Worker SUDAH di-deploy 2026-10-16 sebagai versi `0bec79ee-2958-475e-97fe-64ababf31c9c`, dengan override `--var ALLOWED_ORIGINS` sehingga `localhost:5000` tidak ikut ter-deploy; sisi Flutter belum di-hosting — `PROJECT_STATE.md` §5t):** validasi deterministik kata target (Dart `utils/cowrite_validator.dart` ⇄ Worker `src/cowriteValidator.ts`); penolakan lokal hanya untuk input yang memuat kata target sebagai kata lepas/fragmen/daftar; **fallback tiga giliran dimiliki aplikasi** (penghitung `consecutiveMissedStudentTurns`, pemilihan satu kata acak, mode `forcedWord` di `/cowrite-turn`, kata dari bot dihitung di tingkat sesi saja — tidak pernah mastery); feedback terikat ke giliran siswa saat ini; saran menulis `Coba tulis "..."`; retensi fokus/papan ketik composer. **CW-05:** kredit kosakata untuk pemakaian bermakna walau ada kesalahan grammar/tense; bentuk yang dilaporkan model (`attacked`, `"ATTACKS"`) dipetakan ke kata dasar; infleksi sesuai aturan ejaan (`attackked` ditolak); retry Worker tidak menghapus kredit siswa. **Input Indonesia/campuran:** dideteksi deterministik oleh aplikasi (`containsIndonesianWords`) → feedback pengingat singkat untuk menulis dalam bahasa Inggris, kata sah hanya untuk cakupan sesi (bukan mastery mandiri); bot selalu berbahasa Inggris dan tetap di dalam cerita. **CW-02 (feedback):** prompt memprioritaskan pemakaian kata target di giliran saat ini (bukan grammar kecil/pujian generik); feedback yang memuji klaim kata yang ditolak validasi diganti pesan netral; indikator tampilan ✓/💡/💬 diturunkan dari hasil validasi (in-memory `feedbackKind`, tidak disimpan ke Firestore, tidak memengaruhi mastery); Worker menjawab 502 bila tidak ada `aiTurn` yang dapat diterima. Detail: `SPEC.md` §5.3, `DATA_MODEL.md` §10.2, `PROJECT_STATE.md` §5p–§5s.
 >
-> - **Pilih kata Difficult untuk "Pelajari Kembali" (working tree, belum di-commit, Flutter saja):** siswa mencentang kata difficult yang ingin dipelajari ulang (awalnya kosong, Pilih Semua / Batalkan Pilihan, "Pelajari Kembali (N kata)", tanpa batas jumlah); hanya kata yang masih `difficult` yang dikirim; Riwayat memuat ulang datanya setelah kembali dari sesi. Menggantikan Keputusan 2 Milestone 7 — `PROJECT_STATE.md` §5u.
+> - **Pilih kata Difficult untuk "Pelajari Kembali" (committed di `6423dd2`, Flutter saja):** siswa mencentang kata difficult yang ingin dipelajari ulang (awalnya kosong, Pilih Semua / Batalkan Pilihan, "Pelajari Kembali (N kata)", tanpa batas jumlah); hanya kata yang masih `difficult` yang dikirim; Riwayat memuat ulang datanya setelah kembali dari sesi. Menggantikan Keputusan 2 Milestone 7 — `PROJECT_STATE.md` §5u.
 >
-> **Langkah Selanjutnya:** Review/commit perubahan pilihan kata Difficult; jangan ikutkan origin lokal `localhost:5000` di `wrangler.jsonc` (deploy Worker berikutnya wajib memakai override `--var ALLOWED_ORIGINS` yang sama); uji E2E browser + LLM asli terhadap Worker produksi, konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, dan persiapan responden penelitian (skema demografi, pembersihan data uji, instrumen pre/post test).
+> - **Modul riset Pre/Post Test — Milestone 1 (committed bersama M2a — commit `feat: add research instrument bank and secure assessment rules`):** bank soal aman-app `assets/research/instrument_v1.json` (80 butir: A2/B1/B2/C1 × 20, 4 opsi ber-ID opaque + pilihan terpisah `dont_know`, **tanpa kunci jawaban**) di-generate dan divalidasi dari PDF instrumen oleh `tools/research/bin/build_instrument.js`; kunci privat hanya ditulis ke path eksplisit di luar repo & OneDrive — sudah di-generate peneliti (2026-10-24) di folder lokal di luar repo & OneDrive, dan terverifikasi cocok dengan build ulang dari PDF (isinya tidak pernah ditampilkan). Layar tes, penyimpanan jawaban dari Flutter, tooling peneliti, dan ekspor **belum** dibangun; placement test ditunda. Detail: `tools/research/README.md`, `PROJECT_STATE.md` §5v.
+> - **Modul riset Pre/Post Test — Milestone 2a (committed, BELUM di-deploy):** konfigurasi Firebase Emulator (`firebase.json` `emulators`) + security rules riset di `firestore.rules` + 70 uji rules di emulator lokal (termasuk regresi audit keamanan UID) (`tools/research`, `npm run test:rules`; JDK 21 portabel di `%USERPROFILE%\.vocably-dev`). Tidak ada perubahan kode Flutter. Detail: `PROJECT_STATE.md` §5w, `DATA_MODEL.md` §6b.
+>
+> **Langkah Selanjutnya:** Hapus laporan perbandingan ekstraksi privat setelah direview dan simpan cadangan privat kunci jawaban; milestone riset berikutnya (M2b) menunggu persetujuan eksplisit; sebelum pengambilan data responden masih dibutuhkan tooling peneliti (seed `researchInstrument` & `researchParticipants`), layar tes, ekspor, dan kebijakan retensi data (catatan: deploy `firestore.rules` kini juga ikut men-deploy rules riset — aman karena gagal-tertutup sampai tooling peneliti men-seed data, tapi harus keputusan sadar); jangan ikutkan origin lokal `localhost:5000` di `wrangler.jsonc` (deploy Worker berikutnya wajib memakai override `--var ALLOWED_ORIGINS` yang sama); uji E2E browser + LLM asli terhadap Worker produksi, konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, dan persiapan responden penelitian (35–40 siswa: skema demografi, pembersihan data uji, milestone berikutnya modul Pre/Post Test).
 
 ## 8. Logic Penting yang Sering Disalahpahami
 
@@ -423,29 +439,60 @@ maupun "sudah ditawari tapi menunda".
 - Firestore Security Rules — dokumentasi resmi, terutama `get()`/`exists()`
   di rules dan `diff().affectedKeys()` untuk validasi field-level
 
-## 10. Placement Test & Modul Riset (Pre-Test/Post-Test) — Status: TBD
+## 10. Placement Test & Modul Riset (Pre-Test/Post-Test)
 
 Dua fitur ini **berbeda tujuan** dan **berbeda posisi arsitektur**, jangan
 disatukan atau ditukar-tukar pemahamannya:
 
-- **Placement Test** — mekanisme aplikasi untuk personalisasi belajar
-  (menentukan `users.cefrLevel`). Sudah punya alur/entry-point di
-  `SPEC.md` §3.1 dan §3.2, tapi **detail teknis penilaian & algoritma
-  penentuan level CEFR-nya masih TBD** — jangan diasumsikan atau dibuatkan
-  sistem skoring sendiri. Begitu metodenya diputuskan, skoring **dihitung di
+- **Placement Test — Status: TBD, ditunda.** Mekanisme aplikasi untuk
+  personalisasi belajar (menentukan `users.cefrLevel`). Sudah punya
+  alur/entry-point di `SPEC.md` §3.1 dan §3.2, tapi **detail teknis
+  penilaian & algoritma penentuan level CEFR-nya masih TBD** — jangan
+  diasumsikan atau dibuatkan sistem skoring sendiri. Implementasinya
+  **ditunda** dan **bukan prasyarat** untuk mengembangkan & menguji Pre/Post
+  Test. Begitu metodenya diputuskan, skoring placement **dihitung di
   client** (tidak ada logic rahasia yang perlu disembunyikan), dengan
   jawaban mentah tetap disimpan ke Firestore supaya bisa diverifikasi ulang
   saat analisis skripsi.
-- **Pre-Test / Post-Test** — instrumen pengambilan data penelitian skripsi
-  (mengukur kemampuan kosakata siswa sebelum & sesudah pakai Vocably),
-  awalnya direncanakan pakai Google Forms tapi diarahkan pembimbing untuk
-  jadi satu kesatuan di dalam aplikasi. **Instrumennya masih disusun &
-  belum divalidasi** — lihat `SPEC.md` §3.7.
+- **Pre-Test / Post-Test — instrumen sudah dirancang; fitur app belum
+  dibangun.** Instrumen pengambilan data penelitian skripsi (mengukur
+  kemampuan kosakata siswa sebelum & sesudah pakai Vocably), awalnya
+  direncanakan pakai Google Forms tapi diarahkan pembimbing untuk jadi satu
+  kesatuan di dalam aplikasi.
+  - **Sumber tunggal instrumen:** PDF peneliti
+    `Rancangan_Instrumen_Pretest_Vocably.pdf` (tidak disimpan di repo karena
+    memuat kunci jawaban). 4 band (A2, B1, B2, C1) × 20 butir pilihan ganda:
+    4 opsi arti bahasa Indonesia + "Saya tidak tahu kata ini". Pretest &
+    posttest memakai 20 butir yang sama per siswa; posttest **segera setelah
+    sesi treatment ke-4** (4 sesi × 5 kata, alur Storyfier → Cloze →
+    Co-Write). Rencana sampel **35–40 siswa**.
+  - **Validasi ahli & uji coba pada non-responden masih belum dilakukan** —
+    jangan sebut instrumen ini valid/reliabel.
+  - **Sudah ada (Milestone 1 modul riset):** bank soal aman-app
+    `assets/research/instrument_v1.json` (tanpa kunci) + tooling
+    `tools/research/` yang mem-validasi PDF dan menulis kunci privat hanya ke
+    path eksplisit di luar repo & OneDrive. Detail: `tools/research/README.md`.
+  - **Sudah ada (Milestone 2a, belum di-deploy):** security rules untuk
+    `researchParticipants`, `researchAssessmentResults`, dan
+    `researchInstrument` (`DATA_MODEL.md` §6b), diuji otomatis terhadap
+    **Firestore Emulator lokal** (project `demo-vocably-test`, `cd
+    tools/research && npm run test:rules`, butuh Java 21+). Band & otorisasi
+    tes hanya dari `researchParticipants` (ditulis tooling peneliti) —
+    **`users.cefrLevel` tidak pernah dipakai** untuk band/kelayakan.
+  - **Belum ada:** layar tes, pengacakan urutan butir/opsi saat runtime,
+    penyimpanan jawaban dari Flutter, tooling peneliti (pendaftaran peserta,
+    pembukaan posttest, retake, seed `researchInstrument`), ekspor & skoring.
+    Layar `research_assessment/` masih placeholder. Kebijakan retensi data
+    riset harus difinalkan sebelum pengambilan data responden.
+  - **Skoring Pre/Post Test dilakukan offline oleh peneliti** (bukan di
+    app), dengan kunci privat: B = 1, S/T/K = 0, skor maks 20, Gain = Post −
+    Pre, N-gain = (Post − Pre)/(20 − Pre) dan tidak dihitung bila Pre = 20.
+    Siswa tidak pernah melihat feedback benar/salah, skor, atau kunci.
 
-Untuk sekarang, kerjakan **hanya scaffolding**: routing, entry point di
-dashboard, dan struktur data placeholder (lihat `DATA_MODEL.md` §6 & §6b) —
-supaya saat metodenya sudah diputuskan, instrumen yang sudah divalidasi
-tinggal dipasang tanpa perombakan arsitektur besar.
+Placement Test: kerjakan **hanya scaffolding** (routing, entry point,
+placeholder `DATA_MODEL.md` §6). Pre/Post Test: dibangun bertahap per
+milestone yang disetujui — jangan melompat ke milestone berikutnya tanpa
+persetujuan eksplisit.
 
 ### Satu hal lain yang berstatus ditunda
 

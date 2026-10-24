@@ -355,9 +355,10 @@ Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
 
 ### 5.5 Pre-Test & Post-Test — Placeholder (bukan desain final)
 
-> **Status: TBD sepenuhnya.** Instrumen belum disusun/divalidasi (lihat
-> `SPEC.md` §3.7). Desain di bawah murni untuk entry point di dashboard,
-> bukan isi soal.
+> **Status:** instrumennya sudah dirancang (PDF peneliti; validasi ahli &
+> uji coba non-responden masih belum) dan bank soalnya sudah ada sebagai
+> aset (`SPEC.md` §3.7), tapi **layar tesnya belum dibangun**. Desain di
+> bawah masih murni untuk entry point placeholder di dashboard.
 
 - Di layar "Belajar" (§5.1), section terpisah di bawah dua card utama:
   card/banner sederhana bertuliskan "Pre-Test" dan "Post-Test" (dua entri
@@ -365,8 +366,11 @@ Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
   style rounded konsisten dengan card lain tapi dengan penanda visual "belum
   tersedia": badge kecil "Segera" atau ikon jam pasir, warna netral abu bukan
   navy solid, supaya jelas beda dari CTA aktif lain.
-- Begitu instrumen final tersedia, section ini akan didesain ulang sesuai
-  kebutuhan instrumen tersebut.
+- Saat layar tes dibangun (milestone berikutnya), section ini didesain ulang
+  sesuai ketentuan instrumen (PDF §4.5): kata target ditampilkan **tebal**
+  dengan kelas katanya di samping; satu butir per layar atau daftar yang
+  jelas; "Saya tidak tahu kata ini" selalu opsi terakhir; tanpa feedback
+  benar/salah, skor, atau kunci.
 
 ### 5.6 Registrasi Guru (kode akses) — pola minimal
 

@@ -9,10 +9,10 @@ This project also serves as a research instrument for a bachelor's thesis, incor
 
 ---
 
-## Current Status (Updated: 2026-10-16)
+## Current Status (Updated: 2026-10-24)
 
-- **Milestones 1–8:** Complete and committed. `main` is at `2e175f1`, which includes the Co-Write work below.
-- **Difficult Words selection (working tree, not committed):** in Riwayat → Per Kata → Difficult, students tick the difficult words to relearn. Nothing is selected initially; there are Pilih Semua / Batalkan Pilihan and "Pelajari Kembali (N kata)", with no size cap. Riwayat reloads after the session. See `PROJECT_STATE.md` §5u.
+- **Milestones 1–8:** Complete and committed on `main` (see `git log`), together with the Co-Write work, the Difficult Words selection and research Milestones 1/2a below (commit `feat: add research instrument bank and secure assessment rules`).
+- **Difficult Words selection (committed in `6423dd2`):** in Riwayat → Per Kata → Difficult, students tick the difficult words to relearn. Nothing is selected initially; there are Pilih Semua / Batalkan Pilihan and "Pelajari Kembali (N kata)", with no size cap. Riwayat reloads after the session. See `PROJECT_STATE.md` §5u.
 - **Co-Write remediation Phase 1 + Phase 2:** Implemented, automated-test verified, and **committed** in this repo (`2e175f1`) and `vocably-ai-worker` (`5bcb5e4`). The **Worker side is deployed** (version `0bec79ee`, 2026-10-16, from the working tree just before that commit; see `PROJECT_STATE.md` §5t). The Flutter side isn't hosted. Covers the application-owned three-turn fallback, deterministic target-word validation, feedback tied to the current turn, and Indonesian writing suggestions. CW-05 (same working tree) credits meaningful target-word use even with grammar or tense errors, maps model-reported surface forms to base targets, and stops a retry from erasing a student's credit. Indonesian/mixed-language handling (same working tree) classifies each student turn deterministically: an Indonesian or mixed turn gets a short "write in English" reminder and earns session coverage only, never independent mastery; the bot always continues in English and stays in the story. CW-02 (same working tree):
   - Feedback puts the current turn's target-word use ahead of minor grammar.
   - Praise for a word that validation rejected is replaced with a neutral message.
@@ -20,7 +20,9 @@ This project also serves as a research instrument for a bachelor's thesis, incor
   - The Worker returns 502 rather than an unacceptable bot sentence.
 
   See `SPEC.md` §5.3 and `PROJECT_STATE.md` §5p–§5s. Browser and real-LLM end-to-end testing is still pending.
-- **Test Suite:** **484 / 484 tests passing** (`flutter test --concurrency=1`).
+- **Research pretest/posttest — Milestone 1 (committed):** the instrument bank `assets/research/instrument_v1.json` is built and validated from the researcher's instrument PDF by `tools/research/bin/build_instrument.js`. It has 80 items (A2/B1/B2/C1 × 20), each with four opaque-ID options plus a separate "Saya tidak tahu kata ini" choice, and **no answer key**. The private key is written only to an explicit path outside the repository and outside OneDrive. It was generated on 2026-10-24 in a local folder outside both, and verified against a fresh build from the PDF; its contents were never displayed. The assessment screens, Firestore persistence, rules, posttest eligibility and export are **not implemented**; the dashboard still opens the placeholder. The placement test is deferred. The instrument awaits expert validation and a non-respondent pilot. Planned sample: 35–40 students. See `tools/research/README.md`.
+- **Test Suite:** **486 / 486 tests passing** (`flutter test --concurrency=1`); research tooling **46 passing + 2 skipped** (`cd tools/research && npm test`; the 2 PDF/key checks are skipped unless their environment variables are set); research security rules **70/70 passing** against the local Firestore Emulator (`cd tools/research && npm run test:rules`; needs Java 21+, see `tools/research/README.md`).
+- **Research pretest/posttest — Milestone 2a (committed, NOT deployed):** Firebase Emulator configuration (`firebase.json` `emulators`, demo project `demo-vocably-test`) and Firestore security rules for `researchParticipants`, `researchAssessmentResults` and `researchInstrument`, tested against the local emulator only. No Flutter code changed. The research band and test authorization come only from researcher-controlled records, never from `users.cefrLevel`. Researcher tooling, the assessment UI, export and scoring are still not implemented. See `DATA_MODEL.md` §6b and `PROJECT_STATE.md` §5w.
 - **Static Analysis:** Clean (**0 issues**, `flutter analyze`).
 - **Production Build:** `flutter build web --release` succeeds (JavaScript/CanvasKit output).
 - **Sibling Worker:** Separate repository [`vocably-ai-worker`](https://github.com/refahilya/vocably-ai-worker.git) running the Cloudflare Workers proxy for LLM endpoints (**148 / 148 tests passing** locally). Deployed 2026-10-16 as version `0bec79ee-2958-475e-97fe-64ababf31c9c` from its working tree just before commit `5bcb5e4`, including all Co-Write Worker work; production CORS, auth and routing smoke tests passed.
@@ -39,6 +41,7 @@ Read these documents for authoritative project guidelines:
 5. [`DATA_MODEL.md`](DATA_MODEL.md) — Firestore data schemas, security rules logic, and Worker API contracts.
 6. [`DESIGN_REFERENCE.md`](DESIGN_REFERENCE.md) — Design system tokens, color palettes, and responsive layouts.
 7. [`tools/vocab_import/README.md`](tools/vocab_import/README.md) — Oxford 3000/5000 vocabulary processing & Firestore seeding pipeline.
+8. [`tools/research/README.md`](tools/research/README.md) — Research instrument bank (pretest/posttest) build, validation and private answer-key handling.
 
 ---
 

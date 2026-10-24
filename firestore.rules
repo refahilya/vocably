@@ -368,23 +368,214 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Milestone 6 scaffolds these two read paths for forward-compatibility
-    // even though nothing in this milestone reads or writes them yet (no
-    // placement-test/pre-post-test screen shows past results) —
-    // `CLAUDE.md` §10's TBD status covers the scoring/instrument, not
-    // whether a student may ever read their own past attempts. Write is
-    // denied for the same reason as above: the scoring method
-    // (`placementTestResults`) and research instrument
-    // (`researchAssessmentResults`) are both still undecided
-    // (`CLAUDE.md` §10) — no field shape exists yet to validate against.
+    // Milestone 6 scaffolds this read path for forward-compatibility even
+    // though nothing reads or writes it yet. Write is denied because the
+    // placement-test scoring method is still undecided and the placement
+    // test is deferred (`CLAUDE.md` §10) — no field shape exists yet to
+    // validate against.
     match /placementTestResults/{docId} {
       allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
       allow write: if false;
     }
 
-    match /researchAssessmentResults/{docId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
-      allow write: if false;
+    // ---------------------------------------------------------------------
+    // Research pretest/posttest (research Milestone 2a, `DATA_MODEL.md`
+    // §6b). Tested only against the local Firestore Emulator
+    // (`tools/research`, `npm run test:rules`); NOT deployed.
+    //
+    // Trust model (Spark plan, no Cloud Functions):
+    // - `researchParticipants/{uid}` is written ONLY by researcher-controlled
+    //   Admin SDK tooling (which bypasses these rules). It holds the
+    //   research band and the explicit per-stage authorization
+    //   `authorizedAttempts: {preTest: int, postTest: int}` (0 = not
+    //   authorized; n = attempt n may be created). Clients can read their
+    //   own record and never write it, so nobody can pick their band or
+    //   authorize themselves. `users.cefrLevel` is never consulted.
+    // - `researchAssessmentResults/{uid}_{stage}_{n}` is one attempt. The
+    //   student creates it (fixed question/option order), then adds one
+    //   answer per write (never changing a saved answer), then completes it
+    //   once all 20 answers exist. `voided` (technical interruption) is set
+    //   only by trusted tooling, which also raises `authorizedAttempts` for
+    //   a retake; the old attempt and its answers are kept untouched.
+    // - Option IDs and texts are checked against the bank's PUBLIC data in
+    //   `researchInstrument/{version}_{band}` (trusted-tooling only; no
+    //   answer key, no correctness information).
+    // - Never stored here: answer key, correctness, per-item codes, scores.
+    // ---------------------------------------------------------------------
+
+    function researchParticipant() {
+      return get(/databases/$(database)/documents/researchParticipants/$(request.auth.uid)).data;
+    }
+
+    function researchAttemptId(stage, n) {
+      return request.auth.uid + '_' + stage + '_' + string(n);
+    }
+
+    // Public instrument-bank data for one version + band, written only by
+    // trusted tooling from `assets/research/instrument_v1.json`:
+    //   researchInstrument/{version}_{band} = {
+    //     optionIds:   {itemId: [4 option IDs]},
+    //     optionTexts: {itemId: {optionId: text}} }
+    // No answer key, no correctness information. Read through get() (one
+    // cached document read per request) rather than embedded as rule
+    // literals, because large literals exceed Firestore's 1000-expression
+    // per-request limit. A missing document makes every create/answer fail
+    // closed.
+    function researchInstrument(version, band) {
+      return get(/databases/$(database)/documents/researchInstrument/$(version + '_' + band)).data;
+    }
+
+    // Exactly the band's 20 bank items, each once.
+    function validResearchItemOrder(io, ids) {
+      return io is list && io.size() == 20 && io.toSet().size() == 20 && io.hasOnly(ids.keys());
+    }
+
+    // The 4 displayed options of item k: a permutation of the bank's 4
+    // option IDs for that item ("Saya tidak tahu kata ini" is never listed:
+    // it is always shown last and stored as 'dont_know').
+    function validResearchOptions(oo, k, ids) {
+      return oo[k] is list && oo[k].size() == 4 && oo[k].toSet() == ids[k].toSet();
+    }
+
+    // Written out per position because the rules language has no loops.
+    function validResearchOptionOrder(oo, io, ids) {
+      return oo is map && oo.size() == 20 && oo.keys().hasOnly(io)
+        && validResearchOptions(oo, io[0], ids) && validResearchOptions(oo, io[1], ids)
+        && validResearchOptions(oo, io[2], ids) && validResearchOptions(oo, io[3], ids)
+        && validResearchOptions(oo, io[4], ids) && validResearchOptions(oo, io[5], ids)
+        && validResearchOptions(oo, io[6], ids) && validResearchOptions(oo, io[7], ids)
+        && validResearchOptions(oo, io[8], ids) && validResearchOptions(oo, io[9], ids)
+        && validResearchOptions(oo, io[10], ids) && validResearchOptions(oo, io[11], ids)
+        && validResearchOptions(oo, io[12], ids) && validResearchOptions(oo, io[13], ids)
+        && validResearchOptions(oo, io[14], ids) && validResearchOptions(oo, io[15], ids)
+        && validResearchOptions(oo, io[16], ids) && validResearchOptions(oo, io[17], ids)
+        && validResearchOptions(oo, io[18], ids) && validResearchOptions(oo, io[19], ids);
+    }
+
+    // Exact-equality check against the caller's currently authorized attempt
+    // IDs (`uid_stage_n`); fails closed when the caller has no participant
+    // record.
+    function isOwnAuthorizedResearchAttemptId(attemptId) {
+      let a = researchParticipant().authorizedAttempts;
+      return (a.preTest is int && a.preTest >= 1 && attemptId == researchAttemptId('preTest', a.preTest))
+        || (a.postTest is int && a.postTest >= 1 && attemptId == researchAttemptId('postTest', a.postTest));
+    }
+
+    function researchPreTestCompleted(p) {
+      return p.authorizedAttempts.preTest is int && p.authorizedAttempts.preTest >= 1
+        && get(/databases/$(database)/documents/researchAssessmentResults/$(researchAttemptId('preTest', p.authorizedAttempts.preTest))).data.status == 'completed';
+    }
+
+    function validResearchAttemptCreate(attemptId) {
+      let d = request.resource.data;
+      let p = researchParticipant();
+      let ids = researchInstrument(d.instrumentVersion, d.band).optionIds;
+      let fields = ['studentId', 'stage', 'attemptNumber', 'band', 'instrumentVersion',
+                    'itemOrder', 'optionOrder', 'responses', 'lastAnsweredItemId',
+                    'status', 'startedAt', 'updatedAt', 'completedAt'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.studentId == request.auth.uid
+        && d.stage in ['preTest', 'postTest']
+        && d.attemptNumber is int && d.attemptNumber >= 1
+        && attemptId == researchAttemptId(d.stage, d.attemptNumber)
+        && p.authorizedAttempts[d.stage] == d.attemptNumber
+        && d.band in ['A2', 'B1', 'B2', 'C1'] && d.band == p.band
+        && d.instrumentVersion == p.instrumentVersion
+        && d.status == 'in_progress'
+        && d.responses == {}
+        && d.lastAnsweredItemId == null
+        && d.completedAt == null
+        && d.startedAt == request.time
+        && d.updatedAt == request.time
+        && validResearchItemOrder(d.itemOrder, ids)
+        && validResearchOptionOrder(d.optionOrder, d.itemOrder, ids)
+        && (d.stage == 'preTest' || researchPreTestCompleted(p));
+    }
+
+    // One saved answer: the chosen displayed option (or 'dont_know', always
+    // position 5), its exact bank text, and a server timestamp.
+    function validResearchAnswer(r, item, oo, texts) {
+      let fields = ['optionId', 'optionText', 'displayPosition', 'answeredAt'];
+      return r is map && r.keys().hasOnly(fields) && r.keys().hasAll(fields)
+        && r.answeredAt == request.time
+        && r.displayPosition is int
+        && ((r.optionId == 'dont_know'
+              && r.displayPosition == 5
+              && r.optionText == 'Saya tidak tahu kata ini')
+          || (r.optionId is string && r.optionId in oo[item]
+              && r.optionText == texts[item][r.optionId]
+              && ((r.displayPosition == 1 && oo[item][0] == r.optionId)
+                || (r.displayPosition == 2 && oo[item][1] == r.optionId)
+                || (r.displayPosition == 3 && oo[item][2] == r.optionId)
+                || (r.displayPosition == 4 && oo[item][3] == r.optionId))));
+    }
+
+    // Exactly one new answer, for an item of this attempt that has no saved
+    // answer yet (forward-only: a saved answer can never be changed).
+    function validResearchAnswerWrite() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let item = after.lastAnsweredItemId;
+      return after.diff(before).affectedKeys().hasOnly(['responses', 'lastAnsweredItemId', 'updatedAt'])
+        && after.updatedAt == request.time
+        && item is string
+        && item in before.itemOrder
+        && !(item in before.responses)
+        && after.responses.diff(before.responses).affectedKeys().hasOnly([item])
+        && item in after.responses
+        && validResearchAnswer(after.responses[item], item, before.optionOrder,
+                               researchInstrument(before.instrumentVersion, before.band).optionTexts);
+    }
+
+    // Completion: only once all 20 items have a saved answer.
+    function validResearchCompletion() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return after.diff(before).affectedKeys().hasOnly(['status', 'completedAt', 'updatedAt'])
+        && after.status == 'completed'
+        && after.completedAt == request.time
+        && after.updatedAt == request.time
+        && before.responses.size() == 20
+        && before.responses.keys().hasOnly(before.itemOrder);
+    }
+
+    match /researchParticipants/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    // Trusted, read-only bank data used by the rules above. Clients never
+    // need it (the app bundles the same public bank as an asset); get()
+    // inside rules is not subject to these read rules.
+    match /researchInstrument/{docId} {
+      allow read, write: if false;
+    }
+
+    match /researchAssessmentResults/{attemptId} {
+      // Own attempts only. An existing attempt is readable only by the UID
+      // stored in it; a not-yet-created one only when its ID is EXACTLY one
+      // of the caller's currently authorized attempt IDs (so the app can
+      // check "is there an attempt to resume?"). No UID is ever used as a
+      // regex or prefix (security audit 2026-10-24: a regex built from the
+      // UID let a crafted UID such as 'stu.x' probe whether 'stuax' had an
+      // attempt, and broke reads for UIDs with regex metacharacters).
+      // No list queries.
+      allow get: if request.auth != null
+        && ((resource != null && resource.data.studentId == request.auth.uid)
+          || (resource == null && isOwnAuthorizedResearchAttemptId(attemptId)));
+      allow list: if false;
+
+      allow create: if request.auth != null && validResearchAttemptCreate(attemptId);
+
+      // Only while in progress, and only on the attempt that is currently
+      // authorized for this stage (a superseded attempt is frozen).
+      allow update: if request.auth != null
+        && resource.data.studentId == request.auth.uid
+        && resource.data.status == 'in_progress'
+        && researchParticipant().authorizedAttempts[resource.data.stage] == resource.data.attemptNumber
+        && (validResearchAnswerWrite() || validResearchCompletion());
+
+      allow delete: if false;
     }
 
     match /{document=**} {

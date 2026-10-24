@@ -76,8 +76,14 @@ flutter:
   # Claude. Declared as a directory (not individual files) because not
   # every level is guaranteed to have a file yet — C2 in particular can
   # legitimately be absent (DATA_MODEL.md §11.2) until guru adds C2 words.
+  #
+  # Research pretest/posttest instrument bank (assets/research/), generated
+  # by tools/research/bin/build_instrument.js from the instrument PDF.
+  # App-safe by construction: items and options only, never the answer key
+  # (tools/research/README.md).
   assets:
     - assets/vocab/
+    - assets/research/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
