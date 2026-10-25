@@ -89,10 +89,21 @@ Verify any claim here that matters to your task against the source,
     never `users.cefrLevel`. No Flutter code changed.
   - Deploying `firestore.rules` now includes these rules. They fail closed
     until trusted tooling seeds `researchInstrument` and participants.
+- **Research pretest/posttest — M2b-1 (2026-10-25, working tree, NOT
+  committed, nothing deployed, `PROJECT_STATE.md` §5x):** pure Dart only.
+  - Instrument models with strict parsing, and
+    `ResearchInstrumentService` (injectable `AssetBundle`; a missing or
+    malformed bank throws).
+  - `planResearchAttempt` shuffles the assigned band's 20 items and each
+    item's 4 options with an injected `Random`; "Saya tidak tahu kata ini"
+    is always last; `ResearchAttemptPlan.fromOrder` restores a stored
+    order; `firstUnansweredIndex` gives the resume point.
+  - No Firestore, screens, navigation, scoring or key data. Not yet used
+    by any screen.
 
 | | |
 |---|---|
-| **Confirmed** (Flutter and research checks re-run 2026-10-25 on the final research M1/M2a tree, just before it was committed; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **486/486**; `tools/research` `npm test` 46 passing + 2 skipped (env-gated PDF/key checks) and `npm run test:rules` **70/70** on the local Firestore Emulator; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
+| **Confirmed** (Flutter and research checks re-run 2026-10-25 on the final research M1/M2a tree, just before it was committed; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **538/538** (re-run 2026-10-25 on the M2b-1 working tree after the pre-commit review, with `flutter analyze` 0 issues; the release build and research npm suites were not re-run for M2b-1); `tools/research` `npm test` 46 passing + 2 skipped (env-gated PDF/key checks) and `npm run test:rules` **70/70** on the local Firestore Emulator; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
 | **Worker deployment** (2026-10-16) | `0bec79ee-2958-475e-97fe-64ababf31c9c` at 100%, confirmed via `wrangler deployments list`; production CORS, auth and routing smoke tests passed (`PROJECT_STATE.md` §5t) |
 | **Not verified** | Chrome E2E of Co-Write against the production Worker (incl. the Bug A physical-keyboard fix); real-LLM output quality in production (feedback accuracy, non-echo continuations, forced-word sentences). The owner reported a satisfactory **local** manual CW-02 E2E |
 | **Known gaps** | No `"hosting"` block; Milestone 8 rules undeployed; student demographics (class/NISN) not in `users`; Placement Test deferred (scoring TBD); Pre-/Post-Test instrument bank (§5v) and emulator-tested rules (§5w, undeployed) exist, but the assessment feature and researcher tooling are not implemented; data-retention policy not yet finalised |
@@ -243,7 +254,7 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 
 ## 6. Repositories & Deployment Inventory
 
-- **`vocably`:** `main`, which includes all Co-Write work, the Difficult Words selection (§5u, `6423dd2`) and research Milestones 1/2a (§5v/§5w, commit `feat: add research instrument bank and secure assessment rules`; see `git log`). Local Git's OpenSSL CA bundle doesn't trust this network's TLS certificate; `git -c http.sslBackend=schannel <fetch|push>` (Windows certificate store, still verified) works per command without changing config.
+- **`vocably`:** `main`, which includes all Co-Write work, the Difficult Words selection (§5u, `6423dd2`) and research Milestones 1/2a (§5v/§5w, commit `feat: add research instrument bank and secure assessment rules`; see `git log`). **Uncommitted:** research M2b-1 (§5x): the new research models, service, planner, constants and their tests, plus doc updates. Local Git's OpenSSL CA bundle doesn't trust this network's TLS certificate; `git -c http.sslBackend=schannel <fetch|push>` (Windows certificate store, still verified) works per command without changing config.
 - **`vocably-ai-worker`:** `main` at `5bcb5e4`, level with `origin/main`. The only uncommitted change is the local-only `wrangler.jsonc` origin.
   **`wrangler.jsonc` carries a local-only `http://localhost:5000` entry in
   `ALLOWED_ORIGINS` — never stage, commit, or deploy it.** Never print or
@@ -304,8 +315,8 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 
 1. Confirm the research Milestone 1 extraction comparison report was
    reviewed against the PDF, then delete it; keep a private backup of the
-   answer key. §5v and §5w are committed; the next research milestone
-   (M2b) needs explicit approval.
+   answer key. §5v and §5w are committed; M2b-1 (§5x) is in the working
+   tree for review and commit; M2b-2 needs explicit approval.
 2. Any future Worker deploy must keep `wrangler.jsonc`'s local-only
    origin out (reuse the `--var ALLOWED_ORIGINS` override). Co-Write is
    already committed and deployed.

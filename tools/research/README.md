@@ -13,8 +13,12 @@ security-rules tests use two pinned dev-only dependencies (see
 - **Research Milestone 2a (done):** Firestore security rules for the
   research collections are written and tested against a **local Firestore
   Emulator** only. **They are not deployed.**
+- **M2b-1 (working tree, not committed):** the app has pure Dart models,
+  a strict loader for this bank (`lib/services/research_instrument_service.dart`)
+  and the runtime shuffling/resume planner
+  (`lib/utils/research_attempt_planner.dart`). Nothing calls them yet.
 - **Still not implemented:** the pretest/posttest **feature** in the app
-  (screens, runtime shuffling, saving answers from Flutter), the researcher
+  (screens, saving answers from Flutter), the researcher
   tooling that writes participant/eligibility and bank documents in
   production, and the offline export and scoring. The app still shows the
   placeholder screen. The placement test is deferred.

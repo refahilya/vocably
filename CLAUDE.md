@@ -45,7 +45,7 @@ komponen disesuaikan untuk web, bukan disalin persis. Detail di
 - **Database & Auth:** Firebase (Firestore + Firebase Auth), **plan Spark
   (gratis)** — tidak perlu upgrade Blaze/billing account sama sekali.
 - **Deployment app:** Firebase Hosting via `web.app` (free tier). **Catatan audit:** konfigurasi blok `"hosting"` di `firebase.json` belum dibuat (baru ada `"firestore"`). Blok hosting dengan `public: "build/web"` dan SPA rewrite ke `/index.html` harus ditambahkan sebelum `firebase deploy`.
-- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (486 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
+- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (538 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
 - **Build web produksi:** `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`.
 - **AI proxy: Cloudflare Workers** (bukan Firebase Cloud Functions — diganti karena kendala billing/kartu kredit untuk Blaze plan). Ini **repo/project terpisah** dari Flutter app (TypeScript, deploy sendiri via `wrangler`, free tier tanpa kartu kredit, 100.000 request/hari). Satu-satunya alasan butuh proxy ini: **API key ChatGPT tidak boleh ada di client**. Worker ini yang menyimpan `OPENAI_API_KEY` dan meneruskan panggilan AI. Detail arsitektur lengkap di `DATA_MODEL.md` §10.
 - **AI generation:** ChatGPT API — **selalu dipanggil lewat Cloudflare Worker**. Endpoint yang tersedia: `POST /generate-story`, `POST /cowrite-turn`, `POST /translate` (kontrak lengkap di `DATA_MODEL.md` §10.2).
@@ -251,7 +251,7 @@ dulu kalau perlu penyesuaian.
 8. **Guru:** set target kata per sesi/waktu + Edit Kata (edit topik kata
    yang sudah ada). *(Selesai, committed di `1f2b606`).*
 
-> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**486 tests passing**, `flutter test --concurrency=1`; Worker **148 tests passing**, `npx vitest run --fileParallelism=false`; tooling riset **46 tests passing + 2 skipped**, `cd tools/research && npm test`; rules riset **70 tests passing** di Firestore Emulator lokal, `npm run test:rules`). Perbaikan berikutnya di `main` dan working tree:
+> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**538 tests passing**, `flutter test --concurrency=1`; Worker **148 tests passing**, `npx vitest run --fileParallelism=false`; tooling riset **46 tests passing + 2 skipped**, `cd tools/research && npm test`; rules riset **70 tests passing** di Firestore Emulator lokal, `npm run test:rules`). Perbaikan berikutnya di `main` dan working tree:
 > - `56ded8b`: Pembersihan tombol logout ganda pada dashboard siswa.
 > - `34a9c4b`: Sanitasi feedback Co-Write untuk mencegah kebocoran marker terjemahan.
 > - `fa4d52c` (`vocably`) & `6239f7e` (`vocably-ai-worker`): Perbaikan kebocoran posisi kata target pada alur Storyfier → Cloze Test (committed; Worker-nya kini ikut ter-deploy dalam versi `0bec79ee` 2026-10-16).
@@ -261,8 +261,9 @@ dulu kalau perlu penyesuaian.
 >
 > - **Modul riset Pre/Post Test — Milestone 1 (committed bersama M2a — commit `feat: add research instrument bank and secure assessment rules`):** bank soal aman-app `assets/research/instrument_v1.json` (80 butir: A2/B1/B2/C1 × 20, 4 opsi ber-ID opaque + pilihan terpisah `dont_know`, **tanpa kunci jawaban**) di-generate dan divalidasi dari PDF instrumen oleh `tools/research/bin/build_instrument.js`; kunci privat hanya ditulis ke path eksplisit di luar repo & OneDrive — sudah di-generate peneliti (2026-10-24) di folder lokal di luar repo & OneDrive, dan terverifikasi cocok dengan build ulang dari PDF (isinya tidak pernah ditampilkan). Layar tes, penyimpanan jawaban dari Flutter, tooling peneliti, dan ekspor **belum** dibangun; placement test ditunda. Detail: `tools/research/README.md`, `PROJECT_STATE.md` §5v.
 > - **Modul riset Pre/Post Test — Milestone 2a (committed, BELUM di-deploy):** konfigurasi Firebase Emulator (`firebase.json` `emulators`) + security rules riset di `firestore.rules` + 70 uji rules di emulator lokal (termasuk regresi audit keamanan UID) (`tools/research`, `npm run test:rules`; JDK 21 portabel di `%USERPROFILE%\.vocably-dev`). Tidak ada perubahan kode Flutter. Detail: `PROJECT_STATE.md` §5w, `DATA_MODEL.md` §6b.
+> - **Modul riset Pre/Post Test — M2b-1 (working tree, BELUM di-commit, tidak ada deploy; implementasi lokal saja):** kode Dart murni — model bank soal (`models/research_instrument.dart`, parsing ketat yang menolak field tak dikenal, ID ganda, versi/skema tak didukung, dan band yang tidak tepat 20 butir), `ResearchParticipantAssignment` (band + versi saja), loader aset `services/research_instrument_service.dart` (`AssetBundle` injectable; aset hilang/rusak = error, bukan daftar kosong), dan perencana percobaan `utils/research_attempt_planner.dart` + `models/research_attempt_plan.dart` (20 butir band yang ditetapkan, urutan butir & 4 opsi diacak dengan `Random` yang di-inject, "Saya tidak tahu kata ini" selalu terakhir, pemulihan rencana dari `itemOrder`/`optionOrder`, posisi lanjut = butir pertama yang belum dijawab menurut urutan rencana). Tanpa Firestore, layar, navigasi, skoring, atau kunci jawaban; dashboard masih membuka placeholder. Detail: `PROJECT_STATE.md` §5x.
 >
-> **Langkah Selanjutnya:** Hapus laporan perbandingan ekstraksi privat setelah direview dan simpan cadangan privat kunci jawaban; milestone riset berikutnya (M2b) menunggu persetujuan eksplisit; sebelum pengambilan data responden masih dibutuhkan tooling peneliti (seed `researchInstrument` & `researchParticipants`), layar tes, ekspor, dan kebijakan retensi data (catatan: deploy `firestore.rules` kini juga ikut men-deploy rules riset — aman karena gagal-tertutup sampai tooling peneliti men-seed data, tapi harus keputusan sadar); jangan ikutkan origin lokal `localhost:5000` di `wrangler.jsonc` (deploy Worker berikutnya wajib memakai override `--var ALLOWED_ORIGINS` yang sama); uji E2E browser + LLM asli terhadap Worker produksi, konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, dan persiapan responden penelitian (35–40 siswa: skema demografi, pembersihan data uji, milestone berikutnya modul Pre/Post Test).
+> **Langkah Selanjutnya:** Hapus laporan perbandingan ekstraksi privat setelah direview dan simpan cadangan privat kunci jawaban; M2b-1 (model, loader bank, perencana percobaan) selesai di working tree dan belum di-commit — review/commit, lalu M2b-2 (layanan penyimpanan jawaban) menunggu persetujuan eksplisit; sebelum pengambilan data responden masih dibutuhkan tooling peneliti (seed `researchInstrument` & `researchParticipants`), layar tes, ekspor, dan kebijakan retensi data (catatan: deploy `firestore.rules` kini juga ikut men-deploy rules riset — aman karena gagal-tertutup sampai tooling peneliti men-seed data, tapi harus keputusan sadar); jangan ikutkan origin lokal `localhost:5000` di `wrangler.jsonc` (deploy Worker berikutnya wajib memakai override `--var ALLOWED_ORIGINS` yang sama); uji E2E browser + LLM asli terhadap Worker produksi, konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, dan persiapan responden penelitian (35–40 siswa: skema demografi, pembersihan data uji, milestone berikutnya modul Pre/Post Test).
 
 ## 8. Logic Penting yang Sering Disalahpahami
 
@@ -479,8 +480,11 @@ disatukan atau ditukar-tukar pemahamannya:
     tools/research && npm run test:rules`, butuh Java 21+). Band & otorisasi
     tes hanya dari `researchParticipants` (ditulis tooling peneliti) —
     **`users.cefrLevel` tidak pernah dipakai** untuk band/kelayakan.
-  - **Belum ada:** layar tes, pengacakan urutan butir/opsi saat runtime,
-    penyimpanan jawaban dari Flutter, tooling peneliti (pendaftaran peserta,
+  - **Sudah ada (M2b-1, lokal, belum di-commit):** model bank soal +
+    loader aset yang gagal-tertutup, dan perencana percobaan murni
+    (pengacakan urutan butir/opsi dengan `Random` yang di-inject, "tidak
+    tahu" selalu terakhir, posisi lanjut). Belum dipakai layar mana pun.
+  - **Belum ada:** layar tes, penyimpanan jawaban dari Flutter, tooling peneliti (pendaftaran peserta,
     pembukaan posttest, retake, seed `researchInstrument`), ekspor & skoring.
     Layar `research_assessment/` masih placeholder. Kebijakan retensi data
     riset harus difinalkan sebelum pengambilan data responden.

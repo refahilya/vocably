@@ -737,7 +737,10 @@ kepemilikan data beda — lihat tabel perbandingan di `SPEC.md` §3.7).
 > belum di-deploy ke produksi**, dan **belum ada kode Flutter** yang membaca
 > atau menulis collection ini (layar tes masih placeholder). Tooling peneliti
 > yang menulis `researchParticipants`/`researchInstrument` di produksi juga
-> **belum dibangun**. Placement test tetap ditunda.
+> **belum dibangun**. Placement test tetap ditunda. **M2b-1 (lokal, belum
+> di-commit):** kode Dart murni untuk membentuk `itemOrder`/`optionOrder`
+> (`utils/research_attempt_planner.dart`, `models/research_attempt_plan.dart`)
+> sudah ada, tapi masih **tanpa** baca/tulis Firestore.
 
 **Model kepercayaan (Spark, tanpa Cloud Functions):** dokumen
 `researchParticipants` dan `researchInstrument` **hanya** ditulis oleh
@@ -839,7 +842,14 @@ jangan diedit manual. Skema lengkap & prosedurnya di
 - **ID opsi** = `opt_` + 12 hex dari SHA-256 (versi, ID butir, teks opsi) —
   stabil antar-build, tidak mengungkap huruf maupun kebenaran opsi.
 - Opsi disimpan dalam urutan acuan PDF; pengacakan dilakukan saat runtime
-  (milestone berikutnya).
+  oleh `planResearchAttempt` (M2b-1): urutan butir dan 4 opsi tiap butir
+  diacak dengan `Random` yang di-inject (app: `Random.secure()`), "tidak
+  tahu" tidak ikut diacak dan selalu terakhir.
+- **Loader app (M2b-1):** `ResearchInstrumentService.load(version)` membaca
+  aset lewat `AssetBundle` yang bisa di-inject dan **gagal-tertutup**: aset
+  hilang, JSON rusak, versi/`schemaVersion` tak didukung, field wajib
+  hilang, field tak dikenal, ID butir/opsi ganda, atau band yang tidak tepat
+  20 butir → `ResearchInstrumentException` (tidak ada nilai default).
 - **Tanpa kunci jawaban** — tidak ada field correct/answer/key/letter/score.
   Kunci privat (ID butir → ID opsi benar) hanya ditulis ke path eksplisit
   di luar repo dan di luar OneDrive, dan tidak pernah dibaca oleh app.

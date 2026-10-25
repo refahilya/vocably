@@ -313,7 +313,10 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 > rules riset sudah ditulis dan diuji di Firestore Emulator lokal (Milestone
 > 2a, `DATA_MODEL.md` §6b) tapi **belum di-deploy**. Layar tes, penyimpanan
 > jawaban dari app, tooling peneliti, dan ekspor **belum ada** — entry point di
-> dashboard masih membuka layar placeholder. Placement Test (3.1)
+> dashboard masih membuka layar placeholder. **M2b-1 (lokal, belum
+> di-commit, tidak ada deploy):** model bank soal, loader aset yang
+> gagal-tertutup, dan perencana percobaan murni (pengacakan + posisi lanjut)
+> sudah ada di kode Dart, tapi belum dipakai layar mana pun. Placement Test (3.1)
 > **ditunda** dan bukan prasyarat pengembangan modul ini.
 
 **Ketentuan instrumen (dari PDF; jangan diubah atau diparafrasekan):**
@@ -329,16 +332,20 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
   yang sama untuk semua siswa.
 - Rencana sampel: **35–40 siswa**.
 
-**Perilaku yang wajib dipenuhi app (direncanakan — belum diimplementasi):**
+**Perilaku yang wajib dipenuhi app (sebagian besar belum diimplementasi):**
 
 - Urutan butir dan urutan opsi a–d diacak per siswa dan per tahap; pretest
   dan posttest diacak **independen**; "Saya tidak tahu kata ini" selalu
-  terakhir.
+  terakhir. *(M2b-1: logika pengacakannya sudah ada di
+  `utils/research_attempt_planner.dart` — satu panggilan per tahap, dengan
+  `Random` yang di-inject; belum terhubung ke layar.)*
 - Yang disimpan adalah **ID opsi (opaque) dan teks opsi yang dipilih**,
   bukan huruf yang tampil.
 - Satu jawaban wajib dipilih sebelum lanjut (termasuk "tidak tahu");
   jawaban disimpan bertahap; percobaan yang terputus dilanjutkan dengan
-  urutan yang sama.
+  urutan yang sama, mulai dari butir pertama yang belum dijawab menurut
+  urutan percobaan itu. *(M2b-1: pemulihan urutan dan penghitungan posisi
+  lanjut sudah ada, belum terhubung ke Firestore/layar.)*
 - **Tidak ada feedback benar/salah, skor, atau kunci** yang ditampilkan ke
   siswa.
 
