@@ -5,51 +5,32 @@ A responsive, mobile-first Flutter web application for learning English vocabula
 2. **Cloze Test:** Fill in blanks for the target words within the generated story.
 3. **Co-Write:** Collaborative turn-based story writing with an AI partner.
 
-This project also serves as a research instrument for a bachelor's thesis, incorporating student mastery tracking, teacher target-word assignments, vocabulary editing, and research assessment scaffolds.
+This project also serves as a research instrument for a bachelor's thesis, incorporating student mastery tracking, teacher target-word assignments, vocabulary editing, and an in-app research pretest/posttest with offline scoring tooling.
 
 ---
 
-## Current Status (Updated: 2026-10-24)
+## Current Status
 
-- **Milestones 1–8:** Complete and committed on `main` (see `git log`), together with the Co-Write work, the Difficult Words selection and research Milestones 1/2a below (commit `feat: add research instrument bank and secure assessment rules`).
-- **Difficult Words selection (committed in `6423dd2`):** in Riwayat → Per Kata → Difficult, students tick the difficult words to relearn. Nothing is selected initially; there are Pilih Semua / Batalkan Pilihan and "Pelajari Kembali (N kata)", with no size cap. Riwayat reloads after the session. See `PROJECT_STATE.md` §5u.
-- **Co-Write remediation Phase 1 + Phase 2:** Implemented, automated-test verified, and **committed** in this repo (`2e175f1`) and `vocably-ai-worker` (`5bcb5e4`). The **Worker side is deployed** (version `0bec79ee`, 2026-10-16, from the working tree just before that commit; see `PROJECT_STATE.md` §5t). The Flutter side isn't hosted. Covers the application-owned three-turn fallback, deterministic target-word validation, feedback tied to the current turn, and Indonesian writing suggestions. CW-05 (same working tree) credits meaningful target-word use even with grammar or tense errors, maps model-reported surface forms to base targets, and stops a retry from erasing a student's credit. Indonesian/mixed-language handling (same working tree) classifies each student turn deterministically: an Indonesian or mixed turn gets a short "write in English" reminder and earns session coverage only, never independent mastery; the bot always continues in English and stays in the story. CW-02 (same working tree):
-  - Feedback puts the current turn's target-word use ahead of minor grammar.
-  - Praise for a word that validation rejected is replaced with a neutral message.
-  - Feedback shows a ✓, 💡 or 💬 indicator derived from validated results. It's display-only, not persisted, and doesn't affect mastery.
-  - The Worker returns 502 rather than an unacceptable bot sentence.
-
-  See `SPEC.md` §5.3 and `PROJECT_STATE.md` §5p–§5s. Browser and real-LLM end-to-end testing is still pending.
-- **Research pretest/posttest — Milestone 1 (committed):** the instrument bank `assets/research/instrument_v1.json` is built and validated from the researcher's instrument PDF by `tools/research/bin/build_instrument.js`. It has 80 items (A2/B1/B2/C1 × 20), each with four opaque-ID options plus a separate "Saya tidak tahu kata ini" choice, and **no answer key**. The private key is written only to an explicit path outside the repository and outside OneDrive. It was generated on 2026-10-24 in a local folder outside both, and verified against a fresh build from the PDF; its contents were never displayed. The assessment screens, persistence, tooling and export came later (M2b, below). The placement test is deferred. The instrument awaits expert validation and a non-respondent pilot. Planned sample: 35–40 students. See `tools/research/README.md`.
-- **Test Suite:** **602 / 602 tests passing** (`flutter test --concurrency=1`); research tooling **71 passing + 2 skipped** (`cd tools/research && npm test`; the 2 PDF/key checks are skipped unless their environment variables are set); research emulator suites **86/86 passing** — 70 security-rules tests, 15 researcher-tooling tests and 1 end-to-end flow — against local Firestore + Auth emulators (`cd tools/research && npm run test:rules`; needs Java 21+, see `tools/research/README.md`).
-- **Research pretest/posttest — Milestone 2a (committed, NOT deployed):** Firebase Emulator configuration (`firebase.json` `emulators`, demo project `demo-vocably-test`) and Firestore security rules for `researchParticipants`, `researchAssessmentResults` and `researchInstrument`, tested against the local emulator only. No Flutter code changed. The research band and test authorization come only from researcher-controlled records, never from `users.cefrLevel`. Researcher tooling, the assessment UI, export and scoring came later (M2b, below). See `DATA_MODEL.md` §6b and `PROJECT_STATE.md` §5w.
-- **Research pretest/posttest — M2b-1 (committed locally as `97c1469`, not pushed, nothing deployed):** pure Dart models for the instrument bank, a strict asset loader, and an attempt planner (shuffled item and option order, "Saya tidak tahu kata ini" always last, resume at the first unanswered item).
-- **Research pretest/posttest — M2b-2 to M2b-6 (working tree, not committed, nothing deployed, never run against production):**
-  - **M2b-2:** the app saves answers one at a time to `researchAssessmentResults`, re-reading the server after every write; safe retries; resume in the stored order; `Random.secure()` for new attempts.
-  - **M2b-3:** researcher tooling `tools/research/bin/research_admin.js` (seed the bank documents, enrol from a strict CSV, authorize, void, retake, status). Dry run by default, with an audit log and an explicit emulator/production target. Opening the posttest requires the researcher's attestation that treatment session 4 happened, because session tracking doesn't exist.
-  - **M2b-4:** the real Pre-Test/Post-Test screens replace the placeholder: instructions verbatim from the instrument, one item per screen, no score, feedback or progress counter. The dashboard shows each stage's real status. Not yet checked by hand in a browser.
-  - **M2b-5:** an Auth emulator, `npm run emulators` / `npm run seed:emulator`, and a debug-only `--dart-define=USE_FIREBASE_EMULATORS=true` app mode (refused in release builds and compiled out of them). An end-to-end emulator test replays the app's exact payloads after a real Auth-emulator sign-in.
-  - **M2b-6:** offline scoring and CSV export `tools/research/bin/export_results.js`. The private key is validated against the bank; the real key passed without its contents being shown. Analysis files carry research IDs only.
-  - One new dev dependency: `firebase-admin` 14.5.0, in `tools/research` only. See `PROJECT_STATE.md` §5y.
-- **Static Analysis:** Clean (**0 issues**, `flutter analyze`).
-- **Production Build:** `flutter build web --release` succeeds (JavaScript/CanvasKit output).
-- **Sibling Worker:** Separate repository [`vocably-ai-worker`](https://github.com/refahilya/vocably-ai-worker.git) running the Cloudflare Workers proxy for LLM endpoints (**148 / 148 tests passing** locally). Deployed 2026-10-16 as version `0bec79ee-2958-475e-97fe-64ababf31c9c` from its working tree just before commit `5bcb5e4`, including all Co-Write Worker work; production CORS, auth and routing smoke tests passed.
-- **Firebase Hosting:** Web hosting configuration in `firebase.json` is pending implementation before deployment.
+Milestones 1–8, the Co-Write remediation, Difficult-word relearning and the research pretest/posttest workflow are implemented. The Flutter app is not hosted yet, and the research workflow has not been used in production. For the verified current state — Git, deployment, latest test results, blockers, open research decisions and next steps — see **[`HANDOFF.md`](HANDOFF.md)**, the only maintained status snapshot.
 
 ---
 
-## Core Documentation
+## Documentation
 
-Read these documents for authoritative project guidelines:
+Each kind of information has one owner; other documents link to it instead of copying it.
 
-1. [`HANDOFF.md`](HANDOFF.md) — Current state orientation layer, verification snapshot, and open items.
-2. [`CLAUDE.md`](CLAUDE.md) — Developer context, strict constraints, tech stack rules, and conventions.
-3. [`PROJECT_STATE.md`](PROJECT_STATE.md) — Detailed chronological project log, milestone details, and production roadmap.
-4. [`SPEC.md`](SPEC.md) — Product and functional behavior specifications.
-5. [`DATA_MODEL.md`](DATA_MODEL.md) — Firestore data schemas, security rules logic, and Worker API contracts.
-6. [`DESIGN_REFERENCE.md`](DESIGN_REFERENCE.md) — Design system tokens, color palettes, and responsive layouts.
-7. [`tools/vocab_import/README.md`](tools/vocab_import/README.md) — Oxford 3000/5000 vocabulary processing & Firestore seeding pipeline.
-8. [`tools/research/README.md`](tools/research/README.md) — Research instrument bank (pretest/posttest) build, validation and private answer-key handling.
+| Document | Owns |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Rules for AI coding agents: source-of-truth hierarchy, hard constraints, conventions, documentation maintenance, Git/deployment limits |
+| [`HANDOFF.md`](HANDOFF.md) | **Current status**: Git and deployment state, latest verification, blockers, open decisions, known issues, next steps |
+| [`PROJECT_STATE.md`](PROJECT_STATE.md) | Historical development record and decision rationale (append-only) |
+| [`SPEC.md`](SPEC.md) | Product and functional behaviour |
+| [`DATA_MODEL.md`](DATA_MODEL.md) | Firestore schemas, security-rules logic, Worker API contracts |
+| [`DESIGN_REFERENCE.md`](DESIGN_REFERENCE.md) | Visual identity, UI patterns, responsive layout |
+| [`tools/research/README.md`](tools/research/README.md) | Research tooling: instrument bank build, private answer key, emulator tests, researcher administration, export and scoring |
+| [`tools/vocab_import/README.md`](tools/vocab_import/README.md) | Oxford 3000/5000 vocabulary import and bundle generation |
+
+**Reading order for a new session:** `CLAUDE.md`, then `HANDOFF.md`, then whichever of `SPEC.md`, `DATA_MODEL.md` or `DESIGN_REFERENCE.md` the task touches.
 
 ---
 
@@ -58,8 +39,9 @@ Read these documents for authoritative project guidelines:
 ### 1. Prerequisites
 - Flutter SDK (stable channel, targeting Web)
 - Chrome browser
-- Node.js (for tools & Cloudflare Worker)
+- Node.js (for the tools and the Cloudflare Worker)
 - Firebase CLI (`npm install -g firebase-tools`)
+- Java 21+ only for the local Firebase Emulators (research tooling; see `tools/research/README.md`)
 
 ### 2. Sibling Repository
 The AI backend lives in a separate repository:
@@ -73,15 +55,70 @@ Run the Flutter web app on a fixed port to match Cloudflare Worker CORS allowlis
 ```bash
 flutter run -d chrome --web-port=5555
 ```
+To run the app against local Firebase Emulators with dummy accounts (debug only; refused in release builds), see "Running the app against the emulators" in `tools/research/README.md`.
 
 ### 4. Running Automated Tests
 > **IMPORTANT:** Always run Flutter tests with `--concurrency=1`. The default concurrency in this environment non-deterministically drops test files while falsely reporting success.
 ```bash
+flutter analyze
 flutter test --concurrency=1
+cd tools/research && npm test             # research tooling unit tests
+cd tools/research && npm run test:rules   # security rules + tooling + end-to-end, local emulators (Java 21+)
+cd tools/vocab_import && npm test         # vocabulary pipeline unit tests
 ```
 
 ### 5. Production Web Build
 ```bash
 flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev
 ```
-*(Note: Do not pass `--wasm` as `flutter_tts: ^4.2.2` utilizes legacy JS interop incompatible with `dart2wasm`).*
+*(Note: Do not pass `--wasm`: `flutter_tts: ^4.2.5` uses legacy JS interop that is incompatible with `dart2wasm`.)*
+
+---
+
+## Deployment
+
+**Every deployment is a deliberate action by the project owner.** AI agents must not deploy or write to production without explicit authorization (`CLAUDE.md` §0). Check `HANDOFF.md` for what is currently deployed and for blockers before deploying anything.
+
+### Architecture
+- **Web frontend:** Firebase Hosting serving the Flutter web single-page app, at `https://vocably-idn-en.web.app` and `https://vocably-idn-en.firebaseapp.com`.
+- **Database & Auth:** Firebase project `vocably-idn-en` (Spark plan, Firestore Native mode, `asia-southeast1`). Single environment, no staging project. Research rules are tested only against the local emulator under the demo project `demo-vocably-test`.
+- **AI proxy:** Cloudflare Worker at `https://vocably-ai-worker.refahilyaa.workers.dev` (separate repository). Its allowed CORS origins are the two Hosting domains plus the local development origin `http://localhost:5555`.
+
+### 1. Hosting configuration
+`firebase.json` needs a `"hosting"` block before the first Hosting deploy:
+```json
+"hosting": {
+  "public": "build/web",
+  "ignore": [
+    "firebase.json",
+    "**/.*",
+    "**/node_modules/**"
+  ],
+  "rewrites": [
+    {
+      "source": "**",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+### 2. Build, then deploy rules, indexes and Hosting
+```bash
+flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev
+firebase deploy --only firestore:rules,firestore:indexes
+firebase deploy --only hosting
+```
+- `firestore.rules` contains every collection's rules, including the research rules, so deploying it deploys all of them. The research rules fail closed until researcher tooling seeds `researchInstrument` (`tools/research/README.md`, "Researcher administration").
+- **Deploy the rules before hosting a build that contains the research module.** Older deployed rules deny the research reads, and the Pre-Test/Post-Test banners would show "Gagal memuat".
+
+### 3. Cloudflare Worker (only when Worker code changed)
+Never run a plain `wrangler deploy` from a working copy whose `wrangler.jsonc` lists the local-only `http://localhost:5000` origin. Override the origins instead:
+```bash
+cd ../vocably-ai-worker
+npx wrangler deploy --var "ALLOWED_ORIGINS:https://vocably-idn-en.web.app,https://vocably-idn-en.firebaseapp.com,http://localhost:5555"
+```
+Secrets (`OPENAI_API_KEY`) are managed with `wrangler secret`; never print or commit `.dev.vars`.
+
+### 4. Research data collection
+Production setup for the pretest/posttest (seeding the bank documents, enrolling participants, opening stages, export) uses the researcher tooling with the researcher's own service account and is never automatic. See `tools/research/README.md`, and the blockers and open decisions in `HANDOFF.md`.

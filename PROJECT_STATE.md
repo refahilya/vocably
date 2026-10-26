@@ -1,118 +1,31 @@
 # Vocably — Project State
 
-> This file is a snapshot, not a source of truth. `CLAUDE.md`, `SPEC.md`,
-> `DATA_MODEL.md`, and `DESIGN_REFERENCE.md` remain the authoritative
-> project documents. If anything here conflicts with the live repository
-> or with those four documents, the live repository / those documents win
-> — update this file, don't trust it blindly.
+> **Historical development record and decision rationale (append-only).**
+> **Current status lives only in `HANDOFF.md`.** Behaviour, schema and design
+> are owned by `SPEC.md`, `DATA_MODEL.md` and `DESIGN_REFERENCE.md`; agent
+> rules by `CLAUDE.md` (§0 defines the ownership and the source-of-truth
+> hierarchy). Entries record what was true when they were written; later
+> corrections are added as dated annotations, not by rewriting the entry.
+> Section numbers are stable (code comments reference §5g and §5i); sections
+> whose content moved elsewhere are kept as short pointers.
 
-## 1. Current Status
+## 1. How to Read This File
 
-**Milestones 1–4 complete and pushed to `origin/main`** (`bab8170`),
-including the post-Milestone-4 pagination-bar layout fix. **Milestone 5
-(Cloudflare Worker + guru "Tambah Kosakata") is complete** —
-implemented (§5g), a real CORS configuration bug found and fixed during
-manual testing (§5h), and manually verified end-to-end by the project
-owner against the real deployed Worker and live Firestore (§5h). A new
-sibling repo, `vocably-ai-worker/` (TypeScript, separate git history,
-not a subdirectory of this Flutter repo, now has its own first commit)
-holds the Worker itself; this repo's changes are the Flutter-side
-integration (new services/providers/screens, `firestore.rules` guru
-write access — deployed and confirmed working by real writes during
-E2E testing). **One thing explicitly remains unconfirmed, not just
-undeployed:** whether Cloudflare's native Rate Limiting binding is
-available on the project owner's Workers plan — the Worker still runs
-on the in-memory fallback (§5g/§7).
-
-**Milestone 6 (Student Dashboard + Riwayat + Placement/Pre-Post-Test
-scaffolds) is now implemented** (§5i) — real "Belajar"/"Riwayat"
-screens replacing their Milestone 3 placeholders, read-only
-`targetWordSets`/`learningProgress`/`learningSessions` access, the
-one-time placement-test auto-offer, and placeholder screens for the
-placement test and the research assessment (Pre-Test/Post-Test), per
-the scope explicitly approved by the project owner. **Not yet
-deployed or manually verified end-to-end** — `firestore.rules`/
-`firestore.indexes.json` changes are written but undeployed, and
-nothing in this milestone has been clicked through in a real browser
-yet (§7/§5i). **A real, pre-existing environment defect was found
-during this milestone's own verification, unrelated to any Milestone 6
-code change:** `flutter test` at its default concurrency silently
-drops a large, non-deterministic subset of test files (both new and
-several pre-existing ones) while still reporting "All tests passed!"
-with a clean exit code — `--concurrency=1` reliably runs the complete
-suite instead. See §5i and §9 for the full finding and its evidence.
-
-**Milestone 7 (Storyfier core — 3-phase learning flow) is complete,
-deployed, and manually verified end-to-end** — implemented (§5j), then
-hardened through a second pass of live-E2E-driven fixes referred to in
-code comments as **"Milestone 7 Phase 2, Stages 1–8"** (§5k): story
-target-word integrity, Cowrite bare-word/AI-fallback/completion-timing
-fixes. `firestore.rules`'s Milestone 7 write rules **are deployed**
-(reported by the project owner; corroborated by a real manual E2E pass
-succeeding under them — see §5k). Both repos are **committed and pushed
-to `origin/main`** (§10): `vocably` at `8f313f2`, `vocably-ai-worker` at
-`cbb066a`. **Confirmed fresh (2026-08-31):** `flutter analyze` clean,
-`flutter test --concurrency=1` 320/320 passing; `vocably-ai-worker`'s
-`npm test` 89/89 passing, `npm run typecheck` clean. **One manual E2E
-pass is recorded** (a "brown"/"building" two-word session reaching
-`mastered` status) — this is a **project-owner-reported observation**,
-not independently reproduced by an AI session (no browser access); see
-§5k for exactly what is and isn't independently verifiable from the
-repository alone.
-
-**Milestone 8 (Guru: Set Target Kata + Edit Kata) is complete, committed,
-and automated-test-verified** (§5l) — real "Target Kata" destination
-(`TargetWordsScreen`), full-screen `SetTargetWordScreen` flow (CEFR level choice
-chips, bundle word selector with search filter, date range picker with
-"Tanpa batas akhir" sentinel `kNoEndDate`, writes to `targetWordSets`),
-`VocabManagementScreen` shell with segmented control ("Tambah Kosakata"
-$\leftrightarrow$ "Edit Kata"), `EditKataScreen` (level filter, search filter,
-word list), and `_EditWordSheet` (read-only word info + editable `topics`
-FilterChips and "+ Tambah topik baru" creator, saving only `topics` and
-`updatedAt`). Restored role-agnostic logout in `AppNavShell`. Committed in
-`1f2b606` (2026-09-05).
-
-**Post-Milestone 8 Bugfixes and Polish are committed:**
-- `56ded8b` (2026-09-09): "fix: remove duplicate student dashboard logout" —
-  removed redundant local logout button on Student Dashboard now that
-  `AppNavShell` hosts the global logout action.
-- `34a9c4b` (2026-09-09): "fix: prevent translation marker leakage" — sanitized
-  Co-Write AI feedback to prevent translation/morphological markers from leaking
-  into the student feedback stream.
-- **Pedagogical Bugfix (2026-10-12): Positional Leakage Elimination in Storyfier → Cloze Test (`fa4d52c` / `6239f7e`):**
-  - Resolved systematic pattern where story sentence order matched target-word input order.
-  - Worker (`generateStory.ts`): Removed the `"in the same order the target words were given"` prompt constraint; instructed model to sequence words by narrative flow without following list order. Validated via `validateMarkers()` set-based invariant checks. Added 3 new tests in `generateStory.test.ts`.
-  - Flutter (`cloze_test_screen.dart`, `cloze_blanks.dart`): Replaced predictable dropdown order with session-stable randomized permutation (`shuffleClozeOptions`), preserving canonical `state.wordIds` and key-based grading (`gradeClozeAnswers`). Added 9 new tests across `cloze_blanks_test.dart` and `cloze_test_screen_test.dart`.
-- **Co-Write Reliability Remediation — Phase 1 (2026-10-13) and Phase 2 (2026-10-15), committed in `2e175f1` (`vocably`) and `5bcb5e4` (`vocably-ai-worker`); Worker side deployed as Worker version `0bec79ee` (deployed 2026-10-15T17:08Z UTC, §5t); Flutter side not hosted** (§5o, §5p):
-  - Deterministic student target-word validation and local rejection of target-word bare words/fragments/lists, with composer focus and keyboard retention (`cowrite_screen.dart`).
-  - Phase 2: application-owned 3-consecutive-miss counter and one-word random fallback (bot usage validated from generated text, counted at session level only, never as student mastery); validator fixes (`Birds fly.`, `This works.`, `Okay.`, `said`/`bit`, comparatives, `lay`≠`lie`); feedback tied to the current student turn; Indonesian "Coba tulis" suggestions; anti-echo continuation with bounded retries.
-  - CW-05 (§5q): credit for meaningful target-word use despite grammar or tense errors; model-reported surface forms mapped to base targets; spelling-rule inflections (no `attackked`); a retry never erases the first student assessment.
-  - Indonesian/mixed-language input (§5r): deterministic app-side detection; a short "write in English" reminder; session coverage only, never independent mastery; the bot always writes in English and stays in the story.
-  - CW-02 feedback (§5s): feedback prioritises current-turn target-word use; praise for rejected claims is replaced; a display-only ✓/💡/💬 indicator from validated results; a 502 instead of an unacceptable bot sentence.
-
-- **Difficult Words selection (§5u, 2026-10-16, committed in `6423dd2`, Flutter only):** students choose which difficult words to relearn (none selected initially, Pilih Semua / Batalkan Pilihan, "Pelajari Kembali (N kata)", no size cap); Riwayat re-fetches its data after the flow returns. Supersedes Milestone 7 Decision 2.
-
-- **Research pretest/posttest — Milestone 1 (§5v, 2026-10-24, committed):** the app-safe instrument bank `assets/research/instrument_v1.json` (80 items, no answer key) is built and validated from the researcher's PDF by `tools/research/`. The private key is written only to an explicit path outside the repo and OneDrive; it was generated on 2026-10-24 and verified against a fresh build from the PDF. The assessment UI, Firestore, rules and export are **not** implemented. Placement test deferred.
-
-- **Research pretest/posttest — Milestone 2a (§5w, 2026-10-24, committed, NOT deployed):** Firebase Emulator configuration plus Firestore security rules for `researchParticipants`, `researchAssessmentResults` and `researchInstrument`, with 70/70 rules tests passing against the local emulator (demo project), including the post-implementation security-audit regressions. No Flutter code changed; researcher tooling, the assessment UI, export and scoring are still not implemented.
-
-- **Research pretest/posttest — M2b-1 (§5x, 2026-10-25, committed locally as `97c1469`, not pushed, nothing deployed):** pure Dart instrument models, a strict bank loader and an attempt planner.
-
-- **Research pretest/posttest — M2b-2 to M2b-6 (§5y, 2026-10-25, working tree, NOT committed, nothing deployed, never run against production):** answer persistence and controller, researcher admin tooling, the real test screens and dashboard status, the emulator workflow with an end-to-end emulator test, and offline export/scoring. The UI has not been checked by hand in a browser.
-
-**Confirmed fresh (2026-10-25, M2b-2–M2b-6 working tree; see §9):**
-- `flutter analyze`: clean (**0 issues**).
-- `flutter test --concurrency=1`: **602/602 passing** (538 after M2b-1; 486 before it).
-- `tools/research`: `npm test` **71 passing, 2 skipped** (PDF/key checks need env vars); `npm run test:rules` **86/86 passing** on local Firestore + Auth emulators.
-- `flutter build web --release --dart-define=WORKER_BASE_URL=...`: **succeeds (re-run 2026-10-25 on the M2b working tree; no emulator code in the output)**.
-  (Note: `--wasm` is blocked by legacy JS interop in `flutter_tts: ^4.2.2`).
-- `vocably-ai-worker`: `npx vitest run --fileParallelism=false` **148/148 passing**, `npx tsc --noEmit` clean. The default parallel run can hit a Node out-of-memory error on this low-RAM machine.
-- `tools/vocab_import`: `npm test` **43/43 passing**.
-- `firebase.json`: **Hosting is NOT configured** (no `"hosting"` block).
-- `firestore.rules`: Milestone 8 `targetWordSets` create rule is committed
-  locally, pending deployment via `firebase deploy --only firestore:rules`.
+- **§2** is the milestone index; **§5–§5z** are the chronological entries, with
+  each milestone's scope, decisions, evidence, test results at the time, and
+  limitations.
+- **§8** collects approved architectural decisions.
+- Until 2026-10-26 this section held a running status summary. It duplicated
+  the §5 entries and the handoff, and had gone stale (it still opened with
+  "Milestones 1–4 complete and pushed"). Its only unique details were moved
+  into §5k (Milestone 7 verification on 2026-08-31) and §5n (cloze
+  positional-leakage fix); see §5z.
 
 ## 2. Milestone History
+
+The status column records each milestone as it was written up; later
+deployment or verification is in the §5 entries and current state in
+`HANDOFF.md`.
 
 | # | Milestone | Status |
 |---|---|---|
@@ -155,82 +68,11 @@ FilterChips and "+ Tambah topik baru" creator, saving only `topics` and
 - **Dev-side data pipeline:** `tools/vocab_import/` (Node.js, separate from the Flutter app) — see §5.
 - **Backend/API beyond Firebase:** `vocably-ai-worker/` (Cloudflare Worker, TypeScript, separate sibling git repo — see §5g), accessed from Flutter via `AiWorkerService`.
 
-### Directory structure (current)
+### Directory structure
 
-```
-lib/
-  app.dart, main.dart, firebase_options.dart
-  models/
-    app_user.dart, vocab_word.dart, vocab_bundle_entry.dart, dictionary_entry.dart,
-    topic.dart,                                           # Milestone 5
-    target_word_set.dart, learning_progress.dart, learning_session.dart  # Milestone 6; gained
-                                                            # write-side helpers in Milestone 7
-  services/
-    firebase_service.dart, auth_service.dart, user_service.dart,
-    vocab_bundle_service.dart, dictionary_api_service.dart, tts_service.dart,
-    ai_worker_service.dart, vocab_word_service.dart, topics_service.dart,  # Milestone 5;
-                                                            # ai_worker_service.dart gained
-                                                            # generateStory()/cowriteTurn() in
-                                                            # Milestone 7
-    target_word_set_service.dart, learning_progress_service.dart,
-    learning_session_service.dart                          # Milestone 6, read-only; the latter
-                                                            # two gained write methods in Milestone 7
-  providers/
-    auth_providers(+.g), sign_up_controller(+.g), login_controller(+.g),
-    complete_registration_controller(+.g), vocab_bundle_providers(+.g),
-    vocab_browser_providers(+.g), learning_cart_providers(+.g),
-    dictionary_providers(+.g),
-    ai_worker_providers(+.g), vocab_management_providers(+.g),
-    lazy_translation_providers(+.g),                       # Milestone 5
-    dashboard_providers(+.g), history_providers(+.g),
-    placement_test_providers(+.g),                         # Milestone 6
-    learning_session_controller(+.g), word_lookup_providers(+.g)  # Milestone 7
-  screens/
-    auth/login_screen.dart, sign_up_screen.dart, complete_registration_screen.dart
-    student/
-      dashboard/dashboard_screen.dart, target_word_list_screen.dart   # Milestone 6; CTA wired
-                                                            # up in Milestone 7
-      history/history_screen.dart, session_detail_screen.dart          # Milestone 6; "Pelajari
-                                                            # Kembali" wired up in Milestone 7
-      placement_test/placement_test_offer_screen.dart,
-        placement_test_placeholder_screen.dart              # Milestone 6, scaffold only
-      research_assessment/research_assessment_screen.dart,
-        research_instructions.dart                          # research M2b-4 (§5y; placeholder deleted)
-      learning_flow/story_reading_screen.dart, cloze_test_screen.dart,
-        cowrite_screen.dart                                 # Milestone 7 — Fase 1/2/3
-      vocab_browser/vocab_browser_screen.dart, learning_cart_screen.dart, word_detail_screen.dart
-                                                            # learning_cart_screen.dart's CTA
-                                                            # wired up in Milestone 7
-    teacher/
-      target_words/target_words_placeholder.dart
-      vocab_management/tambah_kosakata_screen.dart   # Milestone 5 — replaces the old placeholder
-  theme/theme.dart
-  utils/role.dart, normalize_word.dart, vocab_browse_filter.dart, vocab_bundle_constants.dart,
-    cefr_levels.dart, topic_slug.dart, worker_config.dart,  # Milestone 5
-    target_word_constants.dart, story_markers.dart, session_date_format.dart,  # Milestone 6
-    mastery_rules.dart, cloze_blanks.dart                   # Milestone 7
-  widgets/app_nav_shell.dart, mastery_badge.dart,             # mastery_badge.dart: Milestone 6
-    stepper_header.dart                                     # Milestone 7
-
-tools/vocab_import/            # separate Node.js tool, not part of the Flutter app — see §5
-  bin/merge.js, translate.js, seed_firestore.js, generate_bundles.js
-  lib/csvParser.js, normalize.js, merge.js, translateClient.js,
-      translationCache.js, seedDecision.js, bundleGen.js, dotenv.js
-  test/*.test.js
-  input/ (git-ignored), output/ (git-ignored)
-
-assets/vocab/                  # real per-level bundle files, generated by
-                                # tools/vocab_import/ (§5, Stage 4/10)
-```
-
-```
-# SEPARATE REPO (sibling directory, own git history) — see §5g:
-vocably-ai-worker/
-  src/index.ts, auth.ts, cors.ts, rateLimit.ts, openai.ts, env.ts
-  src/handlers/translate.ts, generateStory.ts, cowriteTurn.ts
-  test/*.test.ts, test/handlers/*.test.ts
-  wrangler.jsonc, vitest.config.ts, README.md
-```
+*(Removed 2026-10-26, §5z: the hand-maintained trees of `lib/`,
+`tools/vocab_import/` and the sibling `vocably-ai-worker/` repo had gone
+stale. The repository itself and `CLAUDE.md` §3 are authoritative.)*
 
 `lib/screens/placeholders/` (Milestone 2's temporary routing-proof screens) has been deleted, as planned, once Milestone 3's real nav shell landed. `lib/screens/teacher/vocab_management/vocab_management_placeholder.dart` was deleted the same way in Milestone 5, once `tambah_kosakata_screen.dart` replaced it. `lib/screens/student/dashboard/dashboard_placeholder.dart` and `lib/screens/student/history/history_placeholder.dart` were deleted the same way in Milestone 6, once `dashboard_screen.dart`/`history_screen.dart` replaced them.
 
@@ -1092,6 +934,13 @@ not this document's job to silently resolve):**
   `aiUsedWords` field entirely.
 - The 3-turn fallback and bare-word exclusion have no trace in `SPEC.md`.
 
+**Verification recorded at the time (2026-08-31, moved from the former §1):**
+`flutter analyze` clean, `flutter test --concurrency=1` 320/320;
+`vocably-ai-worker` `npm test` 89/89, `npm run typecheck` clean. Both repos
+committed and pushed (`vocably` at `8f313f2`, `vocably-ai-worker` at
+`cbb066a`). `firestore.rules`' Milestone 7 write rules were reported deployed
+by the project owner.
+
 **Manual E2E verification recorded for this phase:** a two-word ("brown",
 "building") full 3-phase session reaching `mastered` status for both
 words — **reported by the project owner**, not independently reproduced
@@ -1137,6 +986,9 @@ Two subsequent bugfix commits were added to `main` following Milestone 8:
 2. **Commit `34a9c4b` (2026-09-09): "fix: prevent translation marker leakage"**
    - Sanitized Co-Write feedback strings in the AI flow to prevent raw internal markers (such as translation brackets or morphological tags) from leaking into student-facing chat feedback bubbles.
    - This represents the current HEAD commit of `main`.
+   - *[Annotation 2026-10-26: "current" as of 2026-09-09. The dashboard file is
+     `lib/screens/student/dashboard/dashboard_screen.dart`; there is no
+     `student_dashboard_screen.dart`.]*
 
 3. **Clarification on "Fix 3A":**
    - No Git branch or commit named "Fix 3A" exists in the repository.
@@ -1148,6 +1000,11 @@ Two subsequent bugfix commits were added to `main` following Milestone 8:
    - Removed the prompt ordering bias that caused sentence 1 to use target word 1, sentence 2 to use target word 2, etc.; instructed narrative-driven target-word ordering while preserving all `[[targetWord|usedForm]]` marker invariants.
 2. **Flutter (`lib/utils/cloze_blanks.dart`, `lib/screens/student/learning_flow/cloze_test_screen.dart`, commit `fa4d52c`):**
    - Implemented `shuffleWordOptions()` and cached a session-stable randomized dropdown permutation in `_ClozeTestScreenState` so option positions no longer leak blank answers.
+   - *[Annotation 2026-10-26: the function in the code is `shuffleClozeOptions` (`lib/utils/cloze_blanks.dart`).]*
+3. **Detail (moved from the former §1 on 2026-10-26):**
+   - Resolved a systematic pattern where story sentence order matched target-word input order.
+   - Worker (`generateStory.ts`): removed the `"in the same order the target words were given"` prompt constraint and instructed the model to sequence words by narrative flow, still validated by `validateMarkers()`'s set-based invariant checks; 3 new tests in `generateStory.test.ts`.
+   - Flutter: the session-stable shuffle (`shuffleClozeOptions`) preserves canonical `state.wordIds` and key-based grading (`gradeClozeAnswers`); 9 new tests across `cloze_blanks_test.dart` and `cloze_test_screen_test.dart`.
 
 ### 5o. Co-Write Reliability Remediation — Phase 1: Deterministic Target-Word Validation and Bare-Input Handling (2026-10-13)
 
@@ -1625,6 +1482,8 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 ### 5x. Research Pretest/Posttest — M2b-1: Instrument Models, Bank Loading and Attempt Planning (2026-10-25 — implemented and unit-tested locally; committed locally as `97c1469`, not pushed; nothing deployed)
 
+*[Annotation 2026-10-26: pushed to `origin/main` together with `b120d2f`.]*
+
 **Scope:** pure Dart only. No Firestore reads or writes, no Firebase initialization, no screens, no navigation change, no providers, no scoring/export, no Admin SDK tooling, no production configuration. The instrument wording, options, bands, scoring and treatment design are unchanged. The dashboard still opens the placeholder screen.
 
 **Files (new):** `lib/models/research_instrument.dart`, `lib/models/research_participant.dart`, `lib/models/research_attempt_plan.dart`, `lib/services/research_instrument_service.dart`, `lib/utils/research_attempt_planner.dart`, `lib/utils/research_constants.dart`, and tests `test/models/research_instrument_test.dart`, `test/services/research_instrument_service_test.dart`, `test/utils/research_attempt_planner_test.dart`.
@@ -1656,6 +1515,8 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 ### 5y. Research Pretest/Posttest — M2b-2 to M2b-6: Persistence, Researcher Tooling, Test UI, Emulator E2E, Offline Export (2026-10-25 — implemented and tested locally; NOT committed; nothing deployed; never run against production)
 
+*[Annotation 2026-10-26: committed by the project owner as `b120d2f` ("feat: implement research pretest and posttest workflow", 51 files) and pushed to `origin/main`.]*
+
 **Starting point:** M2b-1 committed locally as `97c1469` (one commit ahead of `origin/main`, not pushed); working tree clean.
 
 **M2b-2 — persistence and state (Flutter):**
@@ -1683,6 +1544,7 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 - `lib/services/firebase_emulator_config.dart` + `lib/main.dart`: `--dart-define=USE_FIREBASE_EMULATORS=true` re-points the app at `demo-vocably-test` and the local emulators in debug/profile only; a release build with the define refuses to start, and without it the emulator code is compiled out (verified: the release `main.dart.js` contains no `127.0.0.1`, `demo-vocably-test` or emulator calls).
 - `test/research_client_payloads_test.dart` (Flutter) writes/compares `tools/research/test/fixtures/client_payloads.json` from the app's real payload builders; `tools/research/test/rules/clientFlow.test.js` replays it against the real rules after a **real Auth-emulator sign-in**: create, duplicate create refused, 5 answers, restart + resume (same order, same answers), duplicate and changed answers refused, early completion refused, completion, frozen afterwards, posttest refused until authorized, void → frozen, retake → attempt 2, then the export.
 - **Manual browser E2E against the emulators was not performed** (no browser automation in this session). The workflow scripts themselves were run: emulators started, `seed:emulator` run twice (idempotent), `admin status` read the seeded data, the posttest authorization without attestation and an unconfirmed `--production` call were refused; emulators stopped. A manual checklist is in `tools/research/README.md`.
+- *[Annotation 2026-10-26 — owner-reported, not reproduced by an agent:]* the project owner reported that the full manual browser checklist passed against the local emulators, including voiding a **completed** attempt with `--allow-completed`, authorizing a retake, and taking attempt 2 with a newly generated item/option order while the earlier answers stayed stored. Emulator-only; not evidence of production readiness.
 
 **M2b-6 — offline export and scoring (Node):**
 - `bin/export_results.js` (`validate-key`, `export`) + `lib/export/scoring.js` + `lib/export/files.js`. Key validated against the committed bank (instrument, version, LF-normalized bank SHA-256, every item, band, option ID and text); **real key at `C:\Users\refah\vocably-private\instrument_v1_key.private.json`: OK, 80 entries, bank SHA-256 matches** (contents never printed).
@@ -1696,35 +1558,62 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 - *Low — admin/export hardening*: `void`/`retake` refuse more than one `--uid` (previously the first was used silently); research IDs must start with a letter or digit (a leading `-` could be read as a spreadsheet formula); the export leaves out participants whose `instrumentVersion` differs from the bank being scored (`instrument_version_mismatch` problem) instead of reporting them as invalid records.
 - No Rules change, no schema change, no change to the instrument, scoring rules or protocol.
 
-**Verification (2026-10-25, working tree, after the audit fixes):** see §9. Focused: Flutter research tests (models, controller, screens, dashboard, payload fixture, emulator config) all passing; `tools/research` `npm test` 70 + 2 skipped; `npm run test:rules` 86/86.
+**Verification (2026-10-25, working tree, after the audit fixes):** `flutter analyze` clean; `flutter test --concurrency=1` 602/602; `dart format --set-exit-if-changed` clean on the research Dart files; release web build succeeded with no emulator host, demo project or emulator calls in the output; `export_results.js validate-key` against the real private key OK (contents not printed). Focused: Flutter research tests (models, controller, screens, dashboard, payload fixture, emulator config) all passing; `tools/research` `npm test` 71 + 2 skipped; `npm run test:rules` 86/86.
 
 **Deployment coupling (important):** the production rules currently deployed predate M2a, so `researchParticipants` reads are denied there. If this Flutter build were hosted before the research rules are deployed, every student's Pre-Test/Post-Test banners would show "Gagal memuat" (the learning features are unaffected). Deploy order for real use: researcher decisions → seed `researchInstrument` (tooling, production) → deploy `firestore.rules` → host the app → enrol and authorize.
 
-**Researcher decisions still open (engineering does not resolve them):**
+**Researcher decisions still open** at the time of this entry (B2-06 expert review, data retention, session-4 verification, retake procedure, export storage/access, treatment word sets, progress counter, the example's explanation sentence, production setup) — the live table is in `HANDOFF.md` §6.
 
-| Decision | Impact | Next action |
-|---|---|---|
-| B2-06 *starve* labelled a verb with noun-form options | Validity of one B2 item; the PDF (§4.6) says problematic items are not changed after data collection but analysed with and without | Expert review before the pilot; any change means rebuilding the bank and key (new version) |
-| Data retention / deletion | Ethics and data protection; no deletion job exists | Decide period, who deletes/archives, and how |
-| Verifying treatment session 4 before opening the posttest | Posttest timing validity; there is no session tracking | Define the check (e.g. attendance list) used before `authorize --stage postTest --confirm-session4-completed` |
-| Technical interruption / retake procedure | When to void, who decides, what is recorded | Approve the void → retake procedure and who may run it |
-| Export format, storage, access | Who sees identifiable operational files | Approve the CSV set, storage location and access list |
-| Treatment word-set design (4 × 5 words per band) | The intervention itself is not implemented | Decide the split; separate milestone |
-| Progress indicator | Student experience; not in the PDF | Approve or reject a counter |
-| Showing the example's explanation sentence | It is copied verbatim from PDF §5 but written in the third person | Confirm it should be shown |
-| Production setup (service account, rules deploy, hosting) | Required before any real participant | Explicit go-ahead and credentials from the researcher |
+### 5z. Documentation Consolidation — One Owner per Information Category (2026-10-26)
+
+**Why:** since 2026-10-12 every feature commit had edited six to eight Markdown files, because the same volatile status (commit hashes, test counts, deployment state, next steps) was copied into `CLAUDE.md`, `README.md`, `HANDOFF.md`, this file, and status blocks in `SPEC.md`, `DATA_MODEL.md`, `DESIGN_REFERENCE.md` and `tools/research/README.md`. The copies had started to contradict each other.
+
+**What changed (documentation only; no code, config, data, rules or deployment touched):**
+- `CLAUDE.md` §0 now defines the source-of-truth hierarchy, the owner of each information category, the documentation maintenance rules, and the no-commit/no-deploy/no-production-write limits. Its status block (§7) moved to `HANDOFF.md`; the locked decisions from the old `HANDOFF.md` §7 moved to `CLAUDE.md` §8.
+- `HANDOFF.md` was rewritten as the only current-status snapshot (Git, deployment, latest verification, feature position, blockers, open decisions, known issues, next steps), with evidence labels.
+- This file: the status summary (§1) and the status sections §9/§10/§11/§12 were replaced by pointers; §6 became a pointer plus a dated historical snapshot (it was the only record of the index-deployment evidence and the rules chronology); the historical "completed actions" list in §7 stays; the stale directory trees in §3 were removed. Section numbers are unchanged.
+- `tools/vocab_import/README.md` needed no change (no volatile status; its references are valid).
+- `README.md`: status reduced to a pointer; gained the deployment procedure from the old §12.1/§12.2 and a documentation map.
+- `SPEC.md`, `DATA_MODEL.md`, `DESIGN_REFERENCE.md`, `tools/research/README.md`: status blocks replaced by pointers to `HANDOFF.md`.
+- The old `HANDOFF.md` Co-Write summary (§3) was already fully covered by `SPEC.md` §5.3 and `DATA_MODEL.md` §10.2; its runtime naming map and code anchors were added to `DATA_MODEL.md` §10.2.
+
+**Contradictions resolved, with evidence:**
+- Oxford CSV columns: `CLAUDE.md` said 4 (`word, topics, pos, sumber`), `SPEC.md` §7 said 5. `tools/vocab_import/bin/merge.js` requires the header `word,cefrLevel,topics,pos,source` → 5; `CLAUDE.md` corrected.
+- `flutter_tts`: docs said `^4.2.2`, `pubspec.yaml` has `^4.2.5` → corrected.
+- `cefrLevel + updatedAt` index: `DATA_MODEL.md` §11.3/§11.5 said deployment was still pending, while §6 here recorded it as confirmed live → `DATA_MODEL.md` now points to `HANDOFF.md`.
+- Reading order: `README.md` listed `HANDOFF.md` first while `CLAUDE.md` listed itself, `SPEC.md` and `DATA_MODEL.md` → one order (`CLAUDE.md`, then `HANDOFF.md`).
+- This file's self-description ("snapshot, not a source of truth" vs the old handoff's "authoritative chronological log") → now "historical record".
 
 ## 6. Firebase / Firestore State
 
-- **Project:** `vocably-idn-en`, Firestore Native mode, `asia-southeast1`.
-- **Firebase Hosting:** **NOT configured** in `firebase.json` (no `"hosting"` block exists; only `"firestore"` is defined). To enable hosting, a `"hosting"` block pointing to `public: "build/web"` with SPA rewrites must be added.
-- **Collections modeled in rules:** `users`, `teacherAccessCodes` (Milestone 2); `vocabWords`/`topics` — read-only for any authenticated user, plus guru-only write rules added in Milestone 5 (§5g) for both; `targetWordSets` — read-only rules from Milestone 6, **guru create rule added in Milestone 8** (§5l); `placementTestResults` — read-only rules added in Milestone 6 (§5i), all writes denied; `researchParticipants`/`researchAssessmentResults`/`researchInstrument` — real rules written in research M2a (§5w), **emulator-tested only, not deployed** (the deployed rules still deny all `researchAssessmentResults` writes and every `researchParticipants` read — see the deployment coupling in §5y); `learningProgress`/`learningSessions` — read rules from Milestone 6, **real write rules added in Milestone 7** (§5j).
-- **Real data status:** **confirmed populated** — 4,952 `vocabWords` documents + the `topics` master list, seeded for real by the project owner and confirmed in the Firebase Console (§5, Stage 3). `targetWordSets` has write/create functionality implemented in Milestone 8. `placementTestResults`/`researchAssessmentResults`/`researchParticipants`/`researchInstrument` have **no real documents at all**. The app code that writes `researchAssessmentResults` (§5y) exists only in the working tree and has never run against production. `learningProgress`/`learningSessions` have real Flutter-side writers (§5j).
-- **`cefrLevel` + `updatedAt` composite index (§5b/§11.3):** **confirmed deployed and live** — verified directly against the project via `firebase firestore:indexes`, matching `firestore.indexes.json`.
-- **`targetWordSets` composite index (`targetStudentIds` array-contains + `endAt` ASC, §5i):** present in `firestore.indexes.json`.
-- **Milestone 8's `targetWordSets` create rule (§5l):** written and committed in `firestore.rules` locally; **pending deployment** to the live Firebase project via `firebase deploy --only firestore:rules`.
+*Moved 2026-10-26: current Firebase/Firestore and deployment state is in
+`HANDOFF.md` §2; schema and rules are in `DATA_MODEL.md`.*
 
-## 7. Manual Actions Required
+Last snapshot recorded here before the move (historical, as of 2026-10-25):
+- **Project:** `vocably-idn-en`, Firestore Native mode, `asia-southeast1`.
+  Hosting not configured (no `"hosting"` block in `firebase.json`).
+- **Rules history:** `users`/`teacherAccessCodes` (Milestone 2);
+  `vocabWords`/`topics` read-only plus guru writes (Milestone 5, §5g, deployed
+  §5h); read rules for `targetWordSets`/`learningProgress`/`learningSessions`/
+  `placementTestResults`/`researchAssessmentResults` (Milestone 6, §5i); write
+  rules for `learningSessions`/`learningProgress` (Milestone 7, §5j, reported
+  deployed §5k); guru create rule for `targetWordSets` (Milestone 8, §5l, not
+  deployed); research rules (§5w, emulator-tested only, not deployed — the
+  deployed rules still denied `researchParticipants` reads and all
+  `researchAssessmentResults` writes).
+- **Indexes:** `vocabWords` `cefrLevel + updatedAt` confirmed deployed and live
+  by running `firebase firestore:indexes` against the project (matching
+  `firestore.indexes.json`); the `targetWordSets` index (`targetStudentIds`
+  array-contains + `endAt` ASC, §5i) was present in `firestore.indexes.json`,
+  with no deployment recorded.
+- **Data:** 4,952 `vocabWords` documents and the `topics` master list, seeded by
+  the project owner and confirmed in the Firebase Console (§5 Stage 3); no
+  `placementTestResults` or research documents.
+
+## 7. Manual Actions — Completed (historical)
+
+*Outstanding actions moved to `HANDOFF.md` §5/§8 on 2026-10-26. The list
+below records manual actions completed before then.*
 
 **Completed:**
 - ~~Deploy the Firestore composite index~~ — confirmed live (§6).
@@ -1736,21 +1625,6 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 - ~~Commit Milestone 8 implementation~~ — committed in `1f2b606`.
 - ~~Commit post-Milestone 8 fixes~~ — committed in `56ded8b` and `34a9c4b`.
 - ~~Commit Storyfier → Cloze positional leakage fixes~~ — committed in `fa4d52c` (`vocably`) and `6239f7e` (`vocably-ai-worker`).
-
-**Outstanding:**
-
-1. **Co-Write work is committed** (`2e175f1`, `5bcb5e4`) and its Worker side is deployed (§5t). **Run a live Chrome + real-LLM E2E retest against the production Worker**: the physical-keyboard composer fix; three missed turns → exactly one forced word; feedback matching the current sentence, prioritising target-word use (CW-02) with the ✓/💡/💬 indicators; continuations that don't echo the student; "Coba tulis" suggestions.
-2. **Deploy Milestone 8's `firestore.rules` update** (`targetWordSets` guru create rule) — run `firebase deploy --only firestore:rules`. **Note:** `firestore.rules` now also contains the research rules from M2a (§5w); deploying the file deploys them too. They fail closed (no research write can succeed) until trusted tooling seeds `researchInstrument` and `researchParticipants`, so deploying them is safe, but it should be a deliberate decision.
-3. **Configure Firebase Hosting in `firebase.json`** — add `"hosting"` block with `public: "build/web"` and SPA rewrite rule.
-4. **Manually click through Milestone 8 and Co-Write end-to-end in the browser:**
-   - **Guru flow (Set Target Kata):** Login as Guru $\rightarrow$ "Target Kata" $\rightarrow$ click "+ Set Target Baru" $\rightarrow$ select CEFR level, select words, set date range with "Tanpa batas akhir" $\rightarrow$ Simpan $\rightarrow$ verify card appears in Target Kata list.
-   - **Student regression flow:** Login as Siswa $\rightarrow$ Dashboard "Target Kata Hari Ini" card reflects target words $\rightarrow$ tap "Belajar Kata Ini dengan Cerita" $\rightarrow$ verify Storyfier generates story targeting those words.
-   - **Guru flow (Edit Kata):** Login as Guru $\rightarrow$ "Kosakata" $\rightarrow$ "Edit Kata" $\rightarrow$ search word $\rightarrow$ edit topics $\rightarrow$ Simpan $\rightarrow$ verify updated topics appear.
-   - **Logout action:** Verify top-right `AppBar` logout button ('Keluar') is accessible and logs out cleanly for both Guru and Siswa across responsive widths.
-5. **Confirm whether Cloudflare native Rate Limiting binding is available** (§5g) — Worker is currently running on the in-memory fallback.
-6. **Execute Research Respondent Preparations** (§12) prior to onboarding the 35–40 thesis participants.
-7. **Research M2b-2–M2b-6 (§5y):** review and commit the working tree (M2b-1 is committed as `97c1469`; neither is pushed). Run the manual emulator checklist in `tools/research/README.md`. The researcher decisions in the §5y table are still open.
-8. **Research Milestone 1 (§5v):** the private answer key is generated and verified. Confirm the private extraction comparison report was reviewed against the PDF, then delete it, and keep a private backup of the key (`tools/research/README.md`).
 
 ## 8. Important Architectural Decisions
 
@@ -1766,84 +1640,19 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 ## 9. Verification Status
 
-All Flutter and research checks below were re-run on 2026-10-25 against the M2b-2–M2b-6 working tree (§5y). Worker checks are from 2026-10-15/16 (§5s/§5t) and weren't re-run; the Worker is unaffected by the research work.
-
-- `flutter analyze`: **no issues (0 warnings/errors)**.
-- `flutter test --concurrency=1`: **602/602 passing** (538 after M2b-1, 486 before §5x, 484 before §5v).
-- `dart format --set-exit-if-changed`: clean on all new and changed research Dart files.
-- `tools/research` emulator suites: `npm run test:rules` **86/86 passing** against local Firestore + Auth emulators (demo project `demo-vocably-test`, Java 21 portable): 70 security-rules tests, 15 researcher-tooling tests, 1 end-to-end flow.
-- `tools/research` tests: `npm test` **71 passing, 2 skipped** (the PDF/key checks run only with `VOCABLY_INSTRUMENT_PDF`/`VOCABLY_INSTRUMENT_KEY`; both passed when run with them on 2026-10-24). `export_results.js validate-key` against the real private key: OK (contents not printed).
-- `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`: **succeeds (re-run 2026-10-25 on the M2b working tree; the output contains no emulator host, demo project or emulator calls)** (JavaScript/CanvasKit). Note: `--wasm` is blocked by `flutter_tts: ^4.2.2` legacy JS interop.
-- `vocably-ai-worker/` tests: `npx vitest run --fileParallelism=false` **148/148 passing**, `npx tsc --noEmit` clean.
-- `tools/vocab_import` tests: 43/43 passing (last run 2026-10-13; not re-run, unaffected by this work).
-- **Worker deployment (2026-10-16):** see §5t. The preflight 148/148 and `tsc` were re-run immediately before it, and the production CORS, auth and routing smoke tests passed.
-- **Not performed by Claude:** browser E2E (including the research assessment UI against the emulators) or real-LLM output checks. The owner reported a satisfactory local manual CW-02 E2E. No authenticated production `/cowrite-turn` request was made.
+*Moved 2026-10-26: latest verification results are in `HANDOFF.md` §3. Results
+recorded at the time of each change stay in its §5 entry.*
 
 ## 10. Current Git State
 
-- **Flutter repo (`vocably/`):** branch `main`. All Co-Write work (§5o–§5s), the Difficult Words selection (§5u, `6423dd2`) and research Milestones 1/2a (§5v/§5w: `tools/research/`, `assets/research/instrument_v1.json`, `pubspec.yaml`, `.gitignore`, `firebase.json` `emulators` block, `firestore.rules` research rules, `test/research_instrument_asset_test.dart`, docs) are committed there, the latter as `feat: add research instrument bank and secure assessment rules` (see `git log`). Local Git's OpenSSL CA bundle doesn't trust this network's TLS certificate; `git -c http.sslBackend=schannel <fetch|push>` (Windows certificate store, still verified) works per command without changing config. `main` is at `97c1469` ("feat: add research instrument bank and attempt planner", M2b-1), **one commit ahead of `origin/main` (`267db58`); not pushed**. **Uncommitted (§5y, M2b-2–M2b-6):** new app files under `lib/models/`, `lib/services/`, `lib/providers/` and `lib/screens/student/research_assessment/`; modified `lib/main.dart`, `lib/models/research_participant.dart` and `lib/screens/student/dashboard/dashboard_screen.dart`; the deleted placeholder screen; `firebase.json` (Auth emulator); `tools/research` (`bin/`, `lib/admin/`, `lib/export/`, `lib/emulatorEnv.js`, `lib/safeOutput.js`, tests, fixture, `package.json`/`package-lock.json` with `firebase-admin`); new and updated Flutter tests (incl. `test/support/`); and doc updates.
-- **`vocably-ai-worker/` (sibling repo):** branch `main` at `5bcb5e4` ("fix: validate Co-Write feedback and bot replies"), level with `origin/main`. The only uncommitted change is the **local-only** `http://localhost:5000` origin in `wrangler.jsonc`, which must not be committed or deployed.
-- **Deployment:** the Worker runs version `0bec79ee-2958-475e-97fe-64ababf31c9c` (2026-10-15T17:08:04Z UTC, §5t). It was deployed from the working tree just before `5bcb5e4` was committed; the committed sources appear to be that same code, but this wasn't verified byte-for-byte. The Flutter app is not hosted, and §5u has nothing to deploy beyond a future web build.
+*Moved 2026-10-26: `HANDOFF.md` §1.*
 
 ## 11. Next Recommended Step
 
-1. Review and commit research M2b-2–M2b-6 (§5y); push `97c1469` and that commit when ready. Then run the manual emulator checklist (`tools/research/README.md`). Resolve the researcher decisions in the §5y table before any real participant. Also: finish the M1 wrap-up (§7 item 8), check the Difficult Words selection (§5u) in the browser at phone width, and run the live Co-Write E2E checks in §7 item 1 against the production Worker.
-2. Deploy the updated `firestore.rules` via `firebase deploy --only firestore:rules`. **Note:** `firestore.rules` now also contains the research rules from M2a (§5w); deploying the file deploys them too. They fail closed (no research write can succeed) until trusted tooling seeds `researchInstrument` and `researchParticipants`, so deploying them is safe, but it should be a deliberate decision. **The rules must be deployed before hosting a build that contains §5y** (see the deployment coupling there).
-3. Configure Firebase Hosting in `firebase.json` and deploy web build.
-4. Perform manual browser E2E verification of Milestone 8 and Co-Write using the checklist in §7.
+*Moved 2026-10-26: `HANDOFF.md` §8.*
 
 ## 12. Production Hosting, Deployment & Research Rollout Plan
 
-### 12.1 Production Hosting Architecture
-- **Web Frontend:** Firebase Hosting serving the Flutter Web single-page app (SPA).
-  - Target domains: `https://vocably-idn-en.web.app` and `https://vocably-idn-en.firebaseapp.com`.
-  - `firebase.json` required hosting block:
-    ```json
-    "hosting": {
-      "public": "build/web",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "rewrites": [
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ]
-    }
-    ```
-- **Backend / AI Proxy:** Cloudflare Worker deployed to `https://vocably-ai-worker.refahilyaa.workers.dev`.
-  - Allowed CORS origins include both Firebase Hosting production domains and local development origins.
-- **Database & Auth:** Firebase project `vocably-idn-en` (Spark plan). Single-environment setup (no separate staging project). Research security rules are tested against the **local Firestore Emulator** under the demo project `demo-vocably-test` (§5w), never against production.
-
-### 12.2 Production Build & Deployment Sequence
-1. **Build Flutter Web for Production:**
-   ```bash
-   flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev
-   ```
-   *(Do NOT use `--wasm` because `flutter_tts: ^4.2.2` relies on legacy JS interop incompatible with `dart2wasm`).*
-2. **Deploy Firebase Hosting, Rules, and Indexes:**
-   ```bash
-   firebase deploy --only hosting,firestore:rules,firestore:indexes
-   ```
-3. **Deploy Cloudflare Worker (if worker changes exist):** never a plain `wrangler deploy` from a working copy that adds the local-only `localhost:5000` origin. Override the origins, as documented in the Worker repo's README ("Deploying"):
-   ```bash
-   cd ../vocably-ai-worker
-   npx wrangler deploy --var "ALLOWED_ORIGINS:https://vocably-idn-en.web.app,https://vocably-idn-en.firebaseapp.com,http://localhost:5555"
-   ```
-
-### 12.3 Research Respondent Preparation Checklist (35–40 Students)
-Before deploying to real student respondents for thesis data collection:
-1. **Student Demographics Collection:**
-   - The current `users` schema only collects `name` and `email`.
-   - If thesis analysis requires student class/grade, NISN, or school identification, the registration form and `users` schema must be updated prior to onboarding.
-2. **Database Test Data Purge:**
-   - Pre-research test accounts and test sessions currently in `learningSessions`, `learningProgress`, and `targetWordSets` must be purged to prevent telemetry pollution.
-   - Master vocabulary (`vocabWords`, 4,952 docs) and `topics` must remain intact.
-3. **Research Assessment Instruments:**
-   - **Pre-Test/Post-Test:** the instrument is designed (researcher PDF) and its app-safe bank exists (§5v). Expert validation and the non-respondent pilot are still pending. The assessment screens, answer persistence, rules, posttest eligibility and offline scoring/export still have to be built (later research milestones) before respondents begin.
-   - **Placement Test:** deferred; its scoring method is still TBD. It isn't a prerequisite for developing and testing the Pre-Test/Post-Test features. How real participants' bands are assigned while placement is deferred remains a researcher decision before data collection.
-4. **Data Export & Analysis Pipeline:**
-   - Establish an export script or Firestore query procedure to extract session transcripts, cloze completion rates, and word mastery progression into CSV/JSON format for statistical analysis.
+*Moved 2026-10-26: hosting architecture and the build/deploy sequence (former
+§12.1/§12.2) are in `README.md` "Deployment"; the research respondent
+preparation checklist (former §12.3) is in `HANDOFF.md` §5.*

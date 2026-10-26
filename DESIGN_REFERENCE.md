@@ -47,7 +47,7 @@ Android**, deprecated).
 | Background utama | Putih / abu sangat muda | Body screen |
 | Chip/pill tidak aktif | Putih dengan border tipis abu | Chip kata belum dipilih |
 | Chip/pill aktif/dipilih | Navy solid dengan teks putih + centang hijau kecil | Kata yang sudah dipilih ke keranjang |
-| Netral/disabled | Abu muda | Entry point "Segera" (pre/post test), tombol disabled, pill C2 |
+| Netral/disabled | Abu muda | Latar banner Pre-Test/Post-Test, tombol disabled, pill C2 |
 
 ## 2. Tipografi
 
@@ -241,7 +241,7 @@ Android.
 Destinasi "Belajar" **tidak langsung menampilkan browser kosakata**.
 Isinya layar beranda dengan dua card menu besar (full-width, rounded, style
 konsisten dengan card detail kata di §3.2), ditambah satu section
-placeholder di bawahnya:
+Pre-Test/Post-Test di bawahnya:
 
 - **Card "Target Kata Hari Ini"** — ikon target di kiri, judul bold, subtitle
   jumlah kata (mis. "5 kata dari Guru"). **"dari Guru" adalah label generik
@@ -266,8 +266,8 @@ placeholder di bawahnya:
     tombol besar. Ini **satu-satunya** jalan masuk setelah tawaran otomatis
     pertama lewat (`SPEC.md` §3.1), jadi pastikan tetap mudah ditemukan
     meski kecil.
-- **Section placeholder Pre-Test/Post-Test** — di bawah kedua card, dipisah
-  garis tipis atau spacing yang lebih besar. Lihat §5.5.
+- **Section Pre-Test/Post-Test** — di bawah kedua card, dipisah garis tipis
+  atau spacing yang lebih besar. Lihat §5.5.
 
 **Riwayat Pembelajaran bukan card di layar ini** — dia destinasi navigasi
 tersendiri (§6), dengan desain di §3.3.
@@ -355,10 +355,8 @@ Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
 
 ### 5.5 Pre-Test & Post-Test
 
-> **Status (M2b-4, working tree, belum di-commit, belum di-hosting):** layar
-> tes sudah dibangun (`lib/screens/student/research_assessment/`) dan diuji
-> dengan widget test; **belum dicek manual di browser**. Instrumen belum
-> divalidasi ahli / diuji coba (`SPEC.md` §3.7).
+> Layar tes ada di `lib/screens/student/research_assessment/`; perilakunya
+> diatur `SPEC.md` §3.7. Status implementasi dan verifikasi: `HANDOFF.md`.
 
 - **Dashboard** ("Belajar", §5.1): section terpisah di bawah dua card utama,
   dua banner "Pre-Test" dan "Post-Test" (abu netral, rounded) dengan badge

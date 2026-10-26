@@ -6,30 +6,27 @@ at app runtime. The instrument build has no npm dependencies. The emulator
 tests and the researcher tools use three pinned dev-only dependencies (see
 [Security-rules tests](#security-rules-tests-local-firestore-emulator)).
 
-**Status:**
-- **Research Milestone 1 (done, committed):** the instrument *data* is
-  prepared. The bank of items and options ships with the app, and the
-  private answer key has been generated outside the repository.
-- **Research Milestone 2a (done, committed):** Firestore security rules for
-  the research collections, tested against a **local Firestore Emulator**
-  only. **They are not deployed.**
-- **M2b-1 (committed locally, `97c1469`):** pure Dart models, a strict
-  loader for this bank, and the runtime shuffling/resume planner.
-- **M2b-2 – M2b-6 (working tree, NOT committed, nothing deployed):**
-  - M2b-2: the app saves answers (`lib/services/research_assessment_service.dart`,
-    `lib/providers/research_assessment_providers.dart`);
-  - M2b-3: [researcher administration](#researcher-administration-m2b-3)
-    (`bin/research_admin.js`);
-  - M2b-4: the student test screens (`lib/screens/student/research_assessment/`);
-  - M2b-5: [emulator workflow](#running-the-app-against-the-emulators-m2b-5)
-    and end-to-end emulator tests;
-  - M2b-6: [offline export and scoring](#export-and-scoring-m2b-6)
-    (`bin/export_results.js`).
-- **Not done / not decided:** nothing has been run against production; the
-  rules are not deployed; treatment-session delivery and tracking don't
-  exist (opening the posttest is a researcher attestation); expert
-  validation, the pilot, B2-06 and the retention policy are pending. The
-  placement test is deferred.
+**What this tooling covers:**
+- **Instrument data (research Milestone 1):** builds the app-safe bank of
+  items and options from the researcher's PDF and writes the private answer
+  key outside the repository.
+- **Security-rules tests (Milestone 2a):** the research rules in
+  `firestore.rules`, tested against local emulators only.
+- **App side (M2b-1 – M2b-4, in `lib/`):** the bank loader and attempt
+  planner, answer persistence (`lib/services/research_assessment_service.dart`,
+  `lib/providers/research_assessment_providers.dart`) and the student test
+  screens (`lib/screens/student/research_assessment/`).
+- **M2b-3:** [researcher administration](#researcher-administration-m2b-3)
+  (`bin/research_admin.js`).
+- **M2b-5:** the [emulator workflow](#running-the-app-against-the-emulators-m2b-5)
+  and end-to-end emulator tests.
+- **M2b-6:** [offline export and scoring](#export-and-scoring-m2b-6)
+  (`bin/export_results.js`).
+
+**Current status** — what is committed, deployed, verified or still pending,
+including the open research decisions (B2-06, retention, session-4
+verification, …) — is kept only in [`HANDOFF.md`](../../HANDOFF.md). The
+placement test is deferred.
 
 ## Source of truth
 
@@ -96,7 +93,7 @@ is valid or reliable (PDF §10).
 - **Missing a whole test:** a student who misses the pretest or the posttest is excluded from the paired analysis, and the number and reasons are reported.
 - **Technical interruption:** recorded; if the test can't continue, the student retakes it and the incident is reported.
 
-### Behaviour required of the app (implemented in M2b-1 – M2b-4, not yet committed)
+### Behaviour required of the app
 
 - Item order and the order of options a–d are shuffled per student and per stage (`Random.secure()`), with pretest and posttest shuffled independently. "Saya tidak tahu kata ini" always comes last.
 - The selected option is stored by its **opaque option ID and its text** (plus its display position), never by a displayed letter.
@@ -234,7 +231,7 @@ cd tools/research && npm test   # node --test
 - **`test/adminUnits.test.js`:** strict CSV parsing, target safety (emulator vs production), argument parsing, audit-log and export-folder location checks, CSV encoding.
 - **`test/rules/*.test.js`:** the emulator suites (security rules, admin tooling, the end-to-end flow). **Skipped** in a plain `npm test`; they run only inside the emulators (below).
 
-Current result of a plain `npm test`: **71 passing, 2 skipped** (the PDF/key checks), plus the skipped emulator suites.
+A plain `npm test` skips the two PDF/key checks (unless their environment variables are set) and the emulator suites. Latest results: [`HANDOFF.md`](../../HANDOFF.md) §3.
 
 The Flutter suite also has `test/research_instrument_asset_test.dart`, which checks that the asset is bundled and carries no key fields.
 
@@ -249,9 +246,9 @@ Research Milestone 2a. These tests exercise the real `firestore.rules` from the 
 - Each test file skips itself unless `FIRESTORE_EMULATOR_HOST` (and, for the end-to-end file, `FIREBASE_AUTH_EMULATOR_HOST`) points at `127.0.0.1`/`localhost` and the project ID starts with `demo-`.
 - Every participant is synthetic (`stu-a2`, …) and every answer is fabricated (a fixed display position). The tests never read the answer key; the export test uses a synthetic key.
 - Suites:
-  - `researchRules.test.js` (70): the rules, with trusted records written through the testing library's rules-disabled context.
-  - `adminTooling.test.js` (15): the researcher tooling through the Admin SDK, then the real rules checking what students can do afterwards.
-  - `clientFlow.test.js` (1 end-to-end test): a dummy student signs in through the **Auth emulator** (a real ID token) and replays the app's exact payloads (`test/fixtures/client_payloads.json`) through create, interruption and resume, duplicate/changed answers, early and final completion, posttest gating, void and retake. Then the offline export scores the result.
+  - `researchRules.test.js`: the rules, with trusted records written through the testing library's rules-disabled context.
+  - `adminTooling.test.js`: the researcher tooling through the Admin SDK, then the real rules checking what students can do afterwards.
+  - `clientFlow.test.js` (one end-to-end test): a dummy student signs in through the **Auth emulator** (a real ID token) and replays the app's exact payloads (`test/fixtures/client_payloads.json`) through create, interruption and resume, duplicate/changed answers, early and final completion, posttest gating, void and retake. Then the offline export scores the result.
 
 ### Prerequisites
 
@@ -347,7 +344,7 @@ The full schema is in `DATA_MODEL.md` §6b. In short:
 
 ## Researcher administration (M2b-3)
 
-`bin/research_admin.js` (`npm run admin -- <command> …`). Implemented and tested **against the emulators only**; it has **never been run against production**.
+`bin/research_admin.js` (`npm run admin -- <command> …`). Tested against the local emulators; whether it has been used against production is recorded in [`HANDOFF.md`](../../HANDOFF.md).
 
 | Command | What it does |
 |---|---|
@@ -378,7 +375,7 @@ npm run admin -- authorize --emulator --stage postTest --uid <uid> --confirm-ses
 npm run admin -- status --emulator
 ```
 
-Production use is a separate, explicit decision by the researcher (service-account key, rules deployment, retention policy). It has not been done.
+Production use is a separate, explicit decision by the researcher (service-account key, rules deployment, retention policy); the prerequisites are listed as blockers in [`HANDOFF.md`](../../HANDOFF.md).
 
 ## Running the app against the emulators (M2b-5)
 
@@ -401,7 +398,7 @@ flutter run -d chrome --web-port=5555 --dart-define=USE_FIREBASE_EMULATORS=true
 - `USE_FIREBASE_EMULATORS=true` re-points the app at the demo project and connects Firestore/Auth to `127.0.0.1` (`lib/services/firebase_emulator_config.dart`). A **release** build with that define refuses to start, and without it the emulator code is compiled out (checked: the release `main.dart.js` contains no emulator host or demo project).
 - The AI features still call the Worker as usual; only the research assessment is the point of this mode.
 
-**Manual end-to-end checklist** (not yet performed in a browser; see `PROJECT_STATE.md` §5y):
+**Manual end-to-end checklist** (latest result: [`HANDOFF.md`](../../HANDOFF.md) §3):
 
 1. Log in as `siswa.umum@example.test` → dashboard shows "Belum tersedia" on both banners; tapping shows "Belum terdaftar".
 2. Log in as `siswa.b1@example.test` → Pre-Test "Siap dikerjakan", Post-Test "Belum dibuka".
@@ -413,6 +410,7 @@ flutter run -d chrome --web-port=5555 --dart-define=USE_FIREBASE_EMULATORS=true
 8. Post-Test still "Belum dibuka" → `npm run admin -- authorize --emulator --stage postTest --uid emuStudentB1 --confirm-session4-completed --apply` → "Siap dikerjakan"; the posttest order differs from the pretest's.
 9. Start the posttest, answer 3, then `npm run admin -- void --emulator --uid emuStudentB1 --stage postTest --reason "uji" --apply` → the next "Lanjut" leads to "Tes dibatalkan"; `retake … --apply` → reopening starts attempt 2 with a new order.
 10. Phone width (390 px, DevTools device toolbar): no horizontal scrolling; options are full-width tap targets.
+11. Optional — voiding a **completed** attempt: `npm run admin -- void --emulator --uid <uid> --stage <stage> --reason "uji" --allow-completed --apply` → `retake … --apply` → the student starts attempt 2 with a newly generated item/option order, while `npm run admin -- status --emulator` still shows attempt 1 as `voided` with its answers kept.
 
 ## Export and scoring (M2b-6)
 
@@ -424,11 +422,11 @@ cd tools\research
 npm run export -- validate-key --key C:\Users\<you>\vocably-private\instrument_v1_key.private.json
 # Score and export (folder must exist, outside the repo, Git and OneDrive):
 npm run export -- export --key <key.private.json> --out-dir C:\path\outside\repo\export-2026-xx-xx --emulator
-#   …or --production --project <id> --confirm-project <id> (read-only; not done yet)
+#   …or --production --project <id> --confirm-project <id> (read-only)
 #   optional: --cohort study|pilot|test
 ```
 
-- **Key validation** (refuses to score otherwise): same `instrumentId` and version as the bank, `bankSha256` equal to the committed bank's (LF-normalized), exactly one entry per bank item, band, `correctOptionId` one of that item's four options (never "tidak tahu"), and `correctOptionText` equal to the bank text. Messages name item IDs only. Verified against the real key on 2026-10-25: **OK, 80 entries, bank SHA-256 matches** (contents never printed).
+- **Key validation** (refuses to score otherwise): same `instrumentId` and version as the bank, `bankSha256` equal to the committed bank's (LF-normalized), exactly one entry per bank item, band, `correctOptionId` one of that item's four options (never "tidak tahu"), and `correctOptionText` equal to the bank text. Messages name item IDs only, and the key contents are never printed.
 - **Scoring:** B (key option) = 1; S (other option) = 0; T ("tidak tahu") = 0; K (missing) = 0. Score = number of B (0–20); percent = score ÷ 20 × 100. Gain = post − pre. N-gain = (post − pre) ÷ (20 − pre), 4 decimals, **blank with the note "not computed: pre = 20"** when pre = 20.
 - **Attempt selection, never guessed:** per participant and stage there must be exactly one non-voided attempt, it must be the currently authorized number, it must be valid against the bank (band, version, item order, option orders, every answer's option ID, text and display position), and it must be `completed` with all 20 answers. Otherwise the stage is excluded with a reason: `no_attempt`, `only_voided_attempts`, `conflicting_attempts`, `attempt_not_currently_authorized`, `invalid_authorization_state`, `invalid_record`, `incomplete`. A pair is also excluded if the posttest started before the pretest was completed. Voided attempts are listed but never scored. Excluded attempts get B/S/T/K counts but no score.
 - Participants whose `instrumentVersion` differs from the committed bank are left out with an `instrument_version_mismatch` problem (a different version needs its own bank and key).

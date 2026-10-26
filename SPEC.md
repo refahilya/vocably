@@ -302,28 +302,18 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 
 ### 3.7 Pre-Test & Post-Test (Modul Riset)
 
-> **Status:** **instrumen sudah dirancang; fitur tes di aplikasi dan
-> tooling peneliti sudah dibangun & diuji lokal (M2b-1 – M2b-6) tapi
-> M2b-2 – M2b-6 belum di-commit, belum pernah dijalankan ke produksi, dan
-> rules belum di-deploy.** Sumber tunggal instrumen adalah PDF peneliti
+> **Sumber.** Sumber tunggal instrumen adalah PDF peneliti
 > `Rancangan_Instrumen_Pretest_Vocably.pdf` (soal, opsi, kunci, rubrik,
 > prosedur) — PDF itu memuat kunci jawaban sehingga **tidak** disimpan di
-> repo. **Validasi ahli dan uji coba pada siswa non-responden masih belum
-> dilakukan**, jadi instrumen belum boleh disebut valid/reliabel. Bank soal
-> aman-app (`assets/research/instrument_v1.json`, tanpa kunci) sudah
-> di-generate lewat `tools/research/` (Milestone 1 modul riset). Security
-> rules riset sudah ditulis dan diuji di Firestore Emulator lokal (Milestone
-> 2a, `DATA_MODEL.md` §6b) tapi **belum di-deploy**. M2b-1 (model, loader
-> bank, perencana percobaan) sudah di-commit lokal (`97c1469`, belum
-> di-push). M2b-2 – M2b-6 (working tree): penyimpanan jawaban, tooling
-> peneliti (`tools/research/bin/research_admin.js`), layar tes yang
-> menggantikan placeholder, alur emulator + uji end-to-end emulator, serta
-> ekspor & skoring offline (`tools/research/bin/export_results.js`) —
-> detail di `PROJECT_STATE.md` §5y. **Pengiriman sesi treatment dan
-> pelacakannya belum ada**: pembukaan posttest adalah pernyataan
-> (atestasi) peneliti, bukan bukti otomatis bahwa sesi ke-4 selesai.
-> Placement Test (3.1) **ditunda** dan bukan prasyarat pengembangan modul
-> ini.
+> repo. Instrumen **tidak boleh disebut valid/reliabel** sebelum validasi
+> ahli dan uji coba pada siswa non-responden dilakukan. Bank soal aman-app:
+> `assets/research/instrument_v1.json` (tanpa kunci, di-generate lewat
+> `tools/research/`); rules: `DATA_MODEL.md` §6b; tooling peneliti dan
+> ekspor: `tools/research/README.md`. **Status implementasi, deploy, dan
+> validasi: `HANDOFF.md`.** Aplikasi tidak melacak sesi treatment, jadi
+> pembukaan posttest adalah pernyataan (atestasi) peneliti, bukan bukti
+> otomatis bahwa sesi ke-4 selesai. Placement Test (3.1) **ditunda** dan
+> bukan prasyarat modul ini.
 
 **Ketentuan instrumen (dari PDF; jangan diubah atau diparafrasekan):**
 
@@ -338,7 +328,7 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
   yang sama untuk semua siswa.
 - Rencana sampel: **35–40 siswa**.
 
-**Perilaku yang wajib dipenuhi app (diimplementasi M2b-1 – M2b-4; belum dicek manual di browser):**
+**Perilaku yang wajib dipenuhi app:**
 
 - Urutan butir dan urutan opsi a–d diacak per siswa dan per tahap; pretest
   dan posttest diacak **independen**; "Saya tidak tahu kata ini" selalu
@@ -352,10 +342,10 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
   urutan yang sama, mulai dari butir pertama yang belum dijawab menurut
   urutan percobaan itu. Butir berikutnya baru tampil setelah server
   mengonfirmasi jawaban; gagal simpan bisa dicoba lagi tanpa menulis dua
-  jawaban (pilihan yang sudah dikirim terkunci, karena tulisan yang belum
-  terkonfirmasi bisa saja tetap sampai ke server) (jawaban tersimpan tidak bisa diubah, dan tidak ada tombol kembali
-  ke butir sebelumnya). Setelah butir terakhir dikirim, percobaan ditandai
-  selesai.
+  jawaban. Pilihan yang sudah dikirim terkunci, karena tulisan yang belum
+  terkonfirmasi bisa saja tetap sampai ke server. Jawaban tersimpan tidak
+  bisa diubah, dan tidak ada tombol kembali ke butir sebelumnya. Setelah
+  butir terakhir dikirim, percobaan ditandai selesai.
 - Sebelum butir pertama tampil petunjuk dan contoh butir PDF §5, **persis**
   (`lib/screens/student/research_assessment/research_instructions.dart`).
   Tidak ada penghitung kemajuan ("Butir 7/20") karena PDF tidak
@@ -788,9 +778,7 @@ abjad/tema/POS), memilih kosakata, tambah/kurang kata di keranjang pelajari,
 generate story dari judul/tema (berkali-kali, cerita saat "Selanjutnya"
 ditekan yang dipakai), cloze test, co-write dengan AI, feedback saat
 co-write, saran menulis saat co-write, pelajari ulang kata difficult (3 fase
-penuh), pre-test & post-test (layar tes, penyimpanan jawaban, tooling
-peneliti, dan ekspor dibangun di M2b — belum di-commit seluruhnya, belum
-dipakai di produksi; instrumen belum divalidasi ahli, lihat 3.7).
+penuh), pre-test & post-test (instrumen penelitian; lihat 3.7).
 
 **Guru:** tambah kata baru ke bank kosakata (dengan deteksi duplikat &
 opsi tambah makna baru), edit topik kata yang sudah ada (pilih dari

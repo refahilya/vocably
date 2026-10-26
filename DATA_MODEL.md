@@ -725,25 +725,22 @@ update `users.cefrLevel` + `users.placementTestCompleted`.
 > satu-satunya jalan masuk berikutnya adalah entry point di dashboard, yang
 > selalu tersedia baik untuk mengambil pertama kali maupun mengambil ulang.
 
-## 6b. Riset Pre/Post Test — `researchParticipants`, `researchAssessmentResults`, `researchInstrument` (M2a: rules + uji emulator; BELUM di-deploy)
+## 6b. Riset Pre/Post Test — `researchParticipants`, `researchAssessmentResults`, `researchInstrument`
 
 Collection untuk modul riset **Pre-Test & Post-Test** (SPEC §3.7) —
 **terpisah total dari `placementTestResults`** (tujuan, alur, dan
 kepemilikan data beda — lihat tabel perbandingan di `SPEC.md` §3.7).
 
-> **Status (rules: M2a; app & tooling: M2b-1 – M2b-6):** skema di bawah
-> **ditegakkan oleh `firestore.rules`** dan diuji terhadap **Firestore +
-> Auth Emulator lokal** (`tools/research`, `npm run test:rules`: 70 uji
-> rules + 15 uji tooling peneliti + 1 uji end-to-end yang memutar ulang
-> payload persis dari app). **Rules belum di-deploy ke produksi; tidak ada
-> data riset di produksi.** App membaca `researchParticipants` miliknya dan
-> membaca/menulis `researchAssessmentResults` lewat
-> `services/research_assessment_service.dart` (M2b-2, belum di-commit).
-> Tooling peneliti `tools/research/bin/research_admin.js` (M2b-3, belum
-> di-commit) menulis `researchInstrument` dan `researchParticipants`,
-> mengotorisasi tahap, membatalkan (void) percobaan, dan mengotorisasi
-> retake — **baru pernah dijalankan ke emulator**. Tidak ada field atau
-> collection baru di M2b. Placement test tetap ditunda.
+> Skema di bawah **ditegakkan oleh `firestore.rules`** dan diuji terhadap
+> **Firestore + Auth Emulator lokal** (`cd tools/research && npm run
+> test:rules`: uji rules, uji tooling peneliti, dan uji end-to-end yang
+> memutar ulang payload persis dari app). App membaca `researchParticipants`
+> miliknya dan membaca/menulis `researchAssessmentResults` lewat
+> `services/research_assessment_service.dart`; tooling peneliti
+> `tools/research/bin/research_admin.js` menulis `researchInstrument` dan
+> `researchParticipants`, mengotorisasi tahap, membatalkan (void) percobaan,
+> dan mengotorisasi retake. Placement test tetap ditunda. **Status deploy
+> rules dan data riset di produksi: `HANDOFF.md`.**
 
 **Model kepercayaan (Spark, tanpa Cloud Functions):** dokumen
 `researchParticipants` dan `researchInstrument` **hanya** ditulis oleh
@@ -842,7 +839,7 @@ privat; file analisis hanya memuat `researchId` (lihat
 
 > **Retensi data (D5):** kebijakan retensi serta penghapusan/pengarsipan
 > data riset di Firestore **harus difinalkan sebelum pengambilan data
-> responden sungguhan**. Belum ada data riset di produksi.
+> responden sungguhan** (keputusan terbuka: `HANDOFF.md` §6).
 
 ## 6c. Bank soal riset — aset statis, bukan Firestore (Milestone 1 modul riset)
 
@@ -880,7 +877,7 @@ jangan diedit manual. Skema lengkap & prosedurnya di
 users (siswa) ──1:N── learningProgress ──N:1── vocabWords
 users (siswa) ──1:N── learningSessions
 users (siswa) ──1:N── placementTestResults        (TBD)
-users (siswa) ──1:1── researchParticipants ──1:N── researchAssessmentResults  (rules M2a belum deploy; app/tooling M2b)
+users (siswa) ──1:1── researchParticipants ──1:N── researchAssessmentResults
 researchInstrument (data bank publik, per versi+band) ← dibaca rules lewat get()
 users (guru)  ──1:N── targetWordSets ──N:N── vocabWords (via wordIds)
 users (guru)  ──1:N── vocabWords (via addedByTeacherId, kalau source="guru")
@@ -1205,9 +1202,9 @@ selesai — client menentukan mode lewat request.
 > (client & UI sama-sama menahannya). "✓ Selesai" dijaga
 > `isCompletingCowrite` sehingga ketukan ganda tidak menulis dua kali.
 >
-> **Kompatibilitas dengan Worker yang lebih lama:** sejak 2026-10-16 Worker
-> produksi sudah versi baru (`0bec79ee`, `PROJECT_STATE.md` §5t). Catatan ini
-> tetap berlaku untuk Worker lama (mis. versi 2026-08-30 bila di-rollback), yang
+> **Kompatibilitas dengan Worker yang lebih lama:** versi Worker yang sedang
+> di produksi tercatat di `HANDOFF.md` §2. Catatan ini berlaku untuk Worker
+> lama (mis. versi 2026-08-30 bila di-rollback, `PROJECT_STATE.md` §5t), yang
 > mengabaikan `forcedWord` dan `studentTurnContainsIndonesian`, serta tidak
 > mengirim `assessedStudentTurn`. Client baru tetap aman:
 > - `assessedStudentTurn` opsional, dan awalan saran berbahasa Inggris dibuang client.
@@ -1223,7 +1220,31 @@ selesai — client menentukan mode lewat request.
 >
 > Fallback baru, pengingat bahasa, aturan "bot selalu berbahasa Inggris",
 > prioritas feedback CW-02, dan penolakan (502) `aiTurn` yang tidak dapat
-> diterima hanya berfungsi dengan Worker baru (sudah ter-deploy 2026-10-16).
+> diterima hanya berfungsi dengan Worker baru.
+>
+> **Peta penamaan runtime** (dipindah dari `HANDOFF.md` lama §5):
+>
+> | Konsep | Apa itu | Di mana |
+> |---|---|---|
+> | `wordsUsedCorrectly` | field respons `/cowrite-turn` (mode 1) | divalidasi ulang client terhadap giliran siswa saat ini |
+> | `aiUsedWords` | field respons `/cowrite-turn` | `[forcedWord]` di mode 2, `[]` selain itu; klaimnya diabaikan client, kata dideteksi ulang di teks |
+> | `assessedStudentTurn` | field respons `/cowrite-turn` (mode 1, opsional) | cek pasangan request/respons di client |
+> | `allWordsUsedCorrectly` | state client | cakupan sesi (siswa + fallback tervalidasi); penanda kata + berhenti otomatis |
+> | `independentWordsUsedCorrectly` | state client | pemakaian siswa sendiri tanpa saran, berbahasa Inggris; satu-satunya sumber `cowriteWordsUsedCorrectly` |
+> | `consecutiveMissedStudentTurns` | state client (tidak disimpan) | penghitung fallback |
+> | `cowriteWordsUsedCorrectly` | disimpan, `learningSessions` | masukan perhitungan mastery (`utils/mastery_rules.dart`) |
+> | `hasError` | field respons `/cowrite-turn` | hanya dibaca `classifyCowriteFeedback` untuk indikator; tidak pernah memengaruhi kredit/mastery |
+> | `feedbackKind` | client, `CowriteTurn` (memori saja) | indikator feedback; tidak ada di `toMap`, tidak disimpan |
+>
+> **Jangkar kode:** composer `_ComposeBar` di `cowrite_screen.dart` →
+> `LearningFlowController.sendTurn()` (`learning_session_controller.dart`):
+> respons dibuang bila alur sudah dimulai ulang (`_flowEpoch`);
+> `reconcileCowriteFeedback` + `classifyCowriteFeedback`
+> (`utils/cowrite_feedback.dart`) menempelkan feedback dan jenisnya hanya ke
+> giliran ini; `saveCowriteTranscript` dipanggil setiap giliran; "Saran
+> menulis" → `requestSuggestion()`; "✓ Selesai" → `completeCowrite()`
+> (dijaga `isCompletingCowrite`) → `completeSession` +
+> `recordCowriteCompletion` dengan himpunan mandiri saja.
 
 #### `POST /translate` — terjemahan makna (§2)
 
@@ -1273,6 +1294,11 @@ npx wrangler deploy
 URL yang dihasilkan (`https://vocably-ai-worker.<subdomain>.workers.dev`)
 dimasukkan ke konfigurasi Flutter (`services/`) sebagai base URL AI proxy.
 Development lokal: `npx wrangler dev`.
+
+> Cuplikan di atas adalah setup awal. Untuk deploy berikutnya, ikuti
+> `README.md` "Deployment": jangan `wrangler deploy` polos dari working copy
+> yang memuat origin lokal di `wrangler.jsonc` — pakai override
+> `--var ALLOWED_ORIGINS`.
 
 ### 10.5 Trade-off yang Sudah Disadari (bukan hal yang perlu ditanyakan ulang)
 
@@ -1365,8 +1391,8 @@ menambah banyak kata) supaya delta tidak menumpuk.
 > `FAILED_PRECONDITION` untuk **setiap level**, dan karena
 > `loadLevelWithDelta` dulu tidak menangkap error dari `fetchDelta`,
 > seluruh level gagal dimuat — bukan cuma delta-nya. Diperbaiki dua arah:
-> index-nya sekarang ada di `firestore.indexes.json` (masih perlu
-> di-deploy manual, lihat `PROJECT_STATE.md`), **dan**
+> index-nya sekarang ada di `firestore.indexes.json` (status deploy:
+> `HANDOFF.md` §2), **dan**
 > `VocabBundleService.loadLevelWithDelta` sekarang menangkap kegagalan
 > `fetchDelta` lalu jatuh ke data bundle saja (bukan ke error) — supaya
 > masalah index/delta di masa depan (mis. index sedang dibangun ulang)
@@ -1392,8 +1418,8 @@ normal, karena volumenya kecil dan/atau harus selalu segar:
 - §8: dua composite index `vocabWords` untuk browse **dihapus**; index baru
   `cefrLevel + updatedAt` ditambahkan untuk query delta. **Status:**
   sekarang benar-benar ada di `firestore.indexes.json` (lihat catatan bug
-  di §11.3) — deploy manual (`firebase deploy --only firestore:indexes`)
-  masih tugas dev, lihat `PROJECT_STATE.md`.
+  di §11.3); deploy lewat `firebase deploy --only firestore:indexes`, status
+  deploy-nya di `HANDOFF.md` §2.
 - §2: field `posList` tidak lagi dipakai untuk query Firestore, tapi tetap
   dipertahankan karena ikut masuk bundle dan dipakai filter POS di memori.
 - Skema `vocabWords` **tidak berubah** selain penambahan `updatedAt` —

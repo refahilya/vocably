@@ -1,352 +1,142 @@
-# Vocably — Handoff Briefing
+# Vocably — Handoff (status terkini)
 
-**This is a current-moment orientation document, not an ongoing log.**
-Read this once at the start of a new session, then work from the
-authoritative documents it points to. Unlike `PROJECT_STATE.md` (an
-append-only chronological record), this file describes *only* where
-things stand right now — it can be deleted or fully rewritten once its
-contents are absorbed, without losing project history.
+**Satu-satunya sumber status terkini proyek.** Ditulis ulang sebagai snapshot
+(bukan log) setiap kali status berubah; riwayat ada di `PROJECT_STATE.md`.
+Aturan kerja dan hierarki kebenaran ada di `CLAUDE.md` §0 — kode, tes, Git,
+dan bukti deploy selalu mengalahkan dokumen ini. Verifikasi ulang fakta yang
+penting untuk tugasmu sebelum mengandalkannya.
 
-## 1. Purpose / How to Use This Handoff
+**Snapshot: 2026-10-26.** Label: **[terverifikasi]** = dicek langsung pada
+tanggal itu · **[dilaporkan pemilik]** = hasil yang dilaporkan pemilik proyek,
+tidak direproduksi agen · **[catatan]** = tercatat di riwayat, tidak dicek
+ulang hari ini.
 
-- **`CLAUDE.md`** remains authoritative for coding conventions, tech
-  stack, and hard project rules — read it in full every session, per its
-  own header.
-- **`SPEC.md`** remains authoritative for product/functional behavior
-  (Co-Write: §5.3).
-- **`DATA_MODEL.md`** remains authoritative for the Firestore schema and
-  the Worker's request/response contracts (`/cowrite-turn`: §10.2).
-- **`PROJECT_STATE.md`** remains the authoritative chronological project
-  log — this file summarizes its *current* tail (§5o, §5p).
+## 1. Git
 
-**Ground-truth hierarchy** — when any two sources disagree, trust in
-this order:
+- **`vocably`** [terverifikasi 2026-10-26, termasuk `git ls-remote`]:
+  branch `main` di `b120d2f` ("feat: implement research pretest and posttest
+  workflow"), sama dengan `origin/main` di GitHub. Working tree bersih
+  sebelum konsolidasi dokumen ini; perubahan dokumen ini belum di-commit.
+- **`vocably-ai-worker`** [terverifikasi 2026-10-26]: `main` di `5bcb5e4`,
+  sama dengan `origin/main`. Satu-satunya perubahan lokal: origin
+  `http://localhost:5000` di `wrangler.jsonc` — **khusus lokal; jangan
+  di-stage, di-commit, atau di-deploy** (aturan deploy: `CLAUDE.md` §0).
+- **Catatan jaringan:** CA bundle OpenSSL milik Git menolak sertifikat TLS
+  jaringan ini; `git -c http.sslBackend=schannel <fetch|push|ls-remote>`
+  (Windows certificate store, tetap terverifikasi) berhasil per perintah tanpa
+  mengubah config.
 
-```
-repository code & tests  >  git state  >  verified deployment state  >  HANDOFF.md
-    >  PROJECT_STATE.md / SPEC.md / DATA_MODEL.md  >  prior conversation
-```
+## 2. Deployment & data produksi
 
-Verify any claim here that matters to your task against the source,
-`git log`/`git status`, and deployment state before relying on it.
-
-## 2. Current Project Position (2026-10-24)
-
-- **Milestones 1–8 are complete and committed** (`1f2b606` for
-  Milestone 8). Post-Milestone-8 fixes are committed: `56ded8b`,
-  `34a9c4b`, and the cloze positional-leakage fix `fa4d52c` (Flutter) /
-  `6239f7e` (Worker). The Co-Write work is committed as `2e175f1` (Flutter)
-  / `5bcb5e4` (Worker), both pushed.
-- **Deployment reality:**
-  - The Flutter web app is **not hosted**: `firebase.json` has no
-    `"hosting"` block.
-  - **The Worker is deployed** as version `0bec79ee-2958-475e-97fe-64ababf31c9c`
-    (2026-10-15T17:08Z UTC), including all Co-Write Worker work (Phase
-    1/2, CW-05, Indonesian input, CW-02). It was deployed from the
-    working tree just before `5bcb5e4` was committed; the committed
-    sources appear to match it, though this wasn't verified
-    byte-for-byte (`PROJECT_STATE.md` §5t).
-  - Milestone 8's `firestore.rules` change is committed but not deployed.
-- **Co-Write remediation is committed** (`2e175f1` / `5bcb5e4`).
-  - The Worker side is deployed. The Flutter side runs only locally,
-    because nothing is hosted.
-  - Automated tests pass.
-  - The owner reported a satisfactory local manual E2E of CW-02.
-  - Production verification covered CORS, auth and routing only, with
-    no authenticated Co-Write request.
-- **Difficult Words selection (2026-10-16, committed in `6423dd2`,
-  Flutter only, `PROJECT_STATE.md` §5u):** in Riwayat → Per Kata →
-  Difficult the student ticks which words to relearn.
-  - Nothing is selected initially; there are Pilih Semua / Batalkan
-    Pilihan and "Pelajari Kembali (N kata)", with no size cap.
-  - Only words still `difficult` are submitted, with
-    `pelajariUlangDifficult`.
-  - Riwayat re-fetches its data when the flow returns.
-  - This supersedes Milestone 7 Decision 2.
-- **Research pretest/posttest — Milestone 1 (2026-10-24, committed,
-  `PROJECT_STATE.md` §5v):** the app-safe instrument bank
-  `assets/research/instrument_v1.json` is built and validated from the
-  researcher's PDF by `tools/research/bin/build_instrument.js`.
-  - It has 80 items (A2/B1/B2/C1 × 20) with opaque option IDs and a
-    separate `dont_know` choice, and **no answer key**.
-  - The private key is written only to an explicit path outside the repo
-    and OneDrive. It was generated on 2026-10-24 in a local folder outside
-    both, and verified against a fresh build from the PDF (contents never
-    displayed).
-  - Assessment screens, persistence, tooling and export came later (M2b, below).
-  - The placement test is deferred and is not a prerequisite.
-  - Expert validation and the non-respondent pilot are pending.
-  - Planned sample: 35–40 students.
-- **Research pretest/posttest — Milestone 2a (2026-10-24, committed,
-  NOT deployed, `PROJECT_STATE.md` §5w):** Firebase Emulator config plus
-  Firestore security rules for `researchParticipants`,
-  `researchAssessmentResults` and `researchInstrument` (`DATA_MODEL.md` §6b).
-  - **70/70** rules tests pass against the local emulator (demo project
-    `demo-vocably-test`; `cd tools/research && npm run test:rules`; Java 21+
-    via a portable JDK in `%USERPROFILE%\.vocably-dev`).
-  - Band and authorization come only from researcher-controlled records,
-    never `users.cefrLevel`. No Flutter code changed.
-  - Deploying `firestore.rules` now includes these rules. They fail closed
-    until trusted tooling seeds `researchInstrument` and participants.
-- **Research pretest/posttest — M2b-1 (2026-10-25, committed locally as
-  `97c1469`, not pushed, nothing deployed, `PROJECT_STATE.md` §5x):** pure Dart only.
-  - Instrument models with strict parsing, and
-    `ResearchInstrumentService` (injectable `AssetBundle`; a missing or
-    malformed bank throws).
-  - `planResearchAttempt` shuffles the assigned band's 20 items and each
-    item's 4 options with an injected `Random`; "Saya tidak tahu kata ini"
-    is always last; `ResearchAttemptPlan.fromOrder` restores a stored
-    order; `firstUnansweredIndex` gives the resume point.
-  - No Firestore, screens, navigation, scoring or key data.
-- **Research pretest/posttest — M2b-2 to M2b-6 (2026-10-25, working tree,
-  NOT committed, nothing deployed, never run against production,
-  `PROJECT_STATE.md` §5y):**
-  - M2b-2: `ResearchAssessmentService` + `ResearchAssessmentController`:
-    server-only reads, one answer per write, a server re-read after every
-    write, safe retries, resume in the stored order, `Random.secure()`.
-  - M2b-3: `tools/research/bin/research_admin.js` (seed bank, enrol, authorize,
-    void, retake, status). Dry run by default; audit log; explicit
-    emulator/production target. Posttest needs `--confirm-session4-completed`.
-  - M2b-4: real test screens and dashboard status (placeholder deleted).
-    Instructions verbatim from PDF §5; no score, feedback or progress
-    counter. **Not yet checked by hand in a browser.**
-  - M2b-5: Auth emulator, `npm run emulators` / `seed:emulator`, debug-only
-    `USE_FIREBASE_EMULATORS` app mode (compiled out of release). An
-    end-to-end emulator test replays the app's exact payloads after a real
-    Auth-emulator sign-in.
-  - M2b-6: `tools/research/bin/export_results.js` (key validation, scoring,
-    CSV export). The real key validated OK without being shown.
-  - New dev dependency: `firebase-admin` 14.5.0 (`tools/research` only).
-
-| | |
-|---|---|
-| **Confirmed** (all Flutter and research checks re-run 2026-10-25 on the M2b-2–M2b-6 working tree after the pre-commit audit fixes; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **602/602**; `tools/research` `npm test` **71 passing + 2 skipped** (env-gated PDF/key checks) and `npm run test:rules` **86/86** on local Firestore + Auth emulators (70 rules, 15 admin tooling, 1 end-to-end); `dart format --set-exit-if-changed` clean on the research Dart files; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds, with no emulator code in the output; real private key `validate-key` OK; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
-| **Worker deployment** (2026-10-16) | `0bec79ee-2958-475e-97fe-64ababf31c9c` at 100%, confirmed via `wrangler deployments list`; production CORS, auth and routing smoke tests passed (`PROJECT_STATE.md` §5t) |
-| **Not verified** | Chrome E2E of Co-Write against the production Worker (incl. the Bug A physical-keyboard fix); real-LLM output quality in production (feedback accuracy, non-echo continuations, forced-word sentences). The owner reported a satisfactory **local** manual CW-02 E2E |
-| **Known gaps** | No `"hosting"` block; Milestone 8 and research rules undeployed; no research data or tooling run in production; treatment-session delivery and tracking don't exist (opening the posttest is a researcher attestation); the research UI hasn't been checked by hand in a browser; B2-06 expert review, expert validation and the pilot pending; data-retention policy and export access not finalised; student demographics (class/NISN) not in `users`; Placement Test deferred (scoring TBD) |
-
-## 3. Co-Write — Authoritative Behavior (Phase 2)
-
-Product rules are in `SPEC.md` §5.3. In short:
-
-- **Valid usage (CW-05):** a target word counts when the student uses it
-  **meaningfully, with an acceptable intended meaning**. Vocably credits
-  vocabulary, not grammatical perfection:
-  - Grammar, tense, and agreement errors — including a wrong inflection of
-    the target itself ("Yesterday the monster attack the village.") —
-    don't remove credit. They may still get feedback and `hasError`.
-  - Bare words, lists, fragments, mere mentions ("I do not know the word
-    attack."), nonsense, and wrong meanings never count.
-  - Division of work: the model judges meaning, and deterministic code has
-    the final say (`lib/utils/cowrite_validator.dart`, mirrored in
-    `vocably-ai-worker/src/cowriteValidator.ts`). The code maps a
-    model-reported form (`attacked`, `"ATTACKS"`) to its remaining base
-    target, then requires it to appear in the student's text as a valid
-    inflection.
-  - Over-inflections like `attackked` are rejected.
-  - In the Worker, a bot-sentence retry never replaces the first
-    attempt's student assessment.
-- **"Tanpa kesalahan" in the mastery rule** means acceptable meaning and
-  usage of the target word, not an error-free sentence.
-- **Indonesian / mixed-language turns (2026-10-15):** the app, not the LLM,
-  classifies each student turn with the deterministic
-  `containsIndonesianWords` (Dart, mirrored in TypeScript) and sends
-  `studentTurnContainsIndonesian` to the Worker.
-  - For a flagged turn, feedback is one short, polite Indonesian reminder
-    to write in English.
-  - A validated target word in a flagged turn (e.g. `attack` in "aku
-    attack temanku") counts for **session coverage** and resets the miss
-    counter, but **never** for independent mastery.
-  - Every bot sentence (ordinary or fallback) must be English and stay in
-    the story, never answering off-topic questions, calculations, or
-    requests. The Worker retries an `aiTurn` it detects as Indonesian.
-- **Session coverage vs. independent mastery:** `allWordsUsedCorrectly`
-  holds every validly used word: the student's own, suggestion-assisted,
-  mixed-language, and bot fallback words. `independentWordsUsedCorrectly`
-  holds only the student's own English, non-suggestion uses. Only the
-  latter is persisted as `cowriteWordsUsedCorrectly`.
-- **Local rejection:** only inputs that *contain a target word* and are
-  bare/fragment/list are rejected. A rejected input never reaches the
-  transcript or the Worker and doesn't change the counter. `"Okay."` is an
-  ordinary turn.
-- **Fallback:** the app's `consecutiveMissedStudentTurns` counter reaches
-  3 → the app randomly picks exactly one remaining word → the Worker
-  generates a forced-word turn → the word is credited only if the client
-  detects it in that text. A failed fallback credits nothing and retries
-  on the next missed turn. The counter resets on valid student usage or a
-  successful fallback.
-- **Bot usage:** a validated fallback word counts at **session level**
-  (`allWordsUsedCorrectly`, pills, auto-stop). It **never** counts toward
-  `independentWordsUsedCorrectly` / persisted `cowriteWordsUsedCorrectly`
-  / mastery. Incidental target words in ordinary AI turns are never
-  credited.
-- **Feedback** assesses only the current student sentence (sent
-  separately from the story context; `assessedStudentTurn` is echoed and
-  checked by the client). It is written in Indonesian.
-  - **CW-02 priority:** a credited target word is acknowledged
-    specifically; an attempted but uncredited one gets the real issue
-    explained; no target word gets a gentle nudge.
-  - At most one important grammar or meaning point is mentioned.
-    Capitalization, punctuation, and apostrophes are ignored.
-  - If the model claimed words but code credited none, the feedback is
-    replaced by a fixed neutral message. This happens in the Worker and,
-    for an older Worker, in the client too.
-- **Feedback indicator (display only):** ✓ green "Sudah tepat", 💡 amber
-  "Perlu perbaikan", or 💬 blue "Pengingat".
-  - It's derived by `classifyCowriteFeedback` from code-validated credit,
-    `hasError`, whether a target word occurs in the text, and the language
-    flag. It never comes from the feedback's wording.
-  - It's stored in the in-memory `CowriteTurn.feedbackKind`. It isn't
-    persisted (`toMap` is unchanged) and never affects coverage, the
-    counter, or mastery.
-- **Unacceptable continuation:** if neither ordinary attempt yields an
-  acceptable `aiTurn`, the Worker answers 502. The client rolls back the
-  student turn and shows "Gagal mengirim giliran. Coba lagi.".
-- **Known UX limitation:** when the fallback is due, a turn's feedback
-  appears only after the forced-word call finishes. It's still attached
-  to the correct turn.
-- **Suggestions:** the Worker returns the English sentence only; the client
-  shows `Coba tulis "<sentence>"`.
-
-## 4. Architecture Walkthrough (Cowrite path, current source)
-
-```
-Student types a turn → cowrite_screen.dart (_ComposeBar)
-  → LearningFlowController.sendTurn()          [learning_session_controller.dart]
-      - shouldRejectStudentTurnLocally()        [utils/cowrite_validator.dart]
-        (rejected: turnError, draft + focus kept, nothing else changes)
-      - optimistic student bubble
-      - AiWorkerService.cowriteTurn()           → POST /cowrite-turn (ordinary mode)
-          Worker: storySoFar + currentStudentTurn → model → validateStudentTargetWords,
-                  uncredited-claim feedback replacement,
-                  anti-echo / no-target-word / English checks, ≤2 generations
-                  (no acceptable aiTurn → 502);
-                  returns feedback, wordsUsedCorrectly, aiTurn, aiUsedWords: [],
-                  assessedStudentTurn
-      - drop if flow restarted (_flowEpoch); fail if assessedStudentTurn mismatches
-      - validateStudentTargetWords (eligible = words remaining before the turn)
-      - reconcileCowriteFeedback + classifyCowriteFeedback [utils/cowrite_feedback.dart]
-        → feedback + in-memory feedbackKind for THIS turn only
-      - counter: 0 if a word was validly used, else +1
-      - no words remain → done, no AI bubble
-      - counter ≥ 3 → selectFallbackWord (cowriteFallbackRandomProvider)
-          → AiWorkerService.cowriteForcedTurn() → POST /cowrite-turn {forcedWord}
-              Worker: forced prompt; accepts only if the word is in aiTurn, no other
-                      remaining word, not an echo; ≤2 generations, else 502
-          → validateBotTargetWords(claimed: [], text, [forcedWord]) → credit + reset,
-            otherwise keep the ordinary aiTurn and leave the counter at ≥3
-      - else ordinary aiTurn shown, credits nothing
-      - allWordsUsedCorrectly ∪= student + validated bot words
-        independentWordsUsedCorrectly ∪= student words (not on suggestion turns)
-      - saveCowriteTranscript (every turn)
-"Saran menulis" → requestSuggestion() → POST /cowrite-turn {requestSuggestion: true}
-      → bare English sentence → UI: 'Coba tulis "…"' (blocked while sending, and vice versa)
-"✓ Selesai" → completeCowrite() (guarded by isCompletingCowrite)
-      → completeSession + recordCowriteCompletion with the independent set only
-```
-
-**Responsibility split:**
-- **Flutter client:** every decision — counter, fallback timing, word
-  selection, validation of student and bot text, word status, bubble
-  display, completion, and all Firestore writes.
-- **Worker:** prompt builders for the three modes, deterministic
-  validation of model output, bounded retries.
-- **Model:** generates text and gives linguistic assessment only.
-- **Firestore:** source of truth for `learningSessions`/`learningProgress`.
-  No schema or rules change for Phase 2.
-
-## 5. Runtime / Data Naming Map
-
-| Concept | What it is | Where it lands |
+| Komponen | Status | Bukti |
 |---|---|---|
-| `wordsUsedCorrectly` | `/cowrite-turn` response field (ordinary mode) | Re-validated by the client against the current student turn |
-| `aiUsedWords` | `/cowrite-turn` response field | `[forcedWord]` in forced mode, `[]` otherwise; the client ignores the claim and re-detects in text |
-| `assessedStudentTurn` | `/cowrite-turn` response field (ordinary mode, optional) | Client association check |
-| `allWordsUsedCorrectly` | client state | Session-level usage (student + validated fallback); pills + auto-stop |
-| `independentWordsUsedCorrectly` | client state | Student-only, non-suggestion usage; the only source of `cowriteWordsUsedCorrectly` |
-| `consecutiveMissedStudentTurns` | client state (not persisted) | Fallback counter |
-| `cowriteWordsUsedCorrectly` | Persisted, `learningSessions` | Input to mastery calc (`utils/mastery_rules.dart`) |
-| `hasError` | `/cowrite-turn` response field ("important problem") | Read only by `classifyCowriteFeedback` for the display indicator; never affects credit or mastery |
-| `feedbackKind` | client, `CowriteTurn` (in memory only) | Feedback indicator (positive / needsImprovement / reminder); **not** in `toMap`, not persisted |
+| Flutter web (Firebase Hosting) | **Belum di-hosting**; `firebase.json` tidak punya blok `"hosting"` | [terverifikasi 2026-10-26] |
+| Cloudflare Worker | Versi `0bec79ee-2958-475e-97fe-64ababf31c9c` (deploy 2026-10-15T17:08Z UTC) dengan override `--var ALLOWED_ORIGINS`, mencakup seluruh pekerjaan Co-Write | [catatan] `wrangler deployments list` 2026-10-16 (`PROJECT_STATE.md` §5t) |
+| Firestore rules | Deploy terakhir yang tercatat: rules Milestone 7 (berisi semua rules sampai Milestone 7); **rule `targetWordSets` Milestone 8 dan seluruh rules riset belum di-deploy** | [catatan] `PROJECT_STATE.md` §5h/§5k/§5l/§5w, §6; tidak dicek ke project hari ini |
+| Index | `vocabWords` `cefrLevel + updatedAt` live; status deploy index `targetWordSets` tidak tercatat | [catatan] `firebase firestore:indexes` (§5b/§6) |
+| Data produksi | 4.952 `vocabWords` + master `topics` ter-seed; **tidak ada data riset** (`researchParticipants`/`researchInstrument`/`researchAssessmentResults`) | [catatan] konsol Firebase (§5 Stage 3) |
 
-## 6. Repositories & Deployment Inventory
+## 3. Hasil verifikasi terakhir
 
-- **`vocably`:** `main`, which includes all Co-Write work, the Difficult Words selection (§5u, `6423dd2`) and research Milestones 1/2a (§5v/§5w, commit `feat: add research instrument bank and secure assessment rules`; see `git log`). M2b-1 is committed locally as `97c1469` (one commit ahead of `origin/main`, not pushed). **Uncommitted:** research M2b-2–M2b-6 (§5y): app service/controller/screens, emulator config, `firebase.json` Auth emulator, `tools/research` admin/export/emulator tooling and tests, `firebase-admin`, the deleted placeholder screen, and doc updates. Local Git's OpenSSL CA bundle doesn't trust this network's TLS certificate; `git -c http.sslBackend=schannel <fetch|push>` (Windows certificate store, still verified) works per command without changing config.
-- **`vocably-ai-worker`:** `main` at `5bcb5e4`, level with `origin/main`. The only uncommitted change is the local-only `wrangler.jsonc` origin.
-  **`wrangler.jsonc` carries a local-only `http://localhost:5000` entry in
-  `ALLOWED_ORIGINS` — never stage, commit, or deploy it.** Never print or
-  commit `.dev.vars`.
-- **Worker deployment:**
-  - **Current:** `0bec79ee-2958-475e-97fe-64ababf31c9c`,
-    2026-10-15T17:08:04Z UTC, at 100%. It replaced `cc325d6d…`
-    (2026-08-30).
-  - **How:** deployed from the working tree (committed afterwards as `5bcb5e4`) with
-    `npx wrangler deploy --var "ALLOWED_ORIGINS:<web.app>,<firebaseapp.com>,http://localhost:5555"`,
-    so the local-only `localhost:5000` origin was **not** deployed.
-  - **A plain `wrangler deploy` from this working copy would deploy it.**
-    Reuse the override.
-  - **Production checks:** CORS for the allowed and blocked origins, 401
-    without a valid token, and 405 for GET all passed. The CW-02 feedback
-    content isn't verified in production, because that needs a Firebase ID
-    token.
-- **Firebase:** project `vocably-idn-en`. Hosting is not configured.
-  Milestone 8 rules are undeployed (and `firestore.rules` now also holds
-  the undeployed research rules, §5w). A local Firestore Emulator is
-  configured (`firebase.json` `emulators`, demo project only). It needs
-  Java 21+: the system JDKs (1.8/17/19) are too old, so the rules-test
-  runner uses a portable JDK 21 in `%USERPROFILE%\.vocably-dev`.
+Dijalankan agen pada 2026-10-26 terhadap kode `b120d2f`:
 
-## 7. Do Not Modify Without Explicit Project-Owner Approval
+| Cek | Perintah | Hasil |
+|---|---|---|
+| Analyzer | `flutter analyze` | 0 isu |
+| Tes Flutter | `flutter test --concurrency=1` | **602/602** lulus |
+| Tooling riset | `cd tools/research && npm test` | **71 lulus, 2 dilewati** (cek PDF/kunci butuh `VOCABLY_INSTRUMENT_PDF`/`VOCABLY_INSTRUMENT_KEY`) |
+| Emulator riset | `cd tools/research && npm run test:rules` | **86/86** lulus (rules, tooling peneliti, 1 alur end-to-end) di emulator Firestore + Auth lokal |
 
-- The **Phase 2 Co-Write rules** in §3 / `SPEC.md` §5.3. In particular:
-  the app (never the LLM) owns the counter, word selection, and
-  completion; a bot fallback word counts at session level but never as
-  mastery; incidental bot usage is never credited.
-- The **Dart ⇄ TypeScript validator parity** — change both, with the
-  same tests.
-- The **prompt-only** approach to `/generate-story` `usedForm`
-  integrity — no code-level morphology validator there.
-- **No resume behavior** for abandoned learning sessions (Milestone 7
-  Decision 1). **Difficult relearn uses only the student's ticked,
-  still-difficult words**; Decision 2 (relearn every difficult word) was
-  superseded on 2026-10-16 (§5u). **The learning cart clears only after the first successful
-  `/generate-story`** (Decision 4).
+- **Build rilis** `flutter build web --release --dart-define=WORKER_BASE_URL=…`:
+  berhasil pada 2026-10-26 untuk kode yang sama; output tidak memuat host
+  emulator, project demo, atau pemanggilan emulator.
+- **Kunci jawaban privat:** `export_results.js validate-key` OK (80 entri, hash
+  bank cocok) pada 2026-10-25; isi kunci tidak pernah ditampilkan.
+- **Worker** [catatan 2026-10-15/16]: `npx vitest run --fileParallelism=false`
+  148/148, `npx tsc --noEmit` bersih. **`tools/vocab_import`** [catatan
+  2026-10-13]: `npm test` 43/43.
+- **E2E manual browser modul riset** [dilaporkan pemilik, 2026-10-26]:
+  seluruh checklist di `tools/research/README.md` ("Running the app against
+  the emulators") lulus di emulator lokal, termasuk void percobaan yang
+  **sudah selesai** dengan `--allow-completed` → otorisasi retake → percobaan 2
+  dengan urutan butir/opsi baru, dan jawaban lama tetap tersimpan. Hanya
+  emulator — **bukan** bukti kesiapan produksi.
+- **E2E lokal CW-02** [dilaporkan pemilik, 2026-10-16]: memuaskan.
 
-## 8. Known Issues / Limitations
+## 4. Posisi fitur
+
+- **Milestone 1–8:** selesai (riwayat `PROJECT_STATE.md` §2, §5–§5n).
+- **Co-Write fase 1 + 2, CW-05, input Indonesia, CW-02:** selesai; sisi Worker
+  ter-deploy, sisi Flutter belum di-hosting (§5o–§5t).
+- **Pilih kata Difficult untuk "Pelajari Kembali":** selesai (§5u).
+- **Modul riset Pre/Post Test:** bank soal + pemisahan kunci (§5v), rules +
+  emulator (§5w), model & perencana (§5x), penyimpanan jawaban, tooling
+  peneliti, layar tes, alur emulator + uji end-to-end, serta ekspor & skoring
+  offline (§5y) — semuanya sudah di `main`. **Belum pernah dijalankan ke
+  produksi**; rules riset belum di-deploy.
+- **Placement Test:** ditunda (metode skoring TBD) — hanya scaffold.
+
+## 5. Blocker sebelum produksi / responden sungguhan
+
+1. **Deploy rules dulu, baru hosting.** Rules produksi saat ini menolak baca
+   `researchParticipants`; build yang memuat modul riset akan menampilkan
+   "Gagal memuat" pada banner Pre-Test/Post-Test sampai rules riset
+   ter-deploy. Deploy `firestore.rules` juga membawa rule Milestone 8 —
+   keputusan sadar pemilik proyek.
+2. **Seed produksi** `researchInstrument` lalu enrol & otorisasi peserta
+   (`research_admin.js --production`), dengan service account milik peneliti
+   dan izin eksplisit. Belum pernah dilakukan.
+3. **Konfigurasi Firebase Hosting** (`README.md` "Deployment").
+4. **Validasi ahli instrumen dan pilot** pada siswa non-responden — belum.
+5. **Persiapan responden (35–40 siswa):** keputusan data demografi (kelas/NISN
+   tidak ada di `users`); pembersihan data uji di `learningSessions`,
+   `learningProgress`, `targetWordSets` (bank kosakata dan `topics` tetap);
+   prosedur ekspor data belajar (transkrip, hasil cloze, progres mastery) —
+   **belum ada tool-nya** (ekspor yang ada hanya untuk Pre/Post Test).
+6. Keputusan riset di §6 yang menyangkut pengambilan data.
+
+## 6. Keputusan riset yang masih terbuka (milik peneliti)
+
+| Keputusan | Dampak | Langkah berikutnya |
+|---|---|---|
+| B2-06 *starve*: label kata kerja, opsinya bentuk kata benda | Validitas satu butir B2 (PDF §4.6: butir tidak diubah setelah data terkumpul; dianalisis dengan & tanpa) | Review ahli sebelum pilot; perubahan = build ulang bank & kunci (versi baru) |
+| Retensi / penghapusan data riset | Etika & perlindungan data; belum ada job penghapusan | Tentukan periode, pelaksana, caranya |
+| Verifikasi sesi treatment ke-4 sebelum membuka posttest | Validitas waktu posttest; sesi treatment belum dilacak | Tentukan bukti (mis. daftar hadir) sebelum `--confirm-session4-completed` |
+| Prosedur gangguan teknis / retake | Kapan void, siapa memutuskan, apa yang dicatat | Setujui alur void → retake dan siapa yang boleh menjalankan |
+| Format, penyimpanan, akses ekspor | Siapa boleh melihat file `operational_*` (berisi UID) | Setujui set CSV, lokasi, daftar akses |
+| Desain set kata sesi treatment (4 × 5 kata per band) | Intervensinya belum diimplementasikan | Tentukan pembagian; milestone terpisah |
+| Penghitung kemajuan ("Butir 7/20") | Pengalaman siswa; tidak ada di PDF | Setujui atau tolak |
+| Kalimat penjelasan contoh "book" (orang ketiga, verbatim PDF §5) | Teks petunjuk | Konfirmasi tetap ditampilkan |
+
+## 7. Known issues & keterbatasan
 
 | Item | Status |
 |---|---|
-| Validator is heuristic, with no POS data: comparatives count only in a comparative context; an all-target turn with an inflection and no comma counts as a sentence (e.g. `attacks buttons`); `My mother is teacher` would match `teach` | Known, documented |
-| Language detection is a word-list heuristic, not real language identification. Indonesian made only of content words (e.g. "makan nasi goreng") isn't flagged. A sentence-initial English name that is also an Indonesian weak marker needs a second marker to be flagged ("Dan went home." is fine). Whether the model really keeps every bot sentence in English, gives only a short reminder, and stays on the story needs live testing | Unit- and prompt-contract tested only |
-| CW-05 meaning judgement is the model's: whether a use is meaningful (vs. a mere mention, nonsense, or a wrong meaning), and whether the model still omits a grammatically flawed use, can only be verified with the real model. Code can't add a word the model didn't report. Misspellings (`atacked`) and telegraphic all-target sentences (`Monster attack village.` when all three are targets) are not credited | Prompt-contract tested only; needs live testing |
-| Once the bot uses a word via fallback, the student can't earn independent credit for it in that session | By design under the authoritative rule |
-| LLM output quality (feedback accuracy, continuations) is only prompt- and retry-tested | Needs live testing |
-| CW-02 residual gaps: (1) **partial contradictions** aren't detected, e.g. the model claims two words, one is rejected, and the feedback still praises it; (2) feedback that praises a word the model *didn't* claim can't be caught without parsing text, though the indicator then shows amber or blue, never green; (3) attempt detection misses misspellings (`atacked` → shown as a reminder); (4) feedback waits for the fallback call; (5) assessment is still sampled at temperature 0.7 together with the continuation; (6) a 502 for an unacceptable continuation makes the student resend a turn that might have earned credit | Implemented and locally tested (`PROJECT_STATE.md` §5s); needs live testing |
-| Cloudflare native Rate Limiting binding availability unresolved (in-memory fallback in use) | Pre-existing |
-| `--wasm` build fails (`flutter_tts` legacy JS interop) | Use the JS build |
-| Research respondent prep (35–40 students): demographics, data cleanup, pretest/posttest feature (instrument bank done, §5v) | Pending |
-| Difficult relearn has no session-size cap (product decision). A very large selection means a long one-sentence-per-word story, which the 45 s story timeout may not cover | By design; revisit if it causes failures |
-| Per Kata "Coba lagi" after a failed load invalidates only `historyWordEntriesProvider`, not `learningProgressListProvider`, so it may not re-fetch a failed progress query. Not verified (Riverpod 3 may retry on its own) | Observation only, out of scope of §5u |
+| Validator Co-Write heuristik tanpa data POS (komparatif hanya dalam konteks pembanding; giliran semua-target berinfleksi tanpa koma dihitung kalimat; `My mother is teacher` cocok dengan `teach`) | Diketahui, terdokumentasi |
+| Deteksi bahasa Indonesia berbasis daftar kata (kalimat hanya kata isi tidak terdeteksi; penanda lemah mirip nama butuh penanda kedua) | Hanya uji unit & kontrak prompt |
+| Penilaian makna CW-05 dan kualitas output LLM (feedback, kelanjutan, kalimat fallback) | Perlu uji langsung dengan model asli |
+| Sisa CW-02: kontradiksi parsial tak terdeteksi; pujian untuk kata yang tidak diklaim tak tertangkap (indikator tetap amber/biru); salah eja dianggap pengingat; feedback menunggu panggilan fallback; penilaian di temperatur 0.7; 502 membuat siswa mengirim ulang giliran | Teruji lokal; perlu uji langsung |
+| Setelah bot memakai kata lewat fallback, siswa tidak bisa lagi mendapat kredit mandiri untuk kata itu di sesi tersebut | Sesuai aturan |
+| "Pelajari Kembali" tanpa batas jumlah kata; pilihan sangat besar bisa melampaui timeout cerita 45 dtk | Keputusan produk; tinjau bila bermasalah |
+| "Coba lagi" Per Kata hanya meng-invalidate `historyWordEntriesProvider`, bukan `learningProgressListProvider` | Observasi, belum diverifikasi |
+| Binding Rate Limiting native Cloudflare belum dipastikan (fallback in-memory dipakai) | Terbuka |
+| Build `--wasm` gagal (`flutter_tts` memakai JS interop lama) | Pakai build JS |
+| Tes otomatis void percobaan **selesai** belum memeriksa `responses` tetap utuh (kodenya hanya mengubah `status`/`voidReason`/`voidedAt`) | Celah tes kecil |
+| Belum diverifikasi: E2E Co-Write di Chrome terhadap Worker produksi (termasuk perbaikan keyboard fisik); klik-manual Milestone 8; pilihan Difficult di lebar HP | Terbuka |
 
-## 9. Next-Step Gate
+## 8. Langkah berikutnya
 
-1. Confirm the research Milestone 1 extraction comparison report was
-   reviewed against the PDF, then delete it; keep a private backup of the
-   answer key. §5v, §5w and M2b-1 (§5x, `97c1469`, not pushed) are
-   committed; review and commit M2b-2–M2b-6 (§5y, working tree), then run
-   the manual emulator checklist in `tools/research/README.md`. Researcher
-   decisions still open: `PROJECT_STATE.md` §5y.
-2. Any future Worker deploy must keep `wrangler.jsonc`'s local-only
-   origin out (reuse the `--var ALLOWED_ORIGINS` override). Co-Write is
-   already committed and deployed.
-3. Live Chrome + real-LLM E2E of Co-Write (`PROJECT_STATE.md` §7 item 1).
-4. Deploy Milestone 8 `firestore.rules`; configure Firebase Hosting;
-   manual Milestone 8 E2E.
-5. Research respondent preparations (`PROJECT_STATE.md` §12).
-
-## 10. References
-
-- `PROJECT_STATE.md` §5o (Co-Write Phase 1), §5p (Phase 2), §7
-  (outstanding), §9 (verification), §10 (git state).
-- `SPEC.md` §5.3 (Co-Write), §6 (mastery).
-- `DATA_MODEL.md` §4 (`learningSessions`), §10.2 (`/cowrite-turn`).
+1. Review lalu commit konsolidasi dokumen ini (pemilik proyek).
+2. Ambil keputusan riset di §6, terutama B2-06, retensi, dan verifikasi sesi 4.
+3. E2E langsung Co-Write di Chrome dengan LLM asli terhadap Worker produksi:
+   perbaikan keyboard fisik; tiga giliran tanpa kata → tepat satu kata
+   fallback; feedback sesuai kalimat saat ini dengan indikator ✓/💡/💬;
+   kelanjutan yang tidak mengulang siswa; saran "Coba tulis".
+4. Klik-manual Milestone 8 di browser: guru Set Target Kata ("Tanpa batas
+   akhir") → kartu muncul; siswa melihat target di dashboard → cerita memakai
+   kata itu; guru Edit Kata (topik); tombol "Keluar" untuk guru & siswa di
+   berbagai lebar.
+5. Saat siap produksi (izin eksplisit): urutan di §5 — deploy rules, seed &
+   enrol, hosting, lalu pilot.
+6. Pastikan ketersediaan binding Rate Limiting Cloudflare.
+7. Simpan cadangan privat kunci jawaban di luar repo dan OneDrive.
