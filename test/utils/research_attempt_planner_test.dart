@@ -217,6 +217,11 @@ void main() {
         'lib/utils/research_attempt_planner.dart',
         'lib/utils/research_constants.dart',
         'lib/services/research_instrument_service.dart',
+        'lib/models/research_attempt.dart',
+        'lib/services/research_assessment_service.dart',
+        'lib/providers/research_assessment_providers.dart',
+        'lib/screens/student/research_assessment/research_assessment_screen.dart',
+        'lib/screens/student/research_assessment/research_instructions.dart',
       ]) {
         final code = File(path)
             .readAsLinesSync()

@@ -731,16 +731,19 @@ Collection untuk modul riset **Pre-Test & Post-Test** (SPEC §3.7) —
 **terpisah total dari `placementTestResults`** (tujuan, alur, dan
 kepemilikan data beda — lihat tabel perbandingan di `SPEC.md` §3.7).
 
-> **Status (research Milestone 2a):** skema di bawah sudah **ditegakkan oleh
-> `firestore.rules`** dan diuji otomatis terhadap **Firestore Emulator
-> lokal** (`tools/research`, `npm run test:rules`, 70 test). **Rules ini
-> belum di-deploy ke produksi**, dan **belum ada kode Flutter** yang membaca
-> atau menulis collection ini (layar tes masih placeholder). Tooling peneliti
-> yang menulis `researchParticipants`/`researchInstrument` di produksi juga
-> **belum dibangun**. Placement test tetap ditunda. **M2b-1 (lokal, belum
-> di-commit):** kode Dart murni untuk membentuk `itemOrder`/`optionOrder`
-> (`utils/research_attempt_planner.dart`, `models/research_attempt_plan.dart`)
-> sudah ada, tapi masih **tanpa** baca/tulis Firestore.
+> **Status (rules: M2a; app & tooling: M2b-1 – M2b-6):** skema di bawah
+> **ditegakkan oleh `firestore.rules`** dan diuji terhadap **Firestore +
+> Auth Emulator lokal** (`tools/research`, `npm run test:rules`: 70 uji
+> rules + 15 uji tooling peneliti + 1 uji end-to-end yang memutar ulang
+> payload persis dari app). **Rules belum di-deploy ke produksi; tidak ada
+> data riset di produksi.** App membaca `researchParticipants` miliknya dan
+> membaca/menulis `researchAssessmentResults` lewat
+> `services/research_assessment_service.dart` (M2b-2, belum di-commit).
+> Tooling peneliti `tools/research/bin/research_admin.js` (M2b-3, belum
+> di-commit) menulis `researchInstrument` dan `researchParticipants`,
+> mengotorisasi tahap, membatalkan (void) percobaan, dan mengotorisasi
+> retake — **baru pernah dijalankan ke emulator**. Tidak ada field atau
+> collection baru di M2b. Placement test tetap ditunda.
 
 **Model kepercayaan (Spark, tanpa Cloud Functions):** dokumen
 `researchParticipants` dan `researchInstrument` **hanya** ditulis oleh
@@ -775,7 +778,9 @@ update / delete dari client **selalu ditolak**.
 lewat `get()` untuk memvalidasi ID opsi dan teks opsi (literal sebesar ini di
 dalam rules melampaui batas 1000 ekspresi per request). Client tidak boleh
 membaca maupun menulisnya. Kalau dokumennya tidak ada, pembuatan percobaan
-dan penyimpanan jawaban **gagal tertutup**. **Wajib di-seed oleh tooling
+dan penyimpanan jawaban **gagal tertutup**. Ditulis oleh
+`research_admin.js seed-instrument` (tidak pernah menimpa dokumen yang
+isinya berbeda). **Wajib di-seed oleh tooling
 peneliti sebelum rules ini di-deploy.**
 
 ### `researchAssessmentResults/{uid}_{stage}_{n}` — satu percobaan tes
@@ -792,7 +797,7 @@ peneliti sebelum rules ini di-deploy.**
 | `lastAnsweredItemId` | string \| null | Butir yang ditulis pada tulisan terakhir (pembantu rules) |
 | `status` | `"in_progress" \| "completed" \| "voided"` | `voided` hanya oleh tooling peneliti. "Tidak selesai" = tetap `in_progress` (tidak pernah otomatis `completed`) |
 | `startedAt`, `updatedAt`, `completedAt` | Timestamp | Semua = `request.time` (waktu server); `completedAt` null sampai selesai |
-| `voidReason`, `voidedAt` | string, Timestamp | Hanya tooling peneliti (insiden teknis) |
+| `voidReason`, `voidedAt` | string, Timestamp | Hanya tooling peneliti (`research_admin.js void`; insiden teknis). Void tidak menghapus jawaban apa pun; retake = peneliti menaikkan `authorizedAttempts[stage]` ke n+1 (`retake`), hanya setelah percobaan n di-void |
 
 Yang ditegakkan rules:
 - **Baca:** percobaan yang sudah ada hanya oleh UID yang tersimpan di
@@ -819,6 +824,21 @@ Yang **tidak** bisa dijamin rules (client tidak dipercaya): keacakan
 pengacakan, bahwa urutan yang tersimpan benar-benar yang ditampilkan,
 siapa yang sebenarnya menjawab / tanpa bantuan, dan jeda posttest — diawasi
 saat pelaksanaan dan ditandai saat ekspor.
+
+**Cara app memakai skema ini (M2b-2):** semua baca untuk keputusan memakai
+`Source.server` (bukan cache); setiap tulis (buat percobaan, simpan satu
+jawaban dengan `FieldPath(['responses', itemId])`, tandai selesai) diikuti
+baca ulang dari server, dan status layar dibangun dari yang benar-benar
+tersimpan. Percobaan baru memakai rencana `Random.secure()`; percobaan yang
+sudah ada selalu ditampilkan dengan `itemOrder`/`optionOrder` tersimpan.
+Pengiriman ulang jawaban (mis. setelah konfirmasi hilang) ditolak rules dan
+diselesaikan oleh baca ulang. Payload app diverifikasi terhadap rules asli
+lewat fixture `tools/research/test/fixtures/client_payloads.json`.
+
+**Ekspor & skoring (M2b-6):** `tools/research/bin/export_results.js` membaca
+kedua collection (Admin SDK, read-only) dan menskor offline dengan kunci
+privat; file analisis hanya memuat `researchId` (lihat
+`tools/research/README.md`, "Export and scoring").
 
 > **Retensi data (D5):** kebijakan retensi serta penghapusan/pengarsipan
 > data riset di Firestore **harus difinalkan sebelum pengambilan data
@@ -860,7 +880,7 @@ jangan diedit manual. Skema lengkap & prosedurnya di
 users (siswa) ──1:N── learningProgress ──N:1── vocabWords
 users (siswa) ──1:N── learningSessions
 users (siswa) ──1:N── placementTestResults        (TBD)
-users (siswa) ──1:1── researchParticipants ──1:N── researchAssessmentResults  (rules M2a, belum deploy)
+users (siswa) ──1:1── researchParticipants ──1:N── researchAssessmentResults  (rules M2a belum deploy; app/tooling M2b)
 researchInstrument (data bank publik, per versi+band) ← dibaca rules lewat get()
 users (guru)  ──1:N── targetWordSets ──N:N── vocabWords (via wordIds)
 users (guru)  ──1:N── vocabWords (via addedByTeacherId, kalau source="guru")

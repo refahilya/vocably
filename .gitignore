@@ -41,3 +41,6 @@ migrate_working_dir/
 *.private.json
 *.private.md
 /tools/research/node_modules/
+# Researcher audit logs (tools/research/bin/research_admin.js --log). The tool
+# refuses paths inside this repository; this is a second line of defence.
+*.private.jsonl

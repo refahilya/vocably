@@ -302,8 +302,10 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 
 ### 3.7 Pre-Test & Post-Test (Modul Riset)
 
-> **Status:** **instrumen sudah dirancang; fitur di aplikasi belum
-> dibangun.** Sumber tunggal instrumen adalah PDF peneliti
+> **Status:** **instrumen sudah dirancang; fitur tes di aplikasi dan
+> tooling peneliti sudah dibangun & diuji lokal (M2b-1 – M2b-6) tapi
+> M2b-2 – M2b-6 belum di-commit, belum pernah dijalankan ke produksi, dan
+> rules belum di-deploy.** Sumber tunggal instrumen adalah PDF peneliti
 > `Rancangan_Instrumen_Pretest_Vocably.pdf` (soal, opsi, kunci, rubrik,
 > prosedur) — PDF itu memuat kunci jawaban sehingga **tidak** disimpan di
 > repo. **Validasi ahli dan uji coba pada siswa non-responden masih belum
@@ -311,13 +313,17 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 > aman-app (`assets/research/instrument_v1.json`, tanpa kunci) sudah
 > di-generate lewat `tools/research/` (Milestone 1 modul riset). Security
 > rules riset sudah ditulis dan diuji di Firestore Emulator lokal (Milestone
-> 2a, `DATA_MODEL.md` §6b) tapi **belum di-deploy**. Layar tes, penyimpanan
-> jawaban dari app, tooling peneliti, dan ekspor **belum ada** — entry point di
-> dashboard masih membuka layar placeholder. **M2b-1 (lokal, belum
-> di-commit, tidak ada deploy):** model bank soal, loader aset yang
-> gagal-tertutup, dan perencana percobaan murni (pengacakan + posisi lanjut)
-> sudah ada di kode Dart, tapi belum dipakai layar mana pun. Placement Test (3.1)
-> **ditunda** dan bukan prasyarat pengembangan modul ini.
+> 2a, `DATA_MODEL.md` §6b) tapi **belum di-deploy**. M2b-1 (model, loader
+> bank, perencana percobaan) sudah di-commit lokal (`97c1469`, belum
+> di-push). M2b-2 – M2b-6 (working tree): penyimpanan jawaban, tooling
+> peneliti (`tools/research/bin/research_admin.js`), layar tes yang
+> menggantikan placeholder, alur emulator + uji end-to-end emulator, serta
+> ekspor & skoring offline (`tools/research/bin/export_results.js`) —
+> detail di `PROJECT_STATE.md` §5y. **Pengiriman sesi treatment dan
+> pelacakannya belum ada**: pembukaan posttest adalah pernyataan
+> (atestasi) peneliti, bukan bukti otomatis bahwa sesi ke-4 selesai.
+> Placement Test (3.1) **ditunda** dan bukan prasyarat pengembangan modul
+> ini.
 
 **Ketentuan instrumen (dari PDF; jangan diubah atau diparafrasekan):**
 
@@ -332,20 +338,28 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
   yang sama untuk semua siswa.
 - Rencana sampel: **35–40 siswa**.
 
-**Perilaku yang wajib dipenuhi app (sebagian besar belum diimplementasi):**
+**Perilaku yang wajib dipenuhi app (diimplementasi M2b-1 – M2b-4; belum dicek manual di browser):**
 
 - Urutan butir dan urutan opsi a–d diacak per siswa dan per tahap; pretest
   dan posttest diacak **independen**; "Saya tidak tahu kata ini" selalu
-  terakhir. *(M2b-1: logika pengacakannya sudah ada di
-  `utils/research_attempt_planner.dart` — satu panggilan per tahap, dengan
-  `Random` yang di-inject; belum terhubung ke layar.)*
-- Yang disimpan adalah **ID opsi (opaque) dan teks opsi yang dipilih**,
-  bukan huruf yang tampil.
+  terakhir. *(Rencana baru dibuat dengan `Random.secure()` saat siswa
+  menekan "Mulai"; percobaan yang sudah ada tidak pernah diacak ulang.)*
+- Yang disimpan adalah **ID opsi (opaque), teks opsi yang dipilih, dan
+  posisi tampilnya** (1–4; "tidak tahu" = 5), bukan huruf yang tampil.
+  Huruf a)–e) di layar hanya label posisi, sama seperti contoh di PDF §5.
 - Satu jawaban wajib dipilih sebelum lanjut (termasuk "tidak tahu");
   jawaban disimpan bertahap; percobaan yang terputus dilanjutkan dengan
   urutan yang sama, mulai dari butir pertama yang belum dijawab menurut
-  urutan percobaan itu. *(M2b-1: pemulihan urutan dan penghitungan posisi
-  lanjut sudah ada, belum terhubung ke Firestore/layar.)*
+  urutan percobaan itu. Butir berikutnya baru tampil setelah server
+  mengonfirmasi jawaban; gagal simpan bisa dicoba lagi tanpa menulis dua
+  jawaban (pilihan yang sudah dikirim terkunci, karena tulisan yang belum
+  terkonfirmasi bisa saja tetap sampai ke server) (jawaban tersimpan tidak bisa diubah, dan tidak ada tombol kembali
+  ke butir sebelumnya). Setelah butir terakhir dikirim, percobaan ditandai
+  selesai.
+- Sebelum butir pertama tampil petunjuk dan contoh butir PDF §5, **persis**
+  (`lib/screens/student/research_assessment/research_instructions.dart`).
+  Tidak ada penghitung kemajuan ("Butir 7/20") karena PDF tidak
+  menyebutkannya — keputusan peneliti yang masih terbuka.
 - **Tidak ada feedback benar/salah, skor, atau kunci** yang ditampilkan ke
   siswa.
 
@@ -376,9 +390,9 @@ siswa mengulang tes dan kejadiannya dicatat.
 - **Posisi di UI:** section tersendiri di layar "Belajar", **di bawah** dua
   card utama (3.2) — terpisah secara visual & struktural, bukan bagian dari
   card Level maupun destinasi Riwayat.
-- Untuk sekarang: entry point masih placeholder (lihat
-  `DESIGN_REFERENCE.md` §5.5). Layar tes dibangun di milestone berikutnya
-  memakai bank soal yang sudah ada.
+- Banner Pre-Test/Post-Test menampilkan status asli dari server (belum
+  terdaftar, belum dibuka, siap, lanjutkan, selesai, dibatalkan) dan
+  membuka layar tes (`DESIGN_REFERENCE.md` §5.5).
 
 ## 4. Alur Guru
 
@@ -774,9 +788,9 @@ abjad/tema/POS), memilih kosakata, tambah/kurang kata di keranjang pelajari,
 generate story dari judul/tema (berkali-kali, cerita saat "Selanjutnya"
 ditekan yang dipakai), cloze test, co-write dengan AI, feedback saat
 co-write, saran menulis saat co-write, pelajari ulang kata difficult (3 fase
-penuh), pre-test & post-test (entry point masih placeholder; instrumen sudah
-dirancang di PDF peneliti dan bank soalnya tersedia sebagai aset, layar tes
-belum dibangun).
+penuh), pre-test & post-test (layar tes, penyimpanan jawaban, tooling
+peneliti, dan ekspor dibangun di M2b — belum di-commit seluruhnya, belum
+dipakai di produksi; instrumen belum divalidasi ahli, lihat 3.7).
 
 **Guru:** tambah kata baru ke bank kosakata (dengan deteksi duplikat &
 opsi tambah makna baru), edit topik kata yang sudah ada (pilih dari

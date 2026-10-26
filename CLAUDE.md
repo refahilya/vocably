@@ -22,8 +22,9 @@ Vocably juga berfungsi ganda sebagai **instrumen penelitian skripsi** —
 selain fitur belajar utama, ada modul Placement Test (personalisasi level,
 **ditunda**) dan modul riset Pre-Test/Post-Test (pengukuran data
 penelitian). Instrumen Pre/Post Test sudah dirancang (PDF peneliti) dan bank
-soalnya sudah tersedia sebagai aset; fitur tesnya di aplikasi belum dibangun
-— lihat bagian 10.
+soalnya sudah tersedia sebagai aset; fitur tes, tooling peneliti, dan ekspor
+sudah dibangun & diuji lokal tapi sebagian besar belum di-commit dan belum
+pernah dipakai di produksi — lihat bagian 10.
 
 Ini adalah **pengembangan kedua** dari nol. Versi pertama (Flutter for Android,
 ~80% jadi) di-deprecate karena requirement berubah signifikan. Versi pertama
@@ -45,7 +46,7 @@ komponen disesuaikan untuk web, bukan disalin persis. Detail di
 - **Database & Auth:** Firebase (Firestore + Firebase Auth), **plan Spark
   (gratis)** — tidak perlu upgrade Blaze/billing account sama sekali.
 - **Deployment app:** Firebase Hosting via `web.app` (free tier). **Catatan audit:** konfigurasi blok `"hosting"` di `firebase.json` belum dibuat (baru ada `"firestore"`). Blok hosting dengan `public: "build/web"` dan SPA rewrite ke `/index.html` harus ditambahkan sebelum `firebase deploy`.
-- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (538 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
+- **Perintah test wajib:** Selalu gunakan `flutter test --concurrency=1` (602 tests passing). Jangan gunakan `flutter test` tanpa argumen karena runner bawaan secara tidak deterministik melewatkan test file di lingkungan ini.
 - **Build web produksi:** `flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev`.
 - **AI proxy: Cloudflare Workers** (bukan Firebase Cloud Functions — diganti karena kendala billing/kartu kredit untuk Blaze plan). Ini **repo/project terpisah** dari Flutter app (TypeScript, deploy sendiri via `wrangler`, free tier tanpa kartu kredit, 100.000 request/hari). Satu-satunya alasan butuh proxy ini: **API key ChatGPT tidak boleh ada di client**. Worker ini yang menyimpan `OPENAI_API_KEY` dan meneruskan panggilan AI. Detail arsitektur lengkap di `DATA_MODEL.md` §10.
 - **AI generation:** ChatGPT API — **selalu dipanggil lewat Cloudflare Worker**. Endpoint yang tersedia: `POST /generate-story`, `POST /cowrite-turn`, `POST /translate` (kontrak lengkap di `DATA_MODEL.md` §10.2).
@@ -69,7 +70,7 @@ lib/
       learning_flow/   # 3 fase: read, cloze, co-write
       history/         # 2 tab: per kata, per sesi
       placement_test/  # scaffold saja (placement test ditunda) — lihat bagian 10
-      research_assessment/  # masih placeholder — layar pre-test & post-test belum dibangun, lihat bagian 10
+      research_assessment/  # layar pre-test & post-test (M2b-4, belum di-commit), lihat bagian 10
     teacher/
       dashboard/
       target_words/
@@ -84,7 +85,7 @@ assets/
 
 tools/              # skrip sisi dev, tidak ikut ter-bundle ke app
   vocab_import/     # pipeline CSV Oxford → Firestore + bundle aset (§7 Milestone 4)
-  research/         # PDF instrumen → bank soal aman-app + kunci privat; uji rules riset di emulator (bagian 10)
+  research/         # PDF instrumen → bank + kunci privat; uji emulator; admin peneliti; ekspor & skoring (bagian 10)
 
 # REPO TERPISAH (bukan bagian dari project Flutter di atas):
 vocably-ai-worker/   # Cloudflare Worker (TypeScript) — proxy AI, lihat DATA_MODEL.md §10
@@ -251,7 +252,7 @@ dulu kalau perlu penyesuaian.
 8. **Guru:** set target kata per sesi/waktu + Edit Kata (edit topik kata
    yang sudah ada). *(Selesai, committed di `1f2b606`).*
 
-> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**538 tests passing**, `flutter test --concurrency=1`; Worker **148 tests passing**, `npx vitest run --fileParallelism=false`; tooling riset **46 tests passing + 2 skipped**, `cd tools/research && npm test`; rules riset **70 tests passing** di Firestore Emulator lokal, `npm run test:rules`). Perbaikan berikutnya di `main` dan working tree:
+> **Status Saat Ini:** Seluruh Milestone 1–8 telah selesai dan teruji (**602 tests passing**, `flutter test --concurrency=1`; Worker **148 tests passing**, `npx vitest run --fileParallelism=false`; tooling riset **71 tests passing + 2 skipped**, `cd tools/research && npm test`; suite emulator riset **86 tests passing** (70 rules + 15 tooling peneliti + 1 end-to-end) di Firestore + Auth Emulator lokal, `npm run test:rules`). Perbaikan berikutnya di `main` dan working tree:
 > - `56ded8b`: Pembersihan tombol logout ganda pada dashboard siswa.
 > - `34a9c4b`: Sanitasi feedback Co-Write untuk mencegah kebocoran marker terjemahan.
 > - `fa4d52c` (`vocably`) & `6239f7e` (`vocably-ai-worker`): Perbaikan kebocoran posisi kata target pada alur Storyfier → Cloze Test (committed; Worker-nya kini ikut ter-deploy dalam versi `0bec79ee` 2026-10-16).
@@ -261,9 +262,10 @@ dulu kalau perlu penyesuaian.
 >
 > - **Modul riset Pre/Post Test — Milestone 1 (committed bersama M2a — commit `feat: add research instrument bank and secure assessment rules`):** bank soal aman-app `assets/research/instrument_v1.json` (80 butir: A2/B1/B2/C1 × 20, 4 opsi ber-ID opaque + pilihan terpisah `dont_know`, **tanpa kunci jawaban**) di-generate dan divalidasi dari PDF instrumen oleh `tools/research/bin/build_instrument.js`; kunci privat hanya ditulis ke path eksplisit di luar repo & OneDrive — sudah di-generate peneliti (2026-10-24) di folder lokal di luar repo & OneDrive, dan terverifikasi cocok dengan build ulang dari PDF (isinya tidak pernah ditampilkan). Layar tes, penyimpanan jawaban dari Flutter, tooling peneliti, dan ekspor **belum** dibangun; placement test ditunda. Detail: `tools/research/README.md`, `PROJECT_STATE.md` §5v.
 > - **Modul riset Pre/Post Test — Milestone 2a (committed, BELUM di-deploy):** konfigurasi Firebase Emulator (`firebase.json` `emulators`) + security rules riset di `firestore.rules` + 70 uji rules di emulator lokal (termasuk regresi audit keamanan UID) (`tools/research`, `npm run test:rules`; JDK 21 portabel di `%USERPROFILE%\.vocably-dev`). Tidak ada perubahan kode Flutter. Detail: `PROJECT_STATE.md` §5w, `DATA_MODEL.md` §6b.
-> - **Modul riset Pre/Post Test — M2b-1 (working tree, BELUM di-commit, tidak ada deploy; implementasi lokal saja):** kode Dart murni — model bank soal (`models/research_instrument.dart`, parsing ketat yang menolak field tak dikenal, ID ganda, versi/skema tak didukung, dan band yang tidak tepat 20 butir), `ResearchParticipantAssignment` (band + versi saja), loader aset `services/research_instrument_service.dart` (`AssetBundle` injectable; aset hilang/rusak = error, bukan daftar kosong), dan perencana percobaan `utils/research_attempt_planner.dart` + `models/research_attempt_plan.dart` (20 butir band yang ditetapkan, urutan butir & 4 opsi diacak dengan `Random` yang di-inject, "Saya tidak tahu kata ini" selalu terakhir, pemulihan rencana dari `itemOrder`/`optionOrder`, posisi lanjut = butir pertama yang belum dijawab menurut urutan rencana). Tanpa Firestore, layar, navigasi, skoring, atau kunci jawaban; dashboard masih membuka placeholder. Detail: `PROJECT_STATE.md` §5x.
+> - **Modul riset Pre/Post Test — M2b-1 (committed lokal `97c1469`, belum di-push, tidak ada deploy):** model bank soal dengan parsing ketat, loader aset gagal-tertutup (`services/research_instrument_service.dart`), dan perencana percobaan (`utils/research_attempt_planner.dart`, `models/research_attempt_plan.dart`). Detail: `PROJECT_STATE.md` §5x.
+> - **Modul riset Pre/Post Test — M2b-2 s.d. M2b-6 (working tree, BELUM di-commit, tidak ada deploy, belum pernah dijalankan ke produksi):** **M2b-2** penyimpanan jawaban (`services/research_assessment_service.dart`, `providers/research_assessment_providers.dart`: baca server-only, satu jawaban per tulis, baca ulang setelah setiap tulis, retry aman, resume dengan urutan tersimpan, `Random.secure()` untuk percobaan baru); **M2b-3** tooling peneliti `tools/research/bin/research_admin.js` (seed bank, enrol CSV ketat, otorisasi, void, retake, status; dry-run default, audit log, target emulator/produksi eksplisit; posttest butuh atestasi `--confirm-session4-completed`); **M2b-4** layar tes menggantikan placeholder (petunjuk PDF §5 verbatim, satu butir per layar, "tidak tahu" terakhir, tanpa skor/feedback/penghitung kemajuan) + status asli di dashboard; **M2b-5** Auth emulator di `firebase.json`, `npm run emulators` / `seed:emulator`, mode app `--dart-define=USE_FIREBASE_EMULATORS=true` (ditolak di release; kodenya hilang dari build release), uji end-to-end emulator dengan sign-in Auth emulator dan payload persis dari app; **M2b-6** ekspor & skoring offline `tools/research/bin/export_results.js` (validasi kunci, pemilihan percobaan tanpa menebak, CSV analisis ber-`researchId` saja; kunci asli terverifikasi cocok tanpa ditampilkan). Satu dependency dev baru: `firebase-admin` 14.5.0 (hanya `tools/research`). **UI belum dicek manual di browser.** Detail: `PROJECT_STATE.md` §5y, `tools/research/README.md`.
 >
-> **Langkah Selanjutnya:** Hapus laporan perbandingan ekstraksi privat setelah direview dan simpan cadangan privat kunci jawaban; M2b-1 (model, loader bank, perencana percobaan) selesai di working tree dan belum di-commit — review/commit, lalu M2b-2 (layanan penyimpanan jawaban) menunggu persetujuan eksplisit; sebelum pengambilan data responden masih dibutuhkan tooling peneliti (seed `researchInstrument` & `researchParticipants`), layar tes, ekspor, dan kebijakan retensi data (catatan: deploy `firestore.rules` kini juga ikut men-deploy rules riset — aman karena gagal-tertutup sampai tooling peneliti men-seed data, tapi harus keputusan sadar); jangan ikutkan origin lokal `localhost:5000` di `wrangler.jsonc` (deploy Worker berikutnya wajib memakai override `--var ALLOWED_ORIGINS` yang sama); uji E2E browser + LLM asli terhadap Worker produksi, konfigurasi hosting pada `firebase.json`, deploy security rules Milestone 8, dan persiapan responden penelitian (35–40 siswa: skema demografi, pembersihan data uji, milestone berikutnya modul Pre/Post Test).
+> **Langkah Selanjutnya:** Review lalu commit M2b-2 – M2b-6 (working tree) dan push `97c1469` + commit itu; jalankan checklist manual E2E di emulator (`tools/research/README.md`, "Running the app against the emulators"); keputusan peneliti yang masih terbuka: B2-06 (*starve*) & validasi ahli + pilot, kebijakan retensi data, prosedur verifikasi sesi ke-4 sebelum membuka posttest (sesi treatment belum dibangun/dilacak), prosedur retake/gangguan teknis, format/penyimpanan/akses ekspor, desain set kata sesi treatment, dan penghitung kemajuan; sebelum pengambilan data responden: seed `researchInstrument` & enrol peserta ke produksi (butuh kredensial service account peneliti + keputusan eksplisit), deploy `firestore.rules` (ikut men-deploy rules riset dan rule Milestone 8 — keputusan sadar), konfigurasi hosting `firebase.json`; jangan ikutkan origin lokal `localhost:5000` di `wrangler.jsonc` (deploy Worker berikutnya wajib memakai override `--var ALLOWED_ORIGINS` yang sama); uji E2E browser + LLM asli terhadap Worker produksi; persiapan responden (35–40 siswa).
 
 ## 8. Logic Penting yang Sering Disalahpahami
 
@@ -455,8 +457,8 @@ disatukan atau ditukar-tukar pemahamannya:
   client** (tidak ada logic rahasia yang perlu disembunyikan), dengan
   jawaban mentah tetap disimpan ke Firestore supaya bisa diverifikasi ulang
   saat analisis skripsi.
-- **Pre-Test / Post-Test — instrumen sudah dirancang; fitur app belum
-  dibangun.** Instrumen pengambilan data penelitian skripsi (mengukur
+- **Pre-Test / Post-Test — instrumen sudah dirancang; fitur app &
+  tooling dibangun lokal (M2b), belum dipakai di produksi.** Instrumen pengambilan data penelitian skripsi (mengukur
   kemampuan kosakata siswa sebelum & sesudah pakai Vocably), awalnya
   direncanakan pakai Google Forms tapi diarahkan pembimbing untuk jadi satu
   kesatuan di dalam aplikasi.
@@ -480,14 +482,19 @@ disatukan atau ditukar-tukar pemahamannya:
     tools/research && npm run test:rules`, butuh Java 21+). Band & otorisasi
     tes hanya dari `researchParticipants` (ditulis tooling peneliti) —
     **`users.cefrLevel` tidak pernah dipakai** untuk band/kelayakan.
-  - **Sudah ada (M2b-1, lokal, belum di-commit):** model bank soal +
-    loader aset yang gagal-tertutup, dan perencana percobaan murni
-    (pengacakan urutan butir/opsi dengan `Random` yang di-inject, "tidak
-    tahu" selalu terakhir, posisi lanjut). Belum dipakai layar mana pun.
-  - **Belum ada:** layar tes, penyimpanan jawaban dari Flutter, tooling peneliti (pendaftaran peserta,
-    pembukaan posttest, retake, seed `researchInstrument`), ekspor & skoring.
-    Layar `research_assessment/` masih placeholder. Kebijakan retensi data
-    riset harus difinalkan sebelum pengambilan data responden.
+  - **Sudah ada (M2b-1, committed lokal `97c1469`):** model bank soal +
+    loader aset yang gagal-tertutup, dan perencana percobaan murni.
+  - **Sudah ada (M2b-2 – M2b-6, working tree, belum di-commit, belum
+    pernah ke produksi):** penyimpanan jawaban dari Flutter, layar tes,
+    status dashboard, tooling peneliti (`research_admin.js`: seed bank,
+    enrol, otorisasi, void, retake), alur emulator + uji end-to-end, dan
+    ekspor & skoring offline (`export_results.js`). Detail:
+    `tools/research/README.md`, `PROJECT_STATE.md` §5y.
+  - **Belum ada / belum diputuskan:** pengiriman & pelacakan sesi treatment
+    (pembukaan posttest = atestasi peneliti, bukan bukti otomatis sesi
+    ke-4), kebijakan retensi data riset, format/akses ekspor final, review
+    ahli B2-06, pilot, dan cek manual UI di browser. Rules riset belum
+    di-deploy; belum ada data riset di produksi.
   - **Skoring Pre/Post Test dilakukan offline oleh peneliti** (bukan di
     app), dengan kunci privat: B = 1, S/T/K = 0, skor maks 20, Gain = Post −
     Pre, N-gain = (Post − Pre)/(20 − Pre) dan tidak dihitung bila Pre = 20.

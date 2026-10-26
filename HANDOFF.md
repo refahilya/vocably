@@ -73,8 +73,7 @@ Verify any claim here that matters to your task against the source,
     and OneDrive. It was generated on 2026-10-24 in a local folder outside
     both, and verified against a fresh build from the PDF (contents never
     displayed).
-  - Assessment screens, Firestore persistence, rules, posttest eligibility
-    and export are **not implemented**.
+  - Assessment screens, persistence, tooling and export came later (M2b, below).
   - The placement test is deferred and is not a prerequisite.
   - Expert validation and the non-respondent pilot are pending.
   - Planned sample: 35–40 students.
@@ -89,8 +88,8 @@ Verify any claim here that matters to your task against the source,
     never `users.cefrLevel`. No Flutter code changed.
   - Deploying `firestore.rules` now includes these rules. They fail closed
     until trusted tooling seeds `researchInstrument` and participants.
-- **Research pretest/posttest — M2b-1 (2026-10-25, working tree, NOT
-  committed, nothing deployed, `PROJECT_STATE.md` §5x):** pure Dart only.
+- **Research pretest/posttest — M2b-1 (2026-10-25, committed locally as
+  `97c1469`, not pushed, nothing deployed, `PROJECT_STATE.md` §5x):** pure Dart only.
   - Instrument models with strict parsing, and
     `ResearchInstrumentService` (injectable `AssetBundle`; a missing or
     malformed bank throws).
@@ -98,15 +97,33 @@ Verify any claim here that matters to your task against the source,
     item's 4 options with an injected `Random`; "Saya tidak tahu kata ini"
     is always last; `ResearchAttemptPlan.fromOrder` restores a stored
     order; `firstUnansweredIndex` gives the resume point.
-  - No Firestore, screens, navigation, scoring or key data. Not yet used
-    by any screen.
+  - No Firestore, screens, navigation, scoring or key data.
+- **Research pretest/posttest — M2b-2 to M2b-6 (2026-10-25, working tree,
+  NOT committed, nothing deployed, never run against production,
+  `PROJECT_STATE.md` §5y):**
+  - M2b-2: `ResearchAssessmentService` + `ResearchAssessmentController`:
+    server-only reads, one answer per write, a server re-read after every
+    write, safe retries, resume in the stored order, `Random.secure()`.
+  - M2b-3: `tools/research/bin/research_admin.js` (seed bank, enrol, authorize,
+    void, retake, status). Dry run by default; audit log; explicit
+    emulator/production target. Posttest needs `--confirm-session4-completed`.
+  - M2b-4: real test screens and dashboard status (placeholder deleted).
+    Instructions verbatim from PDF §5; no score, feedback or progress
+    counter. **Not yet checked by hand in a browser.**
+  - M2b-5: Auth emulator, `npm run emulators` / `seed:emulator`, debug-only
+    `USE_FIREBASE_EMULATORS` app mode (compiled out of release). An
+    end-to-end emulator test replays the app's exact payloads after a real
+    Auth-emulator sign-in.
+  - M2b-6: `tools/research/bin/export_results.js` (key validation, scoring,
+    CSV export). The real key validated OK without being shown.
+  - New dev dependency: `firebase-admin` 14.5.0 (`tools/research` only).
 
 | | |
 |---|---|
-| **Confirmed** (Flutter and research checks re-run 2026-10-25 on the final research M1/M2a tree, just before it was committed; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **538/538** (re-run 2026-10-25 on the M2b-1 working tree after the pre-commit review, with `flutter analyze` 0 issues; the release build and research npm suites were not re-run for M2b-1); `tools/research` `npm test` 46 passing + 2 skipped (env-gated PDF/key checks) and `npm run test:rules` **70/70** on the local Firestore Emulator; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
+| **Confirmed** (all Flutter and research checks re-run 2026-10-25 on the M2b-2–M2b-6 working tree after the pre-commit audit fixes; Worker run 2026-10-15/16) | `flutter analyze` 0 issues; `flutter test --concurrency=1` **602/602**; `tools/research` `npm test` **71 passing + 2 skipped** (env-gated PDF/key checks) and `npm run test:rules` **86/86** on local Firestore + Auth emulators (70 rules, 15 admin tooling, 1 end-to-end); `dart format --set-exit-if-changed` clean on the research Dart files; `flutter build web --release --dart-define=WORKER_BASE_URL=…` succeeds, with no emulator code in the output; real private key `validate-key` OK; Worker `npx vitest run --fileParallelism=false` **148/148**, `npx tsc --noEmit` clean |
 | **Worker deployment** (2026-10-16) | `0bec79ee-2958-475e-97fe-64ababf31c9c` at 100%, confirmed via `wrangler deployments list`; production CORS, auth and routing smoke tests passed (`PROJECT_STATE.md` §5t) |
 | **Not verified** | Chrome E2E of Co-Write against the production Worker (incl. the Bug A physical-keyboard fix); real-LLM output quality in production (feedback accuracy, non-echo continuations, forced-word sentences). The owner reported a satisfactory **local** manual CW-02 E2E |
-| **Known gaps** | No `"hosting"` block; Milestone 8 rules undeployed; student demographics (class/NISN) not in `users`; Placement Test deferred (scoring TBD); Pre-/Post-Test instrument bank (§5v) and emulator-tested rules (§5w, undeployed) exist, but the assessment feature and researcher tooling are not implemented; data-retention policy not yet finalised |
+| **Known gaps** | No `"hosting"` block; Milestone 8 and research rules undeployed; no research data or tooling run in production; treatment-session delivery and tracking don't exist (opening the posttest is a researcher attestation); the research UI hasn't been checked by hand in a browser; B2-06 expert review, expert validation and the pilot pending; data-retention policy and export access not finalised; student demographics (class/NISN) not in `users`; Placement Test deferred (scoring TBD) |
 
 ## 3. Co-Write — Authoritative Behavior (Phase 2)
 
@@ -254,7 +271,7 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 
 ## 6. Repositories & Deployment Inventory
 
-- **`vocably`:** `main`, which includes all Co-Write work, the Difficult Words selection (§5u, `6423dd2`) and research Milestones 1/2a (§5v/§5w, commit `feat: add research instrument bank and secure assessment rules`; see `git log`). **Uncommitted:** research M2b-1 (§5x): the new research models, service, planner, constants and their tests, plus doc updates. Local Git's OpenSSL CA bundle doesn't trust this network's TLS certificate; `git -c http.sslBackend=schannel <fetch|push>` (Windows certificate store, still verified) works per command without changing config.
+- **`vocably`:** `main`, which includes all Co-Write work, the Difficult Words selection (§5u, `6423dd2`) and research Milestones 1/2a (§5v/§5w, commit `feat: add research instrument bank and secure assessment rules`; see `git log`). M2b-1 is committed locally as `97c1469` (one commit ahead of `origin/main`, not pushed). **Uncommitted:** research M2b-2–M2b-6 (§5y): app service/controller/screens, emulator config, `firebase.json` Auth emulator, `tools/research` admin/export/emulator tooling and tests, `firebase-admin`, the deleted placeholder screen, and doc updates. Local Git's OpenSSL CA bundle doesn't trust this network's TLS certificate; `git -c http.sslBackend=schannel <fetch|push>` (Windows certificate store, still verified) works per command without changing config.
 - **`vocably-ai-worker`:** `main` at `5bcb5e4`, level with `origin/main`. The only uncommitted change is the local-only `wrangler.jsonc` origin.
   **`wrangler.jsonc` carries a local-only `http://localhost:5000` entry in
   `ALLOWED_ORIGINS` — never stage, commit, or deploy it.** Never print or
@@ -315,8 +332,10 @@ Student types a turn → cowrite_screen.dart (_ComposeBar)
 
 1. Confirm the research Milestone 1 extraction comparison report was
    reviewed against the PDF, then delete it; keep a private backup of the
-   answer key. §5v and §5w are committed; M2b-1 (§5x) is in the working
-   tree for review and commit; M2b-2 needs explicit approval.
+   answer key. §5v, §5w and M2b-1 (§5x, `97c1469`, not pushed) are
+   committed; review and commit M2b-2–M2b-6 (§5y, working tree), then run
+   the manual emulator checklist in `tools/research/README.md`. Researcher
+   decisions still open: `PROJECT_STATE.md` §5y.
 2. Any future Worker deploy must keep `wrangler.jsonc`'s local-only
    origin out (reuse the `--var ALLOWED_ORIGINS` override). Co-Write is
    already committed and deployed.

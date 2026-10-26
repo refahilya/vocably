@@ -10,11 +10,16 @@ import 'package:vocably/providers/vocab_bundle_providers.dart';
 import 'package:vocably/screens/student/dashboard/dashboard_screen.dart';
 import 'package:vocably/screens/student/dashboard/target_word_list_screen.dart';
 import 'package:vocably/screens/student/placement_test/placement_test_placeholder_screen.dart';
-import 'package:vocably/screens/student/research_assessment/research_assessment_placeholder_screen.dart';
+import 'package:vocably/models/research_attempt.dart';
+import 'package:vocably/providers/research_assessment_providers.dart';
+import 'package:vocably/screens/student/research_assessment/research_assessment_screen.dart';
+import 'package:vocably/services/research_assessment_service.dart';
 import 'package:vocably/screens/student/vocab_browser/vocab_browser_screen.dart';
 import 'package:vocably/services/target_word_set_service.dart';
 import 'package:vocably/services/vocab_bundle_service.dart';
 import 'package:vocably/utils/role.dart';
+
+import '../support/fake_research_assessment_service.dart';
 
 class _FakeTargetWordSetService extends TargetWordSetService {
   List<TargetWordSet> sets = [];
@@ -55,10 +60,16 @@ Future<void> _pumpDashboard(
   required AppUser profile,
   _FakeTargetWordSetService? targetWordSetService,
   _FakeVocabBundleService? vocabBundleService,
+  FakeResearchAssessmentService? researchService,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
+      // No automatic retry, so a simulated read failure stays visible.
+      retry: (_, _) => null,
       overrides: [
+        researchAssessmentServiceProvider.overrideWithValue(
+          researchService ?? FakeResearchAssessmentService(),
+        ),
         targetWordSetServiceProvider.overrideWithValue(
           targetWordSetService ?? _FakeTargetWordSetService(),
         ),
@@ -254,31 +265,101 @@ void main() {
   });
 
   group('DashboardScreen — Pre-Test/Post-Test section', () {
-    testWidgets('shows both entry points with a "Segera" badge', (
+    ResearchAttemptRecord attempt(
+      ResearchStage stage,
+      ResearchAttemptStatus status,
+    ) => ResearchAttemptRecord(
+      attemptId: ResearchAttemptRecord.idFor('student-1', stage, 1),
+      studentId: 'student-1',
+      stage: stage,
+      attemptNumber: 1,
+      band: 'A2',
+      instrumentVersion: 'v1',
+      itemOrder: const [],
+      optionOrder: const {},
+      responses: const {},
+      status: status,
+    );
+
+    testWidgets('a student who is not a participant sees "Belum tersedia"', (
       tester,
     ) async {
       await _pumpDashboard(tester, profile: _studentProfile);
 
       expect(find.text('Pre-Test'), findsOneWidget);
       expect(find.text('Post-Test'), findsOneWidget);
-      expect(find.text('Segera'), findsNWidgets(2));
+      expect(find.text('Belum tersedia'), findsNWidgets(2));
+      expect(find.text('Segera'), findsNothing);
     });
 
-    testWidgets(
-      'tapping Pre-Test opens the research-assessment placeholder screen',
-      (tester) async {
-        await _pumpDashboard(tester, profile: _studentProfile);
+    testWidgets('shows the persisted status of each stage', (tester) async {
+      final service = FakeResearchAssessmentService(
+        participant: participantFor(preTest: 1),
+      );
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        researchService: service,
+      );
+      expect(find.text('Siap dikerjakan'), findsOneWidget);
+      expect(find.text('Belum dibuka'), findsOneWidget);
+    });
 
-        await tester.tap(find.text('Pre-Test'));
-        await tester.pumpAndSettle();
+    testWidgets('in progress, completed and an opened posttest', (
+      tester,
+    ) async {
+      final inProgress =
+          FakeResearchAssessmentService(participant: participantFor(preTest: 1))
+            ..putAttempt(
+              attempt(ResearchStage.preTest, ResearchAttemptStatus.inProgress),
+            );
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        researchService: inProgress,
+      );
+      expect(find.text('Lanjutkan'), findsOneWidget);
 
-        expect(
-          find.byType(ResearchAssessmentPlaceholderScreen),
-          findsOneWidget,
-        );
-        expect(find.text('Pre-Test akan segera hadir'), findsOneWidget);
-      },
-    );
+      final done =
+          FakeResearchAssessmentService(
+            participant: participantFor(preTest: 1, postTest: 1),
+          )..putAttempt(
+            attempt(ResearchStage.preTest, ResearchAttemptStatus.completed),
+          );
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        researchService: done,
+      );
+      expect(find.text('Selesai'), findsOneWidget);
+      expect(find.text('Siap dikerjakan'), findsOneWidget);
+    });
+
+    testWidgets('a failed read shows "Gagal memuat", not a placeholder', (
+      tester,
+    ) async {
+      final service = FakeResearchAssessmentService()
+        ..readFaults.addAll([
+          ResearchFailureKind.unavailable,
+          ResearchFailureKind.unavailable,
+        ]);
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        researchService: service,
+      );
+      expect(find.text('Gagal memuat'), findsNWidgets(2));
+    });
+
+    testWidgets('tapping Pre-Test opens the assessment screen', (tester) async {
+      await _pumpDashboard(tester, profile: _studentProfile);
+
+      await tester.tap(find.text('Pre-Test'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ResearchAssessmentScreen), findsOneWidget);
+      expect(find.text('Belum terdaftar'), findsOneWidget);
+    });
   });
 
   group('DashboardScreen — no duplicate logout', () {

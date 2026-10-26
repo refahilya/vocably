@@ -48,12 +48,39 @@ function findGitWorkTree(startDir) {
 }
 
 /**
+ * Location problems shared by every private output: inside the Vocably
+ * repository, inside a OneDrive-synchronised folder, or inside a Git
+ * working tree. [candidates] are file paths (resolved and real);
+ * [existingDir] is their folder when it exists.
+ */
+function locationProblems(candidates, existingDir, { repoRoot, env, platform }) {
+  const reasons = [];
+  const repoRoots = [repoRoot, realpathOrSelf(repoRoot)];
+  if (candidates.some((c) => repoRoots.some((r) => isInside(c, r, platform)))) {
+    reasons.push('it is inside the Vocably repository');
+  }
+
+  const oneDriveRoots = ONEDRIVE_ENV_VARS.map((name) => env[name]).filter((v) => v && String(v).trim());
+  const inOneDrive =
+    candidates.some((c) => oneDriveRoots.some((r) => isInside(c, r, platform))) ||
+    candidates.some((c) => path.dirname(c).split(/[\\/]/).some((seg) => ONEDRIVE_SEGMENT_RE.test(seg)));
+  if (inOneDrive) reasons.push('it is inside a OneDrive-synchronised folder');
+
+  if (existingDir) {
+    const workTree = findGitWorkTree(realpathOrSelf(existingDir));
+    if (workTree) reasons.push(`it is inside a Git working tree (${workTree})`);
+  }
+  return reasons;
+}
+
+/**
  * Returns `{ ok, resolved, reasons }` for a proposed private output path.
- * [env] and [platform] are injectable for tests.
+ * [env] and [platform] are injectable for tests. [allowExisting] accepts an
+ * existing file (only for append-only audit logs).
  */
 function assessPrivateOutputPath(
   target,
-  { repoRoot, requiredSuffix, env = process.env, platform = process.platform }
+  { repoRoot, requiredSuffix, env = process.env, platform = process.platform, allowExisting = false }
 ) {
   const reasons = [];
   if (!target || !String(target).trim()) {
@@ -71,26 +98,34 @@ function assessPrivateOutputPath(
     reasons.push(`the folder ${parent} does not exist (create it yourself first)`);
   }
   const realTarget = path.join(parentExists ? realpathOrSelf(parent) : parent, path.basename(resolved));
-  const candidates = [resolved, realTarget];
+  reasons.push(...locationProblems([resolved, realTarget], parentExists ? parent : null, { repoRoot, env, platform }));
 
-  const repoRoots = [repoRoot, realpathOrSelf(repoRoot)];
-  if (candidates.some((c) => repoRoots.some((r) => isInside(c, r, platform)))) {
-    reasons.push('it is inside the Vocably repository');
+  if (!allowExisting && fs.existsSync(resolved)) reasons.push('the file already exists (refusing to overwrite)');
+
+  return { ok: reasons.length === 0, resolved, reasons };
+}
+
+/**
+ * Returns `{ ok, resolved, reasons }` for a private output folder (the
+ * research export). It must already exist and must not be inside the
+ * repository, a Git working tree or OneDrive. Files inside it are written
+ * with [writeNewPrivateFile], which never overwrites.
+ */
+function assessPrivateOutputDir(target, { repoRoot, env = process.env, platform = process.platform }) {
+  if (!target || !String(target).trim()) {
+    return { ok: false, resolved: null, reasons: ['no output folder was supplied'] };
   }
-
-  const oneDriveRoots = ONEDRIVE_ENV_VARS.map((name) => env[name]).filter((v) => v && String(v).trim());
-  const inOneDrive =
-    candidates.some((c) => oneDriveRoots.some((r) => isInside(c, r, platform))) ||
-    candidates.some((c) => path.dirname(c).split(/[\\/]/).some((seg) => ONEDRIVE_SEGMENT_RE.test(seg)));
-  if (inOneDrive) reasons.push('it is inside a OneDrive-synchronised folder');
-
-  if (parentExists) {
-    const workTree = findGitWorkTree(realpathOrSelf(parent));
-    if (workTree) reasons.push(`it is inside a Git working tree (${workTree})`);
-  }
-
-  if (fs.existsSync(resolved)) reasons.push('the file already exists (refusing to overwrite)');
-
+  const resolved = path.resolve(String(target));
+  const exists = fs.existsSync(resolved) && fs.statSync(resolved).isDirectory();
+  const reasons = exists ? [] : [`the folder ${resolved} does not exist (create it yourself first)`];
+  const real = exists ? realpathOrSelf(resolved) : resolved;
+  reasons.push(
+    ...locationProblems([path.join(resolved, 'f'), path.join(real, 'f')], exists ? resolved : null, {
+      repoRoot,
+      env,
+      platform,
+    })
+  );
   return { ok: reasons.length === 0, resolved, reasons };
 }
 
@@ -99,4 +134,9 @@ function writeNewPrivateFile(filePath, contents) {
   fs.writeFileSync(filePath, contents, { flag: 'wx', mode: 0o600 });
 }
 
-module.exports = { assessPrivateOutputPath, writeNewPrivateFile };
+/** Appends one line to an audit log (created owner-only if missing). */
+function appendPrivateLine(filePath, line) {
+  fs.appendFileSync(filePath, `${line}\n`, { mode: 0o600 });
+}
+
+module.exports = { assessPrivateOutputPath, assessPrivateOutputDir, writeNewPrivateFile, appendPrivateLine };

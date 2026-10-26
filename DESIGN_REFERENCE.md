@@ -353,24 +353,38 @@ Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
       lebih redup, tanpa border input) — supaya guru tidak mengira bisa
       mengedit arti lalu bingung kenapa tidak bisa.
 
-### 5.5 Pre-Test & Post-Test — Placeholder (bukan desain final)
+### 5.5 Pre-Test & Post-Test
 
-> **Status:** instrumennya sudah dirancang (PDF peneliti; validasi ahli &
-> uji coba non-responden masih belum) dan bank soalnya sudah ada sebagai
-> aset (`SPEC.md` §3.7), tapi **layar tesnya belum dibangun**. Desain di
-> bawah masih murni untuk entry point placeholder di dashboard.
+> **Status (M2b-4, working tree, belum di-commit, belum di-hosting):** layar
+> tes sudah dibangun (`lib/screens/student/research_assessment/`) dan diuji
+> dengan widget test; **belum dicek manual di browser**. Instrumen belum
+> divalidasi ahli / diuji coba (`SPEC.md` §3.7).
 
-- Di layar "Belajar" (§5.1), section terpisah di bawah dua card utama:
-  card/banner sederhana bertuliskan "Pre-Test" dan "Post-Test" (dua entri
-  terpisah atau satu card dengan dua tombol kecil — pilih yang paling simpel),
-  style rounded konsisten dengan card lain tapi dengan penanda visual "belum
-  tersedia": badge kecil "Segera" atau ikon jam pasir, warna netral abu bukan
-  navy solid, supaya jelas beda dari CTA aktif lain.
-- Saat layar tes dibangun (milestone berikutnya), section ini didesain ulang
-  sesuai ketentuan instrumen (PDF §4.5): kata target ditampilkan **tebal**
-  dengan kelas katanya di samping; satu butir per layar atau daftar yang
-  jelas; "Saya tidak tahu kata ini" selalu opsi terakhir; tanpa feedback
-  benar/salah, skor, atau kunci.
+- **Dashboard** ("Belajar", §5.1): section terpisah di bawah dua card utama,
+  dua banner "Pre-Test" dan "Post-Test" (abu netral, rounded) dengan badge
+  status dari data server: "Belum tersedia" (bukan peserta), "Belum dibuka"
+  (belum diotorisasi / posttest terkunci), "Siap dikerjakan" (navy),
+  "Lanjutkan" (oranye), "Selesai" (hijau), "Dibatalkan" / "Hubungi peneliti"
+  (merah), "Gagal memuat". Banner selalu bisa diketuk; layar tes menjelaskan
+  setiap status. Badge "Segera" lama sudah dihapus.
+- **Petunjuk:** kotak biru muda berisi teks "Petunjuk" PDF §5 persis, lalu
+  "Contoh butir (kata ini bukan bagian dari tes):", contoh *book (kata
+  benda)* a)–e) statis, dan kalimat penjelasannya — semua verbatim dari PDF
+  (`research_instructions.dart`). Tombol "Mulai" (baru) atau "Lanjutkan"
+  (melanjutkan percobaan).
+- **Butir:** satu butir per layar, lebar maks 600 px di tengah; kata target
+  **tebal** (gaya `wordTitle`) dengan "(kelas kata)" di sampingnya (PDF
+  §4.5); 4 opsi berupa kartu penuh-lebar ber-label a)–d) dalam urutan acak
+  yang tersimpan, "e) Saya tidak tahu kata ini" selalu terakhir; opsi
+  terpilih = border navy 2 px + latar biru muda + ikon radio terisi.
+  Tombol "Lanjut" (butir terakhir: "Kirim") nonaktif sampai ada pilihan, dan
+  menampilkan spinner sampai server mengonfirmasi jawaban. Gagal simpan =
+  banner merah muda "Jawaban belum tersimpan…"; pilihan yang sudah dikirim
+  tetap dan terkunci (opsi lain nonaktif) sampai tersimpan.
+- **Tidak ada** tombol kembali ke butir sebelumnya, penghitung kemajuan
+  ("Butir 7/20" — belum diputuskan peneliti), skor, atau feedback
+  benar/salah. Layar selesai hanya "Pre-Test selesai" + "Terima kasih.
+  Semua jawabanmu sudah tersimpan."
 
 ### 5.6 Registrasi Guru (kode akses) — pola minimal
 

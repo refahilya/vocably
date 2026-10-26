@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/app_user.dart';
+import '../../../models/research_attempt.dart';
 import '../../../providers/dashboard_providers.dart';
+import '../../../providers/research_assessment_providers.dart';
 import '../../../providers/vocab_browser_providers.dart';
+import '../../../services/research_assessment_service.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/cefr_levels.dart';
 import '../placement_test/placement_test_placeholder_screen.dart';
-import '../research_assessment/research_assessment_placeholder_screen.dart';
+import '../research_assessment/research_assessment_screen.dart';
 import '../vocab_browser/vocab_browser_screen.dart';
 import 'target_word_list_screen.dart';
 
@@ -35,7 +38,7 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           const Divider(),
           const SizedBox(height: AppSpacing.md),
-          const _PreTestPostTestSection(),
+          _PreTestPostTestSection(uid: profile.uid),
         ],
       ),
     );
@@ -262,13 +265,14 @@ class _LevelPill extends StatelessWidget {
 
 /// Pre-Test/Post-Test entry section (`SPEC.md` §3.7,
 /// `DESIGN_REFERENCE.md` §5.5) — visually separated below the two main
-/// cards, "Segera" styling (neutral, not navy solid) since the research
-/// instrument itself is fully TBD. Still a real entry point — tapping
-/// either opens [ResearchAssessmentPlaceholderScreen] rather than doing
-/// nothing, so it's honest about "not built yet" instead of appearing
-/// broken.
+/// cards. Each banner shows the stage's real status for this student, read
+/// from the server (participant record + authorized attempt), and opens
+/// [ResearchAssessmentScreen], which explains every state. The status is
+/// refreshed when the student comes back from the test.
 class _PreTestPostTestSection extends StatelessWidget {
-  const _PreTestPostTestSection();
+  const _PreTestPostTestSection({required this.uid});
+
+  final String uid;
 
   @override
   Widget build(BuildContext context) {
@@ -276,14 +280,16 @@ class _PreTestPostTestSection extends StatelessWidget {
       children: [
         Expanded(
           child: _AssessmentBanner(
-            assessmentType: 'preTest',
+            uid: uid,
+            stage: ResearchStage.preTest,
             label: 'Pre-Test',
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: _AssessmentBanner(
-            assessmentType: 'postTest',
+            uid: uid,
+            stage: ResearchStage.postTest,
             label: 'Post-Test',
           ),
         ),
@@ -292,23 +298,48 @@ class _PreTestPostTestSection extends StatelessWidget {
   }
 }
 
-class _AssessmentBanner extends StatelessWidget {
-  const _AssessmentBanner({required this.assessmentType, required this.label});
+class _AssessmentBanner extends ConsumerWidget {
+  const _AssessmentBanner({
+    required this.uid,
+    required this.stage,
+    required this.label,
+  });
 
-  final String assessmentType;
+  final String uid;
+  final ResearchStage stage;
   final String label;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(researchStageStatusProvider(uid, stage));
+    final (text, color) = switch (status) {
+      AsyncData(:final value) => switch (value) {
+        ResearchStageKind.notEnrolled => ('Belum tersedia', AppColors.disabled),
+        ResearchStageKind.notAuthorized ||
+        ResearchStageKind.locked => ('Belum dibuka', AppColors.disabled),
+        ResearchStageKind.notStarted => ('Siap dikerjakan', AppColors.primary),
+        ResearchStageKind.inProgress => ('Lanjutkan', AppColors.warning),
+        ResearchStageKind.completed => ('Selesai', AppColors.success),
+        ResearchStageKind.voided => ('Dibatalkan', AppColors.error),
+        ResearchStageKind.invalid => ('Hubungi peneliti', AppColors.error),
+      },
+      AsyncError() => ('Gagal memuat', AppColors.error),
+      _ => ('Memuat…', AppColors.disabled),
+    };
+
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.medium),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ResearchAssessmentPlaceholderScreen(
-            assessmentType: assessmentType,
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ResearchAssessmentScreen(uid: uid, stage: stage),
           ),
-        ),
-      ),
+        );
+        ref.invalidate(researchStageStatusProvider(uid, ResearchStage.preTest));
+        ref.invalidate(
+          researchStageStatusProvider(uid, ResearchStage.postTest),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm,
@@ -328,7 +359,7 @@ class _AssessmentBanner extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
-            const _SegeraBadge(),
+            _StatusBadge(text: text, color: color),
           ],
         ),
       ),
@@ -336,8 +367,11 @@ class _AssessmentBanner extends StatelessWidget {
   }
 }
 
-class _SegeraBadge extends StatelessWidget {
-  const _SegeraBadge();
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.text, required this.color});
+
+  final String text;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -347,12 +381,13 @@ class _SegeraBadge extends StatelessWidget {
         vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: AppColors.disabled,
+        color: color,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
-      child: const Text(
-        'Segera',
-        style: TextStyle(
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 10,
           fontWeight: FontWeight.w600,
