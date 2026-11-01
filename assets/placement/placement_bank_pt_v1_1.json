@@ -5,7 +5,7 @@
   "status": "Researcher instrument. K2 decision rule selected by the researcher; not empirically or expert validated.",
   "source": {
     "version": "PT-V1.0",
-    "sha256": "83eff1c5ab08f6eeda0b1221029ec3a2a0a097b13b675ee168c6a0e9bc611ec1"
+    "sha256": "0bdc4f6d3ade634046b708e0d0ac8bf4d35c8122193d18ee9d6d817c07079ee2"
   },
   "bands": [
     "A1",
@@ -486,7 +486,7 @@
         },
         {
           "id": "C",
-          "text": "biasa (khas)"
+          "text": "biasa"
         },
         {
           "id": "D",
@@ -620,7 +620,7 @@
         },
         {
           "id": "D",
-          "text": "mendorong (memberi semangat)"
+          "text": "mendorong"
         }
       ]
     },
@@ -946,7 +946,7 @@
       "options": [
         {
           "id": "A",
-          "text": "mengira (tanpa bukti)"
+          "text": "mengira"
         },
         {
           "id": "B",
@@ -980,7 +980,7 @@
         },
         {
           "id": "C",
-          "text": "berat (sulit diterima)"
+          "text": "berat"
         },
         {
           "id": "D",
@@ -1084,7 +1084,7 @@
         },
         {
           "id": "C",
-          "text": "bersama (dari kedua pihak)"
+          "text": "bersama"
         },
         {
           "id": "D",
@@ -1158,7 +1158,7 @@
         },
         {
           "id": "B",
-          "text": "halus (tidak mencolok)"
+          "text": "halus"
         },
         {
           "id": "C",
