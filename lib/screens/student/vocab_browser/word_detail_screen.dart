@@ -10,6 +10,8 @@ import '../../../providers/learning_cart_providers.dart';
 import '../../../services/dictionary_api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/normalize_word.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
 
 /// Milestone 4 Stage 11/12 — "Kamus Detail" (`SPEC.md` §3.5). Reached by
 /// tapping a word's name/translation area in [VocabBrowserScreen]'s list
@@ -52,31 +54,36 @@ class WordDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(entry.word)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _HeaderCard(
-              entry: entry,
-              lookupAsync: lookupAsync,
-              inCart: inCart,
-              hideCartAction: hideCartAction,
-              onToggleCart: () =>
-                  ref.read(learningCartProvider.notifier).toggle(entry),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            for (final meaning in entry.meanings)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _MeaningBlock(
-                  word: entry.word,
-                  meaning: meaning,
-                  content: _dictionaryContentFor(lookupAsync, meaning.pos),
-                  onRetry: () => ref.invalidate(dictionaryLookupProvider(normalized)),
+      body: AppScrollPage(
+        maxWidth: AppContentWidth.list,
+        child: AppTwoPane(
+          sideFirst: true,
+          sideLeading: true,
+          sideWidth: 340,
+          breakpoint: 840,
+          side: _HeaderCard(
+            entry: entry,
+            lookupAsync: lookupAsync,
+            inCart: inCart,
+            hideCartAction: hideCartAction,
+            onToggleCart: () =>
+                ref.read(learningCartProvider.notifier).toggle(entry),
+          ),
+          primary: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final meaning in entry.meanings)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: _MeaningBlock(
+                    word: entry.word,
+                    meaning: meaning,
+                    content: _dictionaryContentFor(lookupAsync, meaning.pos),
+                    onRetry: () => ref.invalidate(dictionaryLookupProvider(normalized)),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -170,12 +177,7 @@ class _HeaderCard extends ConsumerWidget {
       },
     );
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(AppRadius.medium),
-      ),
+    return AppSheet(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -188,10 +190,10 @@ class _HeaderCard extends ConsumerWidget {
                 Row(
                   children: [
                     if (phoneticText != null) ...[
-                      Text(
-                        phoneticText,
-                        style: AppTextStyles.body.copyWith(
-                          color: Colors.black54,
+                      Flexible(
+                        child: Text(
+                          phoneticText,
+                          style: AppTextStyles.bodyMuted,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -214,8 +216,8 @@ class _HeaderCard extends ConsumerWidget {
                   spacing: AppSpacing.xs,
                   runSpacing: AppSpacing.xs,
                   children: [
-                    _Badge(text: entry.cefrLevel, emphasized: true),
-                    for (final topic in entry.topics) _Badge(text: topic),
+                    AppBadge.solid(text: entry.cefrLevel),
+                    for (final topic in entry.topics) AppBadge(text: topic),
                   ],
                 ),
               ],
@@ -258,28 +260,20 @@ class _MeaningBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.disabledBackground),
-        borderRadius: BorderRadius.circular(AppRadius.medium),
-      ),
+    return AppSheet(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _Badge(text: meaning.pos, emphasized: true),
+              AppBadge.solid(text: meaning.pos),
               const SizedBox(width: AppSpacing.sm),
               const Text('🇮🇩 '),
               if (meaning.translation != null)
                 Expanded(
                   child: Text(
                     meaning.translation!,
-                    style: AppTextStyles.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: AppTextStyles.bodyStrong,
                   ),
                 )
               else
@@ -294,28 +288,21 @@ class _MeaningBlock extends ConsumerWidget {
           switch (content) {
             _DictionaryLoading() => Row(
               children: [
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                const AppButtonSpinner(size: 14),
                 const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'Memuat definisi...',
-                  style: AppTextStyles.body.copyWith(color: Colors.black45),
-                ),
+                const Text('Memuat definisi...', style: AppTextStyles.bodyMuted),
               ],
             ),
-            _DictionaryUnavailable() => Text(
+            _DictionaryUnavailable() => const Text(
               'Definisi bahasa Inggris tidak tersedia untuk kata ini.',
-              style: AppTextStyles.body.copyWith(color: Colors.black45),
+              style: AppTextStyles.bodyMuted,
             ),
             _DictionaryRetryable() => Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Text(
                     'Gagal memuat definisi. Periksa koneksi lalu coba lagi.',
-                    style: AppTextStyles.body.copyWith(color: Colors.black45),
+                    style: AppTextStyles.bodyMuted,
                   ),
                 ),
                 TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
@@ -339,10 +326,7 @@ class _MeaningBlock extends ConsumerWidget {
                             ),
                             child: Text(
                               '"${definition.example}"',
-                              style: AppTextStyles.body.copyWith(
-                                color: Colors.black54,
-                                fontStyle: FontStyle.italic,
-                              ),
+                              style: AppTextStyles.example,
                             ),
                           ),
                       ],
@@ -378,56 +362,16 @@ class _LazyTranslationText extends ConsumerWidget {
     return translationAsync.when(
       loading: () => Row(
         children: [
-          const SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          const AppButtonSpinner(size: 12),
           const SizedBox(width: AppSpacing.xs),
-          Text(
-            'Menerjemahkan...',
-            style: AppTextStyles.body.copyWith(
-              color: Colors.black45,
-              fontStyle: FontStyle.italic,
-            ),
+          const Flexible(
+            child: Text('Menerjemahkan...', style: AppTextStyles.bodyMuted),
           ),
         ],
       ),
-      error: (_, _) => Text(
-        '—',
-        style: AppTextStyles.body.copyWith(color: Colors.black45),
-      ),
-      data: (translation) => Text(
-        translation,
-        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600),
-      ),
+      error: (_, _) => const Text('—', style: AppTextStyles.bodyMuted),
+      data: (translation) => Text(translation, style: AppTextStyles.bodyStrong),
     );
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge({required this.text, this.emphasized = false});
-
-  final String text;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: emphasized ? AppColors.primary : AppColors.disabledBackground,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        text,
-        style: AppTextStyles.badgeLabel.copyWith(
-          color: emphasized ? Colors.white : Colors.black87,
-        ),
-      ),
-    );
-  }
-}

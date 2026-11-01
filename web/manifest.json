@@ -1,12 +1,11 @@
 {
-    "name": "vocably",
-    "short_name": "vocably",
+    "name": "Vocably",
+    "short_name": "Vocably",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#1B1F5C",
+    "theme_color": "#1B1F5C",
+    "description": "Belajar kosakata bahasa Inggris lewat cerita.",
     "prefer_related_applications": false,
     "icons": [
         {

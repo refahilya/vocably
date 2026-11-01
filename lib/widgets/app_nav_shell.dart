@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
+import 'app_brand.dart';
+import 'app_layout.dart';
 
 /// One destination hosted by [AppNavShell] — a label, an icon, and the
 /// content shown while it's selected.
@@ -23,12 +25,19 @@ class AppNavDestination {
 
 /// Generic, role-agnostic responsive navigation shell.
 ///
-/// `DESIGN_REFERENCE.md` §6.1: "satu sistem navigasi... berubah bentuk
-/// mengikuti lebar layar" — `NavigationRail` on wide screens, a horizontal
-/// top-tab row on narrow ones — as **one** reusable widget shared by both
-/// siswa and guru, not two separate implementations. This class contains
-/// no Firebase/Riverpod/auth/role knowledge at all; a caller supplies
-/// whatever [destinations] apply to the signed-in user.
+/// `DESIGN_REFERENCE.md` §6.1: one navigation system that changes shape with
+/// the window, shared by siswa and guru:
+///
+/// - below [wideBreakpoint]: a navy app bar with top tabs;
+/// - from [wideBreakpoint]: a navy spine ([NavigationRail]) with icon + label
+///   stacked, and no app bar, so tablets keep their vertical space;
+/// - from [AppBreakpoints.expanded]: the same spine, extended with labels
+///   beside the icons.
+///
+/// Each destination decides its own content width, because a dashboard and a
+/// form want different widths. This class contains no
+/// Firebase/Riverpod/auth/role knowledge at all; a caller supplies whatever
+/// [destinations] apply to the signed-in user.
 class AppNavShell extends StatefulWidget {
   const AppNavShell({
     super.key,
@@ -48,12 +57,8 @@ class AppNavShell extends StatefulWidget {
   final int initialIndex;
   final VoidCallback? onLogout;
 
-  /// Width at which the shell switches from the narrow top-tab layout to
-  /// the wide `NavigationRail` layout. An implementation choice (no exact
-  /// pixel value is specified anywhere in the source documents) — kept
-  /// local to the shell rather than in `theme.dart`, since nothing else
-  /// currently needs this specific number.
-  static const double wideBreakpoint = 600;
+  /// Width at which the shell switches from top tabs to the side spine.
+  static const double wideBreakpoint = AppBreakpoints.compact;
 
   @override
   State<AppNavShell> createState() => _AppNavShellState();
@@ -62,6 +67,11 @@ class AppNavShell extends StatefulWidget {
 class _AppNavShellState extends State<AppNavShell> {
   late int _selectedIndex = widget.initialIndex;
 
+  /// One key per destination, so the selected body keeps its state (a half
+  /// filled form, the open tab) when the window crosses [wideBreakpoint] and
+  /// the shell around it changes shape, for example when a tablet rotates.
+  final _bodyKeys = <int, GlobalKey>{};
+
   void _select(int index) {
     if (index == _selectedIndex) return;
     setState(() => _selectedIndex = index);
@@ -69,8 +79,8 @@ class _AppNavShellState extends State<AppNavShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide =
-        MediaQuery.sizeOf(context).width >= AppNavShell.wideBreakpoint;
+    final width = MediaQuery.sizeOf(context).width;
+    final isWide = width >= AppNavShell.wideBreakpoint;
     // Defensive clamp, not just belt-and-suspenders with the constructor
     // asserts above: asserts are stripped from release builds entirely, and
     // _selectedIndex lives in State, so it can in principle outlive a
@@ -82,14 +92,68 @@ class _AppNavShellState extends State<AppNavShell> {
       widget.destinations.length - 1,
     );
     // Only the selected destination is ever built — switching destinations
-    // simply swaps which widget occupies this spot. No IndexedStack: none
-    // of the current (placeholder) destinations have state worth keeping
-    // alive while hidden, and DESIGN_REFERENCE.md doesn't ask for it here.
-    final selectedBody = widget.destinations[selectedIndex].body;
+    // simply swaps which widget occupies this spot.
+    final selectedBody = KeyedSubtree(
+      key: _bodyKeys.putIfAbsent(selectedIndex, GlobalKey.new),
+      child: widget.destinations[selectedIndex].body,
+    );
+
+    if (isWide) {
+      final extended = width >= AppBreakpoints.expanded;
+      return Scaffold(
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            NavigationRail(
+              selectedIndex: selectedIndex,
+              onDestinationSelected: _select,
+              extended: extended,
+              minExtendedWidth: 232,
+              labelType: extended
+                  ? NavigationRailLabelType.none
+                  : NavigationRailLabelType.all,
+              leading: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  extended ? AppSpacing.md : AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                ),
+                child: AppWordmark(fontSize: extended ? 24 : 16),
+              ),
+              trailing: widget.onLogout == null
+                  ? null
+                  : Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: IconButton(
+                            icon: const Icon(Icons.logout),
+                            color: AppColors.onNavyMuted,
+                            tooltip: 'Keluar',
+                            onPressed: widget.onLogout,
+                          ),
+                        ),
+                      ),
+                    ),
+              destinations: [
+                for (final destination in widget.destinations)
+                  NavigationRailDestination(
+                    icon: Icon(destination.icon),
+                    label: Text(destination.label),
+                  ),
+              ],
+            ),
+            Expanded(child: selectedBody),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vocably'),
+        title: const AppWordmark(),
         actions: [
           if (widget.onLogout != null)
             IconButton(
@@ -98,59 +162,16 @@ class _AppNavShellState extends State<AppNavShell> {
               onPressed: widget.onLogout,
             ),
         ],
-        bottom: isWide
-            ? null
-            : PreferredSize(
-                preferredSize: const Size.fromHeight(56),
-                child: _NavTabRow(
-                  destinations: widget.destinations,
-                  selectedIndex: selectedIndex,
-                  onSelected: _select,
-                ),
-              ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: _NavTabRow(
+            destinations: widget.destinations,
+            selectedIndex: selectedIndex,
+            onSelected: _select,
+          ),
+        ),
       ),
-      body: isWide
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                NavigationRail(
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: _select,
-                  labelType: NavigationRailLabelType.all,
-                  destinations: [
-                    for (final destination in widget.destinations)
-                      NavigationRailDestination(
-                        icon: Icon(destination.icon),
-                        label: Text(destination.label),
-                      ),
-                  ],
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(child: _CenteredContent(child: selectedBody)),
-              ],
-            )
-          : _CenteredContent(child: selectedBody),
-    );
-  }
-}
-
-/// Keeps main content from stretching edge-to-edge on wide screens
-/// (`DESIGN_REFERENCE.md` §6.2: "Di layar lebar, jangan diregangkan...
-/// max-width terpusat"). At the ~390px canonical width this is a no-op —
-/// content is already narrower than the cap — so no separate narrow-width
-/// special case is needed.
-class _CenteredContent extends StatelessWidget {
-  const _CenteredContent({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
-        child: child,
-      ),
+      body: selectedBody,
     );
   }
 }
@@ -173,20 +194,17 @@ class _NavTabRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.background,
-      child: Row(
-        children: [
-          for (var i = 0; i < destinations.length; i++)
-            Expanded(
-              child: _NavTabItem(
-                destination: destinations[i],
-                selected: i == selectedIndex,
-                onTap: () => onSelected(i),
-              ),
+    return Row(
+      children: [
+        for (var i = 0; i < destinations.length; i++)
+          Expanded(
+            child: _NavTabItem(
+              destination: destinations[i],
+              selected: i == selectedIndex,
+              onTap: () => onSelected(i),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -209,7 +227,7 @@ class _NavTabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.primary : Colors.black54;
+    final color = selected ? Colors.white : AppColors.onNavyMuted;
 
     return Semantics(
       button: true,
@@ -218,30 +236,27 @@ class _NavTabItem extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          height: 52,
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: selected ? AppColors.primary : Colors.transparent,
-                width: 2,
+                color: selected ? AppColors.marker : Colors.transparent,
+                width: 3,
               ),
             ),
           ),
-          child: Column(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(destination.icon, color: color, size: 22),
-              // Deliberately tighter than AppSpacing.xs (4) — this is a
-              // component-specific gap sized for this compact tab item, not
-              // an instance of the general spacing scale; doubling it would
-              // visibly loosen the icon/label pairing.
-              const SizedBox(height: 2),
-              Text(
-                destination.label,
-                style: AppTextStyles.badgeLabel.copyWith(
-                  color: color,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              Icon(destination.icon, color: color, size: 20),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: ExcludeSemantics(
+                  child: Text(
+                    destination.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodyStrong.copyWith(color: color),
+                  ),
                 ),
               ),
             ],

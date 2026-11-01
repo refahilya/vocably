@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme.dart';
+import 'app_feedback.dart';
 
 /// Building blocks shared by the test screens (Pre-Test/Post-Test and the
 /// Placement Test): a centred status message, a busy indicator, an error
 /// banner, a button spinner and a single-choice option tile.
+///
+/// Every option looks the same until chosen, including "Saya tidak tahu", so
+/// the presentation never nudges a student toward an answer.
 
 class AssessmentBusy extends StatelessWidget {
   const AssessmentBusy({super.key, required this.label});
@@ -12,19 +16,7 @@ class AssessmentBusy extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: AppSpacing.md),
-          Text(label, style: AppTextStyles.body),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => AppLoading(label: label);
 }
 
 class AssessmentMessage extends StatelessWidget {
@@ -49,29 +41,14 @@ class AssessmentMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        children: [
-          Icon(icon, size: 48, color: AppColors.primary),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(body, textAlign: TextAlign.center, style: AppTextStyles.body),
-          if (footer != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            footer!,
-          ],
-          if (actionLabel != null) ...[
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-          ],
-        ],
-      ),
+    return AppStateMessage(
+      icon: icon,
+      title: title,
+      body: body,
+      footer: footer,
+      action: actionLabel == null
+          ? null
+          : FilledButton(onPressed: onAction, child: Text(actionLabel!)),
     );
   }
 }
@@ -83,14 +60,7 @@ class AssessmentErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.errorBackground,
-        borderRadius: BorderRadius.circular(AppRadius.small),
-      ),
-      child: Text(text, style: const TextStyle(color: AppColors.error)),
-    );
+    return AppNotice(text: text, tone: AppTone.error);
   }
 }
 
@@ -98,13 +68,7 @@ class AssessmentButtonSpinner extends StatelessWidget {
   const AssessmentButtonSpinner({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 20,
-      width: 20,
-      child: CircularProgressIndicator(strokeWidth: 2),
-    );
-  }
+  Widget build(BuildContext context) => const AppButtonSpinner();
 }
 
 /// One answer choice of a single-choice item (radio semantics).
@@ -131,33 +95,36 @@ class AssessmentOptionTile extends StatelessWidget {
         checked: selected,
         enabled: enabled,
         child: Material(
-          color: selected ? AppColors.infoBackground : AppColors.background,
+          color: selected ? AppColors.primaryTint : AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.medium),
             side: BorderSide(
-              color: selected ? AppColors.primary : AppColors.disabled,
+              color: selected ? AppColors.primary : AppColors.lineStrong,
               width: selected ? 2 : 1,
             ),
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.medium),
             onTap: enabled ? onTap : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.md,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    selected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: selected ? AppColors.primary : AppColors.disabled,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: Text(label, style: AppTextStyles.body)),
-                ],
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.smd,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: selected ? AppColors.primary : AppColors.inkMuted,
+                    ),
+                    const SizedBox(width: AppSpacing.smd),
+                    Expanded(child: Text(label, style: AppTextStyles.body)),
+                  ],
+                ),
               ),
             ),
           ),

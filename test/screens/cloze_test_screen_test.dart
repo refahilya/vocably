@@ -401,4 +401,46 @@ void main() {
       expect(find.byType(CowriteScreen), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'grading shows an icon as well as a color, and the wrong-answer notice sits above the story',
+    (tester) async {
+      await _pumpClozeTest(tester, optionsOverride: ['run', 'souvenir']);
+      final dropdowns = find.byType(DropdownButton<String>);
+      await tester.tap(dropdowns.first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('run').last);
+      await tester.pumpAndSettle();
+      await tester.tap(dropdowns.last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('run').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+
+      Finder labelled(String label) => find.byWidgetPredicate(
+        (widget) => widget is Icon && widget.semanticLabel == label,
+      );
+      expect(labelled('Benar'), findsOneWidget);
+      expect(labelled('Salah'), findsOneWidget);
+      expect(
+        tester
+            .getTopLeft(find.text('Ada jawaban yang salah. Jawaban yang benar ditandai hijau.'))
+            .dy,
+        lessThan(tester.getTopLeft(dropdowns.first).dy),
+      );
+    },
+  );
+
+  testWidgets('a long option truncates inside the story on a narrow phone', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pumpClozeTest(
+      tester,
+      optionsOverride: ['run', 'take something very long into careful consideration today'],
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.byType(DropdownButton<String>), findsNWidgets(2));
+  });
 }

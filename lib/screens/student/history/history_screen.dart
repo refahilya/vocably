@@ -8,6 +8,8 @@ import '../../../providers/learning_session_controller.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/normalize_word.dart';
 import '../../../utils/session_date_format.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
 import '../../../widgets/mastery_badge.dart';
 import '../learning_flow/story_reading_screen.dart';
 import 'session_detail_screen.dart';
@@ -39,11 +41,14 @@ class HistoryScreen extends ConsumerWidget {
       length: 2,
       child: Column(
         children: [
-          const TabBar(
-            labelColor: AppColors.primary,
-            unselectedLabelColor: Colors.black54,
-            indicatorColor: AppColors.primary,
-            tabs: [Tab(text: 'Per Kata'), Tab(text: 'Per Sesi')],
+          const ColoredBox(
+            color: AppColors.surface,
+            child: AppContent(
+              maxWidth: AppContentWidth.list,
+              child: TabBar(
+                tabs: [Tab(text: 'Per Kata'), Tab(text: 'Per Sesi')],
+              ),
+            ),
           ),
           Expanded(
             child: TabBarView(
@@ -66,37 +71,70 @@ class _ErrorRetry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Gagal memuat riwayat.'),
-            const SizedBox(height: AppSpacing.sm),
-            OutlinedButton(onPressed: onRetry, child: const Text('Coba lagi')),
-          ],
-        ),
-      ),
-    );
+    return AppErrorState(message: 'Gagal memuat riwayat.', onRetry: onRetry);
   }
 }
 
 class _EmptyMessage extends StatelessWidget {
-  const _EmptyMessage(this.text);
+  const _EmptyMessage(this.text, {this.icon = Icons.history});
 
   final String text;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Text(text, textAlign: TextAlign.center),
+    return AppStateMessage(icon: icon, title: text);
+  }
+}
+
+/// A word in the history: mastery mark, word, translation.
+class _WordTile extends StatelessWidget {
+  const _WordTile({required this.item});
+
+  final HistoryWordEntry item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 64),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: _wordTileDecoration,
+      child: Row(
+        children: [
+          SizedBox(
+            width: AppSpacing.lg,
+            child: MasteryBadge(masteryStatus: item.progress.masteryStatus),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  item.entry?.word ?? item.progress.wordId,
+                  style: AppTextStyles.wordRow,
+                ),
+                Text(
+                  item.entry?.primaryMeaning.translation ?? '—',
+                  style: AppTextStyles.bodyMuted,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
+final _wordTileDecoration = BoxDecoration(
+  color: AppColors.surface,
+  border: Border.all(color: AppColors.line),
+  borderRadius: BorderRadius.circular(AppRadius.medium),
+);
 
 /// "Per Kata" tab (`SPEC.md` §3.6): filterable-by-mastery word list. Under
 /// the `difficult` filter, rows are selectable and "Pelajari Kembali"
@@ -112,7 +150,7 @@ class _PerKataTab extends ConsumerWidget {
     final filter = ref.watch(historyFilterProvider);
 
     return entriesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const AppLoading(),
       // Never let this be a silent failure (a real bug: this used to
       // discard `error`/`stackTrace` entirely, so a genuine Firestore
       // failure — a bad document shape, a rules mismatch — was
@@ -134,8 +172,9 @@ class _PerKataTab extends ConsumerWidget {
 
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
+            AppContent(
+              maxWidth: AppContentWidth.list,
+              vertical: AppSpacing.md,
               child: SegmentedButton<HistoryMasteryFilter>(
                 segments: const [
                   ButtonSegment(value: HistoryMasteryFilter.all, label: Text('Semua')),
@@ -163,6 +202,9 @@ class _PerKataTab extends ConsumerWidget {
                           // §5.8: nada positif, ini kabar baik.
                           ? 'Tidak ada kata yang perlu diulang'
                           : 'Tidak ada kata dengan label ini.',
+                      icon: filter == HistoryMasteryFilter.difficult
+                          ? Icons.check_circle_outline
+                          : Icons.filter_alt_outlined,
                     )
                   : filter == HistoryMasteryFilter.difficult
                   ? _DifficultSelectionList(studentId: studentId, entries: filtered)
@@ -183,18 +225,16 @@ class _PerKataList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      itemCount: entries.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final item = entries[index];
-        return ListTile(
-          leading: MasteryBadge(masteryStatus: item.progress.masteryStatus),
-          title: Text(item.entry?.word ?? item.progress.wordId),
-          subtitle: Text(item.entry?.primaryMeaning.translation ?? '—'),
-        );
-      },
+    return AppContent(
+      maxWidth: AppContentWidth.list,
+      child: AppResponsiveList(
+        itemCount: entries.length,
+        minItemWidth: 300,
+        maxColumns: 2,
+        gap: AppSpacing.sm,
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+        itemBuilder: (context, index) => _WordTile(item: entries[index]),
+      ),
     );
   }
 }
@@ -223,8 +263,8 @@ class _DifficultSelectionList extends ConsumerWidget {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        AppContent(
+          maxWidth: AppContentWidth.list,
           child: Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -250,31 +290,47 @@ class _DifficultSelectionList extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            itemCount: entries.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final item = entries[index];
-              final id = normalizeWord(item.progress.wordId);
-              return CheckboxListTile(
-                value: selection.contains(id),
-                onChanged: (_) => notifier.toggle(id),
-                secondary: MasteryBadge(masteryStatus: item.progress.masteryStatus),
-                title: Text(item.entry?.word ?? item.progress.wordId),
-                subtitle: Text(item.entry?.primaryMeaning.translation ?? '—'),
-              );
-            },
+          child: AppContent(
+            maxWidth: AppContentWidth.list,
+            child: AppResponsiveList(
+              itemCount: entries.length,
+              minItemWidth: 300,
+              maxColumns: 2,
+              gap: AppSpacing.sm,
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              itemBuilder: (context, index) {
+                final item = entries[index];
+                final id = normalizeWord(item.progress.wordId);
+                return Material(
+                  color: AppColors.surface,
+                  shape: RoundedRectangleBorder(
+                    side: const BorderSide(color: AppColors.line),
+                    borderRadius: BorderRadius.circular(AppRadius.medium),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: CheckboxListTile(
+                    value: selection.contains(id),
+                    onChanged: (_) => notifier.toggle(id),
+                    secondary: MasteryBadge(masteryStatus: item.progress.masteryStatus),
+                    title: Text(
+                      item.entry?.word ?? item.progress.wordId,
+                      style: AppTextStyles.wordRow,
+                    ),
+                    subtitle: Text(
+                      item.entry?.primaryMeaning.translation ?? '—',
+                      style: AppTextStyles.bodyMuted,
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: count == 0 ? null : () => _startRelearn(context, ref),
-              child: Text(count == 0 ? 'Pelajari Kembali' : 'Pelajari Kembali ($count kata)'),
-            ),
+        AppBottomBar(
+          maxWidth: AppContentWidth.list,
+          child: FilledButton(
+            onPressed: count == 0 ? null : () => _startRelearn(context, ref),
+            child: Text(count == 0 ? 'Pelajari Kembali' : 'Pelajari Kembali ($count kata)'),
           ),
         ),
       ],
@@ -325,7 +381,7 @@ class _PerSesiTab extends ConsumerWidget {
     final sessionsAsync = ref.watch(learningSessionListProvider(studentId));
 
     return sessionsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const AppLoading(),
       // See the identical comment in _PerKataTab above — same fix, same
       // reason: this used to swallow `error`/`stackTrace` completely.
       error: (error, stackTrace) {
@@ -338,11 +394,15 @@ class _PerSesiTab extends ConsumerWidget {
         if (sessions.isEmpty) {
           return const _EmptyMessage('Belum ada kata yang dipelajari');
         }
-        return ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          itemCount: sessions.length,
-          separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-          itemBuilder: (context, index) => _SessionCard(session: sessions[index]),
+        return AppContent(
+          maxWidth: AppContentWidth.list,
+          child: AppResponsiveList(
+            itemCount: sessions.length,
+            minItemWidth: 340,
+            maxColumns: 2,
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            itemBuilder: (context, index) => _SessionCard(session: sessions[index]),
+          ),
         );
       },
     );
@@ -356,52 +416,45 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.medium),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => SessionDetailScreen(session: session)),
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.line),
+        borderRadius: BorderRadius.circular(AppRadius.large),
       ),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.disabled),
-          borderRadius: BorderRadius.circular(AppRadius.medium),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => SessionDetailScreen(session: session)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    formatSessionTimestamp(session.startedAt),
-                    style: AppTextStyles.body,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      formatSessionTimestamp(session.startedAt),
+                      style: AppTextStyles.bodyStrong,
+                    ),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceAlt,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Text('${session.wordIds.length} kata', style: AppTextStyles.caption),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [
-                for (final wordId in session.wordIds)
-                  Chip(label: Text(wordId), visualDensity: VisualDensity.compact),
-              ],
-            ),
-          ],
+                  const SizedBox(width: AppSpacing.sm),
+                  AppBadge(text: '${session.wordIds.length} kata'),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  for (final wordId in session.wordIds)
+                    AppBadge(text: wordId, tone: AppTone.info),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

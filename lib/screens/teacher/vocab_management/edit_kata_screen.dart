@@ -7,6 +7,9 @@ import '../../../providers/vocab_bundle_providers.dart';
 import '../../../providers/vocab_management_providers.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/cefr_levels.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
+import '../../../widgets/cefr_level_selector.dart';
 
 /// Guru "Edit Kata" screen (`SPEC.md` §4.1, `DESIGN_REFERENCE.md` §5.4).
 /// Allows searching and filtering vocabulary, and editing ONLY `topics`
@@ -48,32 +51,14 @@ class _EditKataScreenState extends ConsumerState<EditKataScreen> {
     return Column(
       children: [
         // Level selector & search bar
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+        AppContent(
+          maxWidth: AppContentWidth.page,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // CEFR Choice Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final level in kCefrLevels) ...[
-                      ChoiceChip(
-                        label: Text(level),
-                        selected: _selectedLevel == level,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() {
-                              _selectedLevel = level;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                    ],
-                  ],
-                ),
+              CefrLevelSelector(
+                selected: _selectedLevel,
+                onSelected: (level) => setState(() => _selectedLevel = level),
               ),
               const SizedBox(height: AppSpacing.sm),
               // Search field
@@ -85,14 +70,13 @@ class _EditKataScreenState extends ConsumerState<EditKataScreen> {
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
+                          tooltip: 'Hapus pencarian',
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
                           },
                         )
                       : null,
-                  isDense: true,
-                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (value) {
                   setState(() {
@@ -100,30 +84,17 @@ class _EditKataScreenState extends ConsumerState<EditKataScreen> {
                   });
                 },
               ),
+              const SizedBox(height: AppSpacing.smd),
             ],
           ),
         ),
-        const Divider(height: 1),
         // Word list
         Expanded(
           child: vocabAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Gagal memuat kosakata.'),
-                    const SizedBox(height: AppSpacing.sm),
-                    OutlinedButton(
-                      onPressed: () =>
-                          ref.invalidate(vocabLevelProvider(_selectedLevel)),
-                      child: const Text('Coba lagi'),
-                    ),
-                  ],
-                ),
-              ),
+            loading: () => const AppLoading(),
+            error: (error, _) => AppErrorState(
+              message: 'Gagal memuat kosakata.',
+              onRetry: () => ref.invalidate(vocabLevelProvider(_selectedLevel)),
             ),
             data: (entries) {
               final filtered = entries.where((e) {
@@ -132,72 +103,92 @@ class _EditKataScreenState extends ConsumerState<EditKataScreen> {
               }).toList();
 
               if (filtered.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Text(
-                      _searchQuery.isEmpty
-                          ? 'Belum ada kosakata di level $_selectedLevel.'
-                          : 'Tidak ada kosakata yang cocok dengan "$_searchQuery".',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+                return AppStateMessage(
+                  icon: Icons.search_off,
+                  title: _searchQuery.isEmpty
+                      ? 'Belum ada kosakata di level $_selectedLevel.'
+                      : 'Tidak ada kosakata yang cocok dengan "$_searchQuery".',
                 );
               }
 
-              return ListView.separated(
-                itemCount: filtered.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final entry = filtered[index];
-                  final translation = entry.primaryMeaning.translation ?? '—';
-                  final pos = entry.primaryMeaning.pos;
-                  final topicsText = entry.topics.isEmpty
-                      ? 'Tanpa topik'
-                      : entry.topics.join(', ');
-
-                  return ListTile(
-                    title: Row(
-                      children: [
-                        Text(
-                          entry.word,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          '($pos)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(translation),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Topik: $topicsText',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: const Icon(Icons.edit_outlined),
-                    onTap: () => _openEditModal(entry),
-                  );
-                },
+              return AppContent(
+                maxWidth: AppContentWidth.page,
+                child: AppResponsiveList(
+                  itemCount: filtered.length,
+                  minItemWidth: 340,
+                  gap: AppSpacing.sm,
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  itemBuilder: (context, index) {
+                    final entry = filtered[index];
+                    return _EditableWordTile(
+                      entry: entry,
+                      onTap: () => _openEditModal(entry),
+                    );
+                  },
+                ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EditableWordTile extends StatelessWidget {
+  const _EditableWordTile({required this.entry, required this.onTap});
+
+  final VocabBundleEntry entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final translation = entry.primaryMeaning.translation ?? '—';
+    final pos = entry.primaryMeaning.pos;
+    final topicsText = entry.topics.isEmpty
+        ? 'Tanpa topik'
+        : entry.topics.join(', ');
+
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.line),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.smd,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: AppSpacing.xs,
+                      children: [
+                        Text(entry.word, style: AppTextStyles.wordRow),
+                        Text('($pos)', style: AppTextStyles.caption),
+                      ],
+                    ),
+                    Text(translation, style: AppTextStyles.body),
+                    const SizedBox(height: 2),
+                    Text('Topik: $topicsText', style: AppTextStyles.caption),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              const Icon(Icons.edit_outlined, color: AppColors.inkMuted),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -297,10 +288,9 @@ class _EditWordSheetState extends ConsumerState<_EditWordSheet> {
 
     return Padding(
       padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.md,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -309,65 +299,48 @@ class _EditWordSheetState extends ConsumerState<_EditWordSheet> {
           children: [
             // Header
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Edit Topik Kata',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: Text('Edit Topik Kata', style: AppTextStyles.statusTitle),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
+                  tooltip: 'Tutup',
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            const Divider(),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.sm),
 
             // Read-only word info
-            Card(
-              elevation: 0,
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          widget.entry.word,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Chip(
-                          label: Text(widget.entry.cefrLevel),
-                          padding: EdgeInsets.zero,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    const Text(
-                      'Makna:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    for (final meaning in widget.entry.meanings)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
+            AppSheet(
+              color: AppColors.surfaceAlt,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          '• (${meaning.pos}) ${meaning.translation ?? "—"}',
+                          widget.entry.word,
+                          style: AppTextStyles.wordTitle,
                         ),
                       ),
-                  ],
-                ),
+                      const SizedBox(width: AppSpacing.sm),
+                      AppBadge.solid(text: widget.entry.cefrLevel),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  const Text('Makna:', style: AppTextStyles.caption),
+                  for (final meaning in widget.entry.meanings)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '• (${meaning.pos}) ${meaning.translation ?? "—"}',
+                        style: AppTextStyles.bodyMuted,
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -375,20 +348,15 @@ class _EditWordSheetState extends ConsumerState<_EditWordSheet> {
             // Editable topics section
             const Text(
               'Topik Kata (bisa pilih lebih dari satu)',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: AppTextStyles.sectionTitle,
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.sm),
 
             topicsAsync.when(
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(AppSpacing.sm),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              error: (error, _) => const Text(
-                'Gagal memuat daftar topik.',
-                style: TextStyle(color: Colors.red),
+              loading: () => const AppLoading(),
+              error: (error, _) => const AppNotice(
+                text: 'Gagal memuat daftar topik.',
+                tone: AppTone.error,
               ),
               data: (topics) {
                 return Wrap(
@@ -413,31 +381,31 @@ class _EditWordSheetState extends ConsumerState<_EditWordSheet> {
                 );
               },
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.smd),
 
             // Add new topic inline
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: TextField(
                     controller: _newTopicController,
                     decoration: InputDecoration(
                       labelText: 'Tambah topik baru',
-                      isDense: true,
-                      border: const OutlineInputBorder(),
                       errorText: _topicError,
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: AppSpacing.sm),
                 FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                  ),
                   onPressed: _isAddingTopic ? null : _addNewTopic,
                   child: _isAddingTopic
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const AppButtonSpinner(size: 16)
                       : const Text('+ Tambah'),
                 ),
               ],
@@ -445,11 +413,11 @@ class _EditWordSheetState extends ConsumerState<_EditWordSheet> {
             const SizedBox(height: AppSpacing.md),
 
             if (controllerState.hasError) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Text(
-                  'Gagal memperbarui topik. Periksa koneksi lalu coba lagi.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+              const Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                child: AppNotice(
+                  text: 'Gagal memperbarui topik. Periksa koneksi lalu coba lagi.',
+                  tone: AppTone.error,
                 ),
               ),
             ],
@@ -458,14 +426,7 @@ class _EditWordSheetState extends ConsumerState<_EditWordSheet> {
             FilledButton(
               onPressed: (!_hasChanges || isSaving) ? null : _saveTopics,
               child: isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
+                  ? const AppButtonSpinner()
                   : const Text('Simpan Perubahan Topik'),
             ),
           ],

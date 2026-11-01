@@ -8,6 +8,7 @@ import '../../../models/placement_status.dart';
 import '../../../providers/placement_test_providers.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/story_markers.dart';
+import '../../../widgets/app_layout.dart';
 import '../../../widgets/assessment_widgets.dart';
 import 'placement_instructions.dart';
 
@@ -67,11 +68,7 @@ class _PlacementTestScreenState extends ConsumerState<PlacementTestScreen> {
       child: Scaffold(
         appBar: AppBar(title: const Text('Tes Penempatan')),
         body: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: switch (state) {
+          child: switch (state) {
                 PlacementTestLoading() => const AssessmentBusy(label: 'Memuat tes…'),
                 PlacementTestLoadFailed() => AssessmentMessage(
                   icon: Icons.wifi_off,
@@ -130,9 +127,7 @@ class _PlacementTestScreenState extends ConsumerState<PlacementTestScreen> {
                   onAction: controller.retryScoring,
                 ),
                 final PlacementTestResult s => _ResultView(state: s, onRetake: controller.startRetake),
-              },
-            ),
-          ),
+          },
         ),
       ),
     );
@@ -192,45 +187,49 @@ class _Intro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.infoBackground,
-              borderRadius: BorderRadius.circular(AppRadius.medium),
-            ),
+    return Column(
+      children: [
+        Expanded(
+          child: AppScrollPage(
+            maxWidth: AppContentWidth.assessment,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(kPlacementInstructionsTitle, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                const SizedBox(height: AppSpacing.sm),
-                const Text(kPlacementInstructionsIntro, style: AppTextStyles.body),
-                const SizedBox(height: AppSpacing.md),
-                const Text(kPlacementInstructionsHeading, style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: AppSpacing.xs),
-                for (var i = 0; i < kPlacementInstructions.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: Text('${i + 1}. ${kPlacementInstructions[i]}', style: AppTextStyles.body),
+                AppSheet(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(kPlacementInstructionsTitle, style: AppTextStyles.pageTitle),
+                      const SizedBox(height: AppSpacing.sm),
+                      const Text(kPlacementInstructionsIntro, style: AppTextStyles.body),
+                      const SizedBox(height: AppSpacing.md),
+                      const Text(kPlacementInstructionsHeading, style: AppTextStyles.sectionTitle),
+                      const SizedBox(height: AppSpacing.xs),
+                      for (var i = 0; i < kPlacementInstructions.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: Text('${i + 1}. ${kPlacementInstructions[i]}', style: AppTextStyles.body),
+                        ),
+                    ],
                   ),
+                ),
+                if (errorText != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AssessmentErrorBanner(text: errorText!),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          if (errorText != null) ...[
-            AssessmentErrorBanner(text: errorText!),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          FilledButton(
+        ),
+        AppBottomBar(
+          maxWidth: AppContentWidth.assessment,
+          child: FilledButton(
             onPressed: busy ? null : onPressed,
             child: busy ? const AssessmentButtonSpinner() : Text(buttonLabel),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -277,47 +276,59 @@ class _ItemView extends StatelessWidget {
       for (final option in item.options) (option.id, '${option.id}. ${option.text}'),
       (kPlacementDontKnowId, '$kPlacementDontKnowId. $kPlacementDontKnowText'),
     ];
-    return SingleChildScrollView(
-      key: ValueKey('placement-item-${item.id}'),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Soal ${state.index + 1} dari ${state.items.length}', style: AppTextStyles.caption),
-          const SizedBox(height: AppSpacing.sm),
-          _Sentence(item: item),
-          const SizedBox(height: AppSpacing.md),
-          Semantics(
+    return Column(
+      children: [
+        LinearProgressIndicator(
+          value: (state.index + 1) / state.items.length,
+          minHeight: 4,
+        ),
+        Expanded(
+          child: AppScrollPage(
+            key: ValueKey('placement-item-${item.id}'),
+            maxWidth: AppContentWidth.assessment,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Soal ${state.index + 1} dari ${state.items.length}', style: AppTextStyles.caption),
+                const SizedBox(height: AppSpacing.sm),
+                _Sentence(item: item),
+                const SizedBox(height: AppSpacing.md),
+                Semantics(
             container: true,
             label: 'Pilihan jawaban',
-            child: Column(
-              children: [
-                for (final (id, label) in labels)
-                  AssessmentOptionTile(
-                    key: ValueKey('placement-option-$id'),
-                    label: label,
-                    selected: saved == id,
-                    enabled: !state.busy,
-                    onTap: () => onSelect(id),
+                  child: Column(
+                    children: [
+                      for (final (id, label) in labels)
+                        AssessmentOptionTile(
+                          key: ValueKey('placement-option-$id'),
+                          label: label,
+                          selected: saved == id,
+                          enabled: !state.busy,
+                          onTap: () => onSelect(id),
+                        ),
+                    ],
                   ),
+                ),
+                SizedBox(
+                  height: 20,
+                  child: Text(
+                    saving ? 'Menyimpan…' : (saved != null ? 'Tersimpan' : ''),
+                    style: AppTextStyles.caption,
+                  ),
+                ),
+                if (state.error != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  const AssessmentErrorBanner(
+                    text: 'Jawaban belum tersimpan. Periksa koneksi internet, lalu pilih lagi.',
+                  ),
+                ],
               ],
             ),
           ),
-          SizedBox(
-            height: 20,
-            child: Text(
-              saving ? 'Menyimpan…' : (saved != null ? 'Tersimpan' : ''),
-              style: AppTextStyles.caption,
-            ),
-          ),
-          if (state.error != null) ...[
-            const AssessmentErrorBanner(
-              text: 'Jawaban belum tersimpan. Periksa koneksi internet, lalu pilih lagi.',
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-          const SizedBox(height: AppSpacing.sm),
-          Row(
+        ),
+        AppBottomBar(
+          maxWidth: AppContentWidth.assessment,
+          child: Row(
             children: [
               Expanded(
                 child: OutlinedButton(
@@ -334,8 +345,8 @@ class _ItemView extends StatelessWidget {
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -350,51 +361,62 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final missing = state.unansweredNumbers;
-    return SingleChildScrollView(
-      key: const ValueKey('placement-summary'),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('Ringkasan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: AppSpacing.sm),
+    return Column(
+      children: [
+        Expanded(
+          child: AppScrollPage(
+            key: const ValueKey('placement-summary'),
+            maxWidth: AppContentWidth.assessment,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Ringkasan', style: AppTextStyles.pageTitle),
+                const SizedBox(height: AppSpacing.sm),
           Text(
             missing.isEmpty
                 ? 'Semua soal sudah dijawab. Ketuk nomor soal untuk memeriksa jawabanmu.'
                 : 'Masih ada soal yang belum dijawab: nomor ${missing.join(', ')}. Jawab semuanya (pilih E jika tidak tahu) sebelum mengirim.',
             style: AppTextStyles.body,
           ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              for (var i = 0; i < state.items.length; i++)
-                SizedBox(
-                  width: 44,
-                  child: OutlinedButton(
-                    key: ValueKey('placement-summary-${i + 1}'),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      backgroundColor: state.attempt.answers.containsKey(state.items[i].id) ? AppColors.infoBackground : null,
-                    ),
-                    onPressed: state.busy ? null : () => onGoTo(i),
-                    child: Text('${i + 1}'),
-                  ),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    for (var i = 0; i < state.items.length; i++)
+                      SizedBox(
+                        width: 48,
+                        child: OutlinedButton(
+                          key: ValueKey('placement-summary-${i + 1}'),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(48, 48),
+                            backgroundColor: state.attempt.answers.containsKey(state.items[i].id)
+                                ? AppColors.primaryTintStrong
+                                : AppColors.surface,
+                          ),
+                          onPressed: state.busy ? null : () => onGoTo(i),
+                          child: Text('${i + 1}'),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
+                if (state.error != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  const AssessmentErrorBanner(text: 'Jawaban belum terkirim. Periksa koneksi internet, lalu coba lagi.'),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          if (state.error != null) ...[
-            const AssessmentErrorBanner(text: 'Jawaban belum terkirim. Periksa koneksi internet, lalu coba lagi.'),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          FilledButton(
+        ),
+        AppBottomBar(
+          maxWidth: AppContentWidth.assessment,
+          child: FilledButton(
             onPressed: missing.isEmpty && !state.busy ? onSubmit : null,
             child: state.submitting ? const AssessmentButtonSpinner() : const Text('Kirim jawaban'),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -411,7 +433,7 @@ class _LevelLine extends StatelessWidget {
         style: AppTextStyles.body,
         children: [
           const TextSpan(text: 'Level kamu: '),
-          TextSpan(text: level, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+          TextSpan(text: level, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
         ],
       ),
       textAlign: TextAlign.center,

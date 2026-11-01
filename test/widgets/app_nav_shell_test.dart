@@ -157,4 +157,66 @@ void main() {
       expect(find.byIcon(Icons.logout), findsNothing);
     });
   });
+
+  testWidgets('tablet widths use the compact rail, large windows extend it', (
+    tester,
+  ) async {
+    setSurfaceSize(tester, const Size(1000, 800));
+    await tester.pumpWidget(
+      MaterialApp(home: AppNavShell(destinations: destinations)),
+    );
+    expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended, isFalse);
+
+    setSurfaceSize(tester, const Size(1280, 800));
+    await tester.pumpAndSettle();
+    expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended, isTrue);
+  });
+
+  testWidgets('the wide layout keeps logout reachable without an app bar', (
+    tester,
+  ) async {
+    setSurfaceSize(tester, const Size(1000, 600));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppNavShell(destinations: destinations, onLogout: () {}),
+      ),
+    );
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byTooltip('Keluar').hitTestable(), findsOneWidget);
+  });
+
+  testWidgets('crossing the breakpoint keeps the state of the open destination', (
+    tester,
+  ) async {
+    setSurfaceSize(tester, const Size(390, 800));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppNavShell(
+          destinations: const [
+            AppNavDestination(
+              label: 'One',
+              icon: Icons.home,
+              body: Material(child: TextField()),
+            ),
+            AppNavDestination(
+              label: 'Two',
+              icon: Icons.settings,
+              body: Text('Body Two'),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), 'setengah terisi');
+
+    // A tablet rotating, or a window being resized.
+    setSurfaceSize(tester, const Size(1000, 800));
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.text('setengah terisi'), findsOneWidget);
+
+    setSurfaceSize(tester, const Size(390, 800));
+    await tester.pumpAndSettle();
+    expect(find.text('setengah terisi'), findsOneWidget);
+  });
 }

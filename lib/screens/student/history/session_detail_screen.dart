@@ -4,6 +4,7 @@ import '../../../models/learning_session.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/session_date_format.dart';
 import '../../../utils/story_markers.dart';
+import '../../../widgets/app_layout.dart';
 
 /// Read-only story replay for one `learningSessions` document
 /// (`SPEC.md` §3.6: "Membuka satu sesi menampilkan cerita yang dipakai...
@@ -37,8 +38,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(session.storyTitle)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.md),
+      body: AppScrollPage(
+        maxWidth: AppContentWidth.reading,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -46,40 +47,42 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               formatSessionTimestamp(session.startedAt),
               style: AppTextStyles.caption,
             ),
-            const SizedBox(height: AppSpacing.md),
-            RichText(
-              text: TextSpan(
-                style: AppTextStyles.body,
-                children: [
-                  for (final segment in segments)
-                    switch (segment) {
-                      PlainStorySegment(:final text) => TextSpan(text: text),
-                      MarkedStorySegment(:final surfaceForm) => TextSpan(
-                        text: surfaceForm,
-                        style: const TextStyle(
-                          backgroundColor: AppColors.storyHighlightBackground,
-                          color: AppColors.storyHighlightText,
-                          fontWeight: FontWeight.w600,
+            const SizedBox(height: AppSpacing.sm),
+            AppSheet(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: RichText(
+                text: TextSpan(
+                  style: AppTextStyles.story,
+                  children: [
+                    for (final segment in segments)
+                      switch (segment) {
+                        PlainStorySegment(:final text) => TextSpan(text: text),
+                        MarkedStorySegment(:final surfaceForm) => TextSpan(
+                          text: surfaceForm,
+                          style: AppTextStyles.storyHighlight,
                         ),
-                      ),
-                    },
-                ],
+                      },
+                  ],
+                ),
               ),
             ),
             if (translation != null) ...[
               const SizedBox(height: AppSpacing.md),
-              OutlinedButton(
-                onPressed: () =>
-                    setState(() => _showTranslation = !_showTranslation),
-                child: Text(
-                  _showTranslation ? 'Sembunyikan Terjemahan' : 'Terjemahan',
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton(
+                  onPressed: () =>
+                      setState(() => _showTranslation = !_showTranslation),
+                  child: Text(
+                    _showTranslation ? 'Sembunyikan Terjemahan' : 'Terjemahan',
+                  ),
                 ),
               ),
               if (_showTranslation) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   stripTranslationMarkers(translation),
-                  style: AppTextStyles.body,
+                  style: AppTextStyles.bodyMuted,
                 ),
               ],
             ],

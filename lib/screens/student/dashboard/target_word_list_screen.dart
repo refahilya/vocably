@@ -6,6 +6,8 @@ import '../../../models/vocab_bundle_entry.dart';
 import '../../../providers/dashboard_providers.dart';
 import '../../../providers/learning_session_controller.dart';
 import '../../../theme/theme.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
 import '../learning_flow/story_reading_screen.dart';
 import '../vocab_browser/word_detail_screen.dart';
 
@@ -27,25 +29,13 @@ class TargetWordListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Target Kata Hari Ini')),
       body: entriesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Gagal memuat target kata.'),
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton(
-                  onPressed: () =>
-                      ref.invalidate(targetWordEntriesProvider(studentId)),
-                  child: const Text('Coba lagi'),
-                ),
-              ],
-            ),
-          ),
+        loading: () => const AppLoading(),
+        error: (error, stackTrace) => AppErrorState(
+          message: 'Gagal memuat target kata.',
+          onRetry: () => ref.invalidate(targetWordEntriesProvider(studentId)),
         ),
-        data: (entries) => _TargetWordListBody(studentId: studentId, entries: entries),
+        data: (entries) =>
+            _TargetWordListBody(studentId: studentId, entries: entries),
       ),
     );
   }
@@ -61,63 +51,89 @@ class _TargetWordListBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (entries.isEmpty) {
       // DESIGN_REFERENCE.md §5.8: "Guru belum men-set target kata".
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(AppSpacing.md),
-          child: Text(
-            'Belum ada target kata dari guru. Coba jelajahi kosakata sendiri '
-            'lewat menu Level.',
-            textAlign: TextAlign.center,
-          ),
-        ),
+      return const AppStateMessage(
+        icon: Icons.track_changes,
+        title: 'Belum ada target kata dari guru.',
+        body: 'Coba jelajahi kosakata sendiri lewat menu Level.',
       );
     }
 
     return Column(
       children: [
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            itemCount: entries.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              return ListTile(
-                title: Text(entry.word),
-                subtitle: Text(entry.primaryMeaning.translation ?? '—'),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => WordDetailScreen(entry: entry)),
-                ),
-              );
-            },
+          child: AppScrollPage(
+            maxWidth: AppContentWidth.reading,
+            child: AppSheet(
+              padding: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < entries.length; i++) ...[
+                    if (i > 0) const Divider(),
+                    _TargetWordRow(entry: entries[i]),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    ref
-                        .read(learningFlowControllerProvider.notifier)
-                        .startFlow(
-                          studentId: studentId,
-                          wordIds: [for (final entry in entries) entry.word],
-                          sourceType: LearningSessionSourceType.targetGuru,
-                        );
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const StoryReadingScreen()),
-                    );
-                  },
-                  child: const Text('📖 Belajar Kata Ini dengan Cerita'),
-                ),
-              ),
-            ],
+        AppBottomBar(
+          maxWidth: AppContentWidth.reading,
+          child: FilledButton(
+            onPressed: () {
+              ref
+                  .read(learningFlowControllerProvider.notifier)
+                  .startFlow(
+                    studentId: studentId,
+                    wordIds: [for (final entry in entries) entry.word],
+                    sourceType: LearningSessionSourceType.targetGuru,
+                  );
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StoryReadingScreen()),
+              );
+            },
+            child: const Text('📖 Belajar Kata Ini dengan Cerita'),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _TargetWordRow extends StatelessWidget {
+  const _TargetWordRow({required this.entry});
+
+  final VocabBundleEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => WordDetailScreen(entry: entry)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.smd,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(entry.word, style: AppTextStyles.wordRow),
+                  Text(
+                    entry.primaryMeaning.translation ?? '—',
+                    style: AppTextStyles.bodyMuted,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.inkMuted),
+          ],
+        ),
+      ),
     );
   }
 }

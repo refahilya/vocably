@@ -6,9 +6,11 @@ import '../../../providers/learning_cart_providers.dart';
 import '../../../providers/vocab_browser_providers.dart';
 import '../../../providers/vocab_bundle_providers.dart';
 import '../../../theme/theme.dart';
-import '../../../utils/cefr_levels.dart';
 import '../../../utils/normalize_word.dart';
 import '../../../utils/vocab_browse_filter.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
+import '../../../widgets/cefr_level_selector.dart';
 import 'learning_cart_screen.dart';
 import 'word_detail_screen.dart';
 
@@ -30,6 +32,10 @@ import 'word_detail_screen.dart';
 /// word and the sticky bottom bar → [LearningCartScreen] for viewing/
 /// removing — see [LearningCart] for why that state is session-local
 /// rather than persisted anywhere.
+///
+/// On phones the filters stack above the list; from
+/// [AppBreakpoints.medium] they move to a side panel and the words flow into
+/// columns, so a desktop isn't reading a phone-width list.
 class VocabBrowserScreen extends ConsumerWidget {
   const VocabBrowserScreen({super.key});
 
@@ -37,32 +43,60 @@ class VocabBrowserScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(vocabBrowserFilterProvider);
     final levelAsync = ref.watch(vocabLevelProvider(filter.cefrLevel));
+    final width = MediaQuery.sizeOf(context).width;
+    // Side panel on wide windows, and on phones held sideways, where stacked
+    // filters would leave no height for the list.
+    final useSidePanel =
+        width >= AppBreakpoints.medium ||
+        (width >= 480 && isShortWindow(context));
+
+    final filters = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _LevelSelector(selected: filter.cefrLevel),
+        const SizedBox(height: AppSpacing.md),
+        _ModeSelector(selected: filter.mode),
+      ],
+    );
+    final results = levelAsync.when(
+      loading: () => const AppLoading(),
+      error: (error, stackTrace) => _ErrorState(
+        onRetry: () => ref.invalidate(vocabLevelProvider(filter.cefrLevel)),
+      ),
+      data: (entries) => _LevelContent(allEntries: entries, filter: filter),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Jelajah Kosakata')),
       bottomNavigationBar: const _CartBar(),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _LevelSelector(selected: filter.cefrLevel),
-            const SizedBox(height: AppSpacing.md),
-            _ModeSelector(selected: filter.mode),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: levelAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (error, stackTrace) => _ErrorState(
-                  onRetry: () =>
-                      ref.invalidate(vocabLevelProvider(filter.cefrLevel)),
-                ),
-                data: (entries) =>
-                    _LevelContent(allEntries: entries, filter: filter),
-              ),
-            ),
-          ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: AppContentWidth.page + 240,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(appGutter(context)),
+            child: useSidePanel
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: width >= AppBreakpoints.medium ? 280 : 232,
+                        child: SingleChildScrollView(child: filters),
+                      ),
+                      const SizedBox(width: AppSpacing.lg),
+                      Expanded(child: results),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      filters,
+                      const SizedBox(height: AppSpacing.md),
+                      Expanded(child: results),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
@@ -84,20 +118,18 @@ class _CartBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final count = ref.watch(learningCartProvider).length;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: FilledButton.icon(
-          icon: const Icon(Icons.shopping_basket_outlined),
-          label: Text(
-            count == 0
-                ? 'Keranjang Pelajari kosong'
-                : 'Lihat Keranjang Pelajari ($count kata)',
-          ),
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const LearningCartScreen()),
-          ),
+    return AppBottomBar(
+      maxWidth: AppContentWidth.message,
+      child: FilledButton.icon(
+        icon: const Icon(Icons.shopping_basket_outlined),
+        label: Text(
+          count == 0
+              ? 'Keranjang Pelajari kosong'
+              : 'Lihat Keranjang Pelajari ($count kata)',
         ),
+        onPressed: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const LearningCartScreen())),
       ),
     );
   }
@@ -110,29 +142,9 @@ class _LevelSelector extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        for (final level in kCefrLevels)
-          ChoiceChip(
-            label: Text(level),
-            selected: level == selected,
-            // DESIGN_REFERENCE.md §1: "Chip/pill aktif/dipilih — Navy
-            // solid dengan teks putih" — applied explicitly since M3's
-            // ChoiceChip default selected color is the secondary/teal
-            // tonal container, not this app's documented chip-active rule.
-            selectedColor: AppColors.primary,
-            labelStyle: AppTextStyles.badgeLabel.copyWith(
-              color: level == selected ? Colors.white : Colors.black87,
-              fontWeight: level == selected
-                  ? FontWeight.w700
-                  : FontWeight.w500,
-            ),
-            onSelected: (_) =>
-                ref.read(vocabBrowserFilterProvider.notifier).selectLevel(level),
-          ),
-      ],
+    return CefrLevelSelector(
+      selected: selected,
+      onSelected: ref.read(vocabBrowserFilterProvider.notifier).selectLevel,
     );
   }
 }
@@ -145,12 +157,6 @@ class _ModeSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SegmentedButton<VocabBrowseMode>(
-      // Same navy-active rule as _LevelSelector, applied here too per
-      // DESIGN_REFERENCE.md §5.7 ("style konsisten dengan stepper §3.1").
-      style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: AppColors.primary,
-        selectedForegroundColor: Colors.white,
-      ),
       segments: const [
         ButtonSegment(
           value: VocabBrowseMode.alphabetical,
@@ -266,8 +272,9 @@ class _LevelContentState extends ConsumerState<_LevelContent> {
             label: 'Pilih Topik',
             value: filter.selectedTopic,
             options: _distinctTopics(),
-            onChanged: (value) =>
-                ref.read(vocabBrowserFilterProvider.notifier).selectTopic(value),
+            onChanged: (value) => ref
+                .read(vocabBrowserFilterProvider.notifier)
+                .selectTopic(value),
           ),
         if (filter.mode == VocabBrowseMode.pos)
           _ValueDropdown(
@@ -285,10 +292,10 @@ class _LevelContentState extends ConsumerState<_LevelContent> {
                   message: 'Tidak ada kata yang cocok dengan filter ini.',
                   suggestion: 'Coba pilih topik atau POS lain.',
                 )
-              : ListView.separated(
+              : AppResponsiveList(
                   itemCount: paged.items.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: AppSpacing.sm),
+                  minItemWidth: 340,
+                  gap: AppSpacing.sm,
                   itemBuilder: (context, index) =>
                       _VocabWordTile(entry: paged.items[index]),
                 ),
@@ -440,10 +447,14 @@ class _ValueDropdown extends StatelessWidget {
 
     return DropdownButtonFormField<String>(
       initialValue: safeValue,
+      isExpanded: true,
       decoration: InputDecoration(labelText: label),
       items: [
         for (final option in options)
-          DropdownMenuItem(value: option, child: Text(option)),
+          DropdownMenuItem(
+            value: option,
+            child: Text(option, overflow: TextOverflow.ellipsis),
+          ),
       ],
       onChanged: onChanged,
     );
@@ -465,100 +476,86 @@ class _VocabWordTile extends ConsumerWidget {
         .watch(learningCartProvider)
         .containsKey(normalizeWord(entry.word));
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.line),
         borderRadius: BorderRadius.circular(AppRadius.medium),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            // Tap-to-open Kamus Detail (`SPEC.md` §3.5) is scoped to just
-            // this word-info area, deliberately kept as a sibling of the
-            // trailing cart IconButton below rather than an ancestor
-            // wrapping it — avoids relying on Flutter's nested-gesture-
-            // arena tap disambiguation to keep "open detail" and "toggle
-            // cart" from both firing on one tap.
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadius.medium),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => WordDetailScreen(entry: entry),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.sm,
+          AppSpacing.xs,
+          AppSpacing.xs,
+          AppSpacing.xs,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              // Tap-to-open Kamus Detail (`SPEC.md` §3.5) is scoped to just
+              // this word-info area, deliberately kept as a sibling of the
+              // trailing cart IconButton below rather than an ancestor
+              // wrapping it — avoids relying on Flutter's nested-gesture-
+              // arena tap disambiguation to keep "open detail" and "toggle
+              // cart" from both firing on one tap.
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.small),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => WordDetailScreen(entry: entry),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(entry.word, style: AppTextStyles.wordRow),
+                      if (primary.translation != null)
+                        Text(
+                          primary.translation!,
+                          style: AppTextStyles.bodyMuted,
+                        ),
+                      if (entry.posList.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Wrap(
+                          spacing: AppSpacing.xs,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            for (final pos in entry.posList)
+                              AppBadge(text: pos),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.word,
-                    style: AppTextStyles.wordTitle.copyWith(fontSize: 18),
-                  ),
-                  if (primary.translation != null) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(primary.translation!, style: AppTextStyles.body),
-                  ],
-                  if (entry.posList.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xs,
-                      children: [
-                        for (final pos in entry.posList) _Badge(text: pos),
-                      ],
-                    ),
-                  ],
-                ],
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.smd),
+              child: AppBadge.solid(text: entry.cefrLevel),
+            ),
+            // DESIGN_REFERENCE.md §3.2/§4: direct tap on a (+) icon adds to
+            // the cart (long-press, the old Android pattern, isn't used for
+            // web); a small green check (§1's documented "chip aktif ...
+            // centang hijau kecil") marks a word already selected. Tapping
+            // again removes it — SPEC.md §3.4's "tambah kata / kurangi kata".
+            IconButton(
+              icon: Icon(
+                inCart ? Icons.check_circle : Icons.add_circle_outline,
               ),
+              color: inCart ? AppColors.success : AppColors.primary,
+              tooltip: inCart
+                  ? 'Hapus dari Keranjang Pelajari'
+                  : 'Tambah ke Keranjang Pelajari',
+              onPressed: () =>
+                  ref.read(learningCartProvider.notifier).toggle(entry),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          _Badge(text: entry.cefrLevel, emphasized: true),
-          const SizedBox(width: AppSpacing.xs),
-          // DESIGN_REFERENCE.md §3.2/§4: direct tap on a (+) icon adds to
-          // the cart (long-press, the old Android pattern, isn't used for
-          // web); a small green check (§1's documented "chip aktif ...
-          // centang hijau kecil") marks a word already selected. Tapping
-          // again removes it — SPEC.md §3.4's "tambah kata / kurangi kata".
-          IconButton(
-            icon: Icon(
-              inCart ? Icons.check_circle : Icons.add_circle_outline,
-            ),
-            color: inCart ? AppColors.success : AppColors.primary,
-            tooltip: inCart
-                ? 'Hapus dari Keranjang Pelajari'
-                : 'Tambah ke Keranjang Pelajari',
-            onPressed: () =>
-                ref.read(learningCartProvider.notifier).toggle(entry),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.text, this.emphasized = false});
-
-  final String text;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: emphasized ? AppColors.primary : AppColors.disabledBackground,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        text,
-        style: AppTextStyles.badgeLabel.copyWith(
-          color: emphasized ? Colors.white : Colors.black87,
+          ],
         ),
       ),
     );
@@ -573,24 +570,10 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.menu_book, size: 48, color: AppColors.disabled),
-            const SizedBox(height: AppSpacing.md),
-            Text(message, style: AppTextStyles.body, textAlign: TextAlign.center),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              suggestion,
-              style: AppTextStyles.body.copyWith(color: Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return AppStateMessage(
+      icon: Icons.menu_book,
+      title: message,
+      body: suggestion,
     );
   }
 }
@@ -602,24 +585,6 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.error),
-            const SizedBox(height: AppSpacing.md),
-            const Text(
-              'Gagal memuat kosakata.',
-              style: AppTextStyles.body,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            OutlinedButton(onPressed: onRetry, child: const Text('Coba lagi')),
-          ],
-        ),
-      ),
-    );
+    return AppErrorState(message: 'Gagal memuat kosakata.', onRetry: onRetry);
   }
 }

@@ -8,6 +8,9 @@ import '../../../services/ai_worker_service.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/cefr_levels.dart';
 import '../../../utils/normalize_word.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
+import '../../../widgets/cefr_level_selector.dart';
 
 /// Guru "Tambah Kosakata" (`SPEC.md` §4.1, `DESIGN_REFERENCE.md` §5.4) —
 /// the real screen behind the "Kosakata" nav destination, replacing
@@ -21,7 +24,8 @@ class TambahKosakataScreen extends ConsumerStatefulWidget {
   final AppUser profile;
 
   @override
-  ConsumerState<TambahKosakataScreen> createState() => _TambahKosakataScreenState();
+  ConsumerState<TambahKosakataScreen> createState() =>
+      _TambahKosakataScreenState();
 }
 
 class _TambahKosakataScreenState extends ConsumerState<TambahKosakataScreen> {
@@ -80,7 +84,12 @@ class _TambahKosakataScreenState extends ConsumerState<TambahKosakataScreen> {
 
   void _removeMeaningRow(int index) {
     if (_meanings.length <= 1) return;
-    setState(() => _meanings = [for (var i = 0; i < _meanings.length; i++) if (i != index) _meanings[i]]);
+    setState(
+      () => _meanings = [
+        for (var i = 0; i < _meanings.length; i++)
+          if (i != index) _meanings[i],
+      ],
+    );
   }
 
   Future<void> _generateTranslation(int index) async {
@@ -93,7 +102,10 @@ class _TambahKosakataScreenState extends ConsumerState<TambahKosakataScreen> {
       final translation = await ref
           .read(tambahKosakataControllerProvider.notifier)
           .generateTranslation(word: word, pos: pos);
-      _updateMeaning(index, (m) => m.copyWith(translation: translation, isGenerating: false));
+      _updateMeaning(
+        index,
+        (m) => m.copyWith(translation: translation, isGenerating: false),
+      );
     } on AiWorkerException {
       _updateMeaning(index, (m) => m.copyWith(isGenerating: false));
       if (!mounted) return;
@@ -134,7 +146,9 @@ class _TambahKosakataScreenState extends ConsumerState<TambahKosakataScreen> {
   bool get _canSubmitNewWord {
     if (_wordController.text.trim().isEmpty) return false;
     if (_meanings.isEmpty) return false;
-    return _meanings.every((m) => m.pos.trim().isNotEmpty && m.translation != null);
+    return _meanings.every(
+      (m) => m.pos.trim().isNotEmpty && m.translation != null,
+    );
   }
 
   Future<void> _submitNewWord() async {
@@ -149,9 +163,9 @@ class _TambahKosakataScreenState extends ConsumerState<TambahKosakataScreen> {
     if (!mounted) return;
     final state = ref.read(tambahKosakataControllerProvider);
     if (!state.hasError) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Kata baru berhasil ditambahkan.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kata baru berhasil ditambahkan.')),
+      );
       setState(() {
         _wordController.clear();
         _wordToCheck = '';
@@ -170,67 +184,72 @@ class _TambahKosakataScreenState extends ConsumerState<TambahKosakataScreen> {
     final topicsAsync = ref.watch(topicsListProvider);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Tambah Kosakata',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _wordController,
-            focusNode: _wordFocusNode,
-            decoration: const InputDecoration(labelText: 'Kata (Bahasa Inggris)'),
-            onSubmitted: (_) => _wordFocusNode.unfocus(),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (duplicateLookup != null)
-            duplicateLookup.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                child: LinearProgressIndicator(),
+      child: AppContent(
+        maxWidth: AppContentWidth.page,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Tambah Kosakata', style: AppTextStyles.pageTitle),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _wordController,
+              focusNode: _wordFocusNode,
+              decoration: const InputDecoration(
+                labelText: 'Kata (Bahasa Inggris)',
               ),
-              error: (_, _) => const SizedBox.shrink(),
-              data: (existing) => existing == null
-                  ? const SizedBox.shrink()
-                  : _DuplicateWordNotice(
-                      word: _wordToCheck,
-                      profile: widget.profile,
-                    ),
+              onSubmitted: (_) => _wordFocusNode.unfocus(),
             ),
-          if (duplicateLookup == null || (duplicateLookup.value == null))
-            _NewWordForm(
-              cefrLevel: _cefrLevel,
-              onCefrLevelChanged: (level) => setState(() => _cefrLevel = level),
-              selectedTopics: _selectedTopics,
-              topicsAsync: topicsAsync,
-              onToggleTopic: (name) => setState(() {
-                if (_selectedTopics.contains(name)) {
-                  _selectedTopics.remove(name);
-                } else {
-                  _selectedTopics.add(name);
-                }
-              }),
-              newTopicController: _newTopicController,
-              isAddingTopic: _isAddingTopic,
-              topicError: _topicError,
-              onAddTopic: _addNewTopic,
-              meanings: _meanings,
-              onMeaningPosChanged: (i, pos) =>
-                  _updateMeaning(i, (m) => m.copyWith(pos: pos, translation: null)),
-              onGenerateTranslation: _generateTranslation,
-              onAddMeaningRow: _addMeaningRow,
-              onRemoveMeaningRow: _removeMeaningRow,
-              canSubmit: _canSubmitNewWord && !controllerState.isLoading,
-              isSubmitting: controllerState.isLoading,
-              onSubmit: _submitNewWord,
-              errorMessage: controllerState.hasError
-                  ? 'Gagal menyimpan kata. Periksa koneksi lalu coba lagi.'
-                  : null,
-            ),
-        ],
+            const SizedBox(height: AppSpacing.sm),
+            if (duplicateLookup != null)
+              duplicateLookup.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: LinearProgressIndicator(),
+                ),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (existing) => existing == null
+                    ? const SizedBox.shrink()
+                    : _DuplicateWordNotice(
+                        word: _wordToCheck,
+                        profile: widget.profile,
+                      ),
+              ),
+            if (duplicateLookup == null || (duplicateLookup.value == null))
+              _NewWordForm(
+                cefrLevel: _cefrLevel,
+                onCefrLevelChanged: (level) =>
+                    setState(() => _cefrLevel = level),
+                selectedTopics: _selectedTopics,
+                topicsAsync: topicsAsync,
+                onToggleTopic: (name) => setState(() {
+                  if (_selectedTopics.contains(name)) {
+                    _selectedTopics.remove(name);
+                  } else {
+                    _selectedTopics.add(name);
+                  }
+                }),
+                newTopicController: _newTopicController,
+                isAddingTopic: _isAddingTopic,
+                topicError: _topicError,
+                onAddTopic: _addNewTopic,
+                meanings: _meanings,
+                onMeaningPosChanged: (i, pos) => _updateMeaning(
+                  i,
+                  (m) => m.copyWith(pos: pos, translation: null),
+                ),
+                onGenerateTranslation: _generateTranslation,
+                onAddMeaningRow: _addMeaningRow,
+                onRemoveMeaningRow: _removeMeaningRow,
+                canSubmit: _canSubmitNewWord && !controllerState.isLoading,
+                isSubmitting: controllerState.isLoading,
+                onSubmit: _submitNewWord,
+                errorMessage: controllerState.hasError
+                    ? 'Gagal menyimpan kata. Periksa koneksi lalu coba lagi.'
+                    : null,
+              ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+        ),
       ),
     );
   }
@@ -246,7 +265,8 @@ class _DuplicateWordNotice extends ConsumerStatefulWidget {
   final AppUser profile;
 
   @override
-  ConsumerState<_DuplicateWordNotice> createState() => _DuplicateWordNoticeState();
+  ConsumerState<_DuplicateWordNotice> createState() =>
+      _DuplicateWordNoticeState();
 }
 
 class _DuplicateWordNoticeState extends ConsumerState<_DuplicateWordNotice> {
@@ -261,7 +281,12 @@ class _DuplicateWordNoticeState extends ConsumerState<_DuplicateWordNotice> {
       final translation = await ref
           .read(tambahKosakataControllerProvider.notifier)
           .generateTranslation(word: widget.word, pos: pos);
-      setState(() => _draft = _draft.copyWith(translation: translation, isGenerating: false));
+      setState(
+        () => _draft = _draft.copyWith(
+          translation: translation,
+          isGenerating: false,
+        ),
+      );
     } on AiWorkerException {
       setState(() => _draft = _draft.copyWith(isGenerating: false));
     }
@@ -269,13 +294,16 @@ class _DuplicateWordNoticeState extends ConsumerState<_DuplicateWordNotice> {
 
   Future<void> _submit() async {
     final controller = ref.read(tambahKosakataControllerProvider.notifier);
-    await controller.appendMeaning(normalizedWord: normalizeWord(widget.word), meaning: _draft);
+    await controller.appendMeaning(
+      normalizedWord: normalizeWord(widget.word),
+      meaning: _draft,
+    );
     if (!mounted) return;
     final state = ref.read(tambahKosakataControllerProvider);
     if (!state.hasError) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Makna baru berhasil ditambahkan.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Makna baru berhasil ditambahkan.')),
+      );
       setState(() {
         _expanded = false;
         _draft = const MeaningDraft(pos: '');
@@ -288,16 +316,19 @@ class _DuplicateWordNoticeState extends ConsumerState<_DuplicateWordNotice> {
     final controllerState = ref.watch(tambahKosakataControllerProvider);
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.smd),
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
+        color: AppColors.infoBackground,
         borderRadius: BorderRadius.circular(AppRadius.medium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Kata ini sudah ada di bank kosakata.', style: AppTextStyles.body),
+          const Text(
+            'Kata ini sudah ada di bank kosakata.',
+            style: AppTextStyles.bodyStrong,
+          ),
           const SizedBox(height: AppSpacing.xs),
           if (!_expanded)
             TextButton(
@@ -306,8 +337,12 @@ class _DuplicateWordNoticeState extends ConsumerState<_DuplicateWordNotice> {
             )
           else ...[
             TextField(
-              decoration: const InputDecoration(labelText: 'Part of speech (POS)'),
-              onChanged: (value) => setState(() => _draft = _draft.copyWith(pos: value, translation: null)),
+              decoration: const InputDecoration(
+                labelText: 'Part of speech (POS)',
+              ),
+              onChanged: (value) => setState(
+                () => _draft = _draft.copyWith(pos: value, translation: null),
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
             Row(
@@ -321,30 +356,31 @@ class _DuplicateWordNoticeState extends ConsumerState<_DuplicateWordNotice> {
                   ),
                 ),
                 TextButton(
-                  onPressed: _draft.pos.trim().isEmpty || _draft.isGenerating ? null : _generate,
+                  onPressed: _draft.pos.trim().isEmpty || _draft.isGenerating
+                      ? null
+                      : _generate,
                   child: const Text('Buat Terjemahan'),
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
             FilledButton(
-              onPressed: _draft.pos.trim().isEmpty || _draft.translation == null || controllerState.isLoading
+              onPressed:
+                  _draft.pos.trim().isEmpty ||
+                      _draft.translation == null ||
+                      controllerState.isLoading
                   ? null
                   : _submit,
               child: controllerState.isLoading
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const AppButtonSpinner()
                   : const Text('Simpan makna baru'),
             ),
             if (controllerState.hasError)
               const Padding(
-                padding: EdgeInsets.only(top: AppSpacing.xs),
-                child: Text(
-                  'Gagal menyimpan makna baru. Coba lagi.',
-                  style: TextStyle(color: AppColors.error),
+                padding: EdgeInsets.only(top: AppSpacing.sm),
+                child: AppNotice(
+                  text: 'Gagal menyimpan makna baru. Coba lagi.',
+                  tone: AppTone.error,
                 ),
               ),
           ],
@@ -398,34 +434,20 @@ class _NewWordForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final classification = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Level CEFR', style: AppTextStyles.body),
-        const SizedBox(height: AppSpacing.xs),
-        Wrap(
-          spacing: AppSpacing.sm,
-          children: [
-            for (final level in kCefrLevels)
-              ChoiceChip(
-                label: Text(level),
-                selected: level == cefrLevel,
-                selectedColor: AppColors.primary,
-                labelStyle: AppTextStyles.badgeLabel.copyWith(
-                  color: level == cefrLevel ? Colors.white : Colors.black87,
-                ),
-                onSelected: (_) => onCefrLevelChanged(level),
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        const Text('Topik', style: AppTextStyles.body),
-        const SizedBox(height: AppSpacing.xs),
+        const Text('Level CEFR', style: AppTextStyles.sectionTitle),
+        const SizedBox(height: AppSpacing.sm),
+        CefrLevelSelector(selected: cefrLevel, onSelected: onCefrLevelChanged),
+        const SizedBox(height: AppSpacing.lg),
+        const Text('Topik', style: AppTextStyles.sectionTitle),
+        const SizedBox(height: AppSpacing.sm),
         topicsAsync.when(
           loading: () => const LinearProgressIndicator(),
-          error: (_, _) => const Text(
-            'Gagal memuat daftar topik.',
-            style: TextStyle(color: AppColors.error),
+          error: (_, _) => const AppNotice(
+            text: 'Gagal memuat daftar topik.',
+            tone: AppTone.error,
           ),
           data: (topics) => Wrap(
             spacing: AppSpacing.sm,
@@ -440,33 +462,41 @@ class _NewWordForm extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.smd),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: TextField(
                 controller: newTopicController,
-                decoration: const InputDecoration(labelText: 'Tambah topik baru'),
+                decoration: const InputDecoration(
+                  labelText: 'Tambah topik baru',
+                ),
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
             IconButton(
+              tooltip: 'Tambah topik',
+              style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
               onPressed: isAddingTopic ? null : onAddTopic,
               icon: isAddingTopic
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const AppButtonSpinner(size: 16)
                   : const Icon(Icons.add),
             ),
           ],
         ),
-        if (topicError != null)
-          Text(topicError!, style: const TextStyle(color: AppColors.error)),
-        const SizedBox(height: AppSpacing.md),
-        const Text('Makna', style: AppTextStyles.body),
-        const SizedBox(height: AppSpacing.xs),
+        if (topicError != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          AppNotice(text: topicError!, tone: AppTone.error),
+        ],
+      ],
+    );
+
+    final meaningFields = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Makna', style: AppTextStyles.sectionTitle),
+        const SizedBox(height: AppSpacing.sm),
         for (var i = 0; i < meanings.length; i++)
           _MeaningRow(
             index: i,
@@ -477,24 +507,37 @@ class _NewWordForm extends StatelessWidget {
             onGenerate: () => onGenerateTranslation(i),
             onRemove: () => onRemoveMeaningRow(i),
           ),
-        TextButton(onPressed: onAddMeaningRow, child: const Text('+ Tambah makna lain')),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: onAddMeaningRow,
+            child: const Text('+ Tambah makna lain'),
+          ),
+        ),
         const SizedBox(height: AppSpacing.md),
         FilledButton(
           onPressed: canSubmit ? onSubmit : null,
           child: isSubmitting
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
+              ? const AppButtonSpinner()
               : const Text('Simpan Kata'),
         ),
-        if (errorMessage != null)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
-            child: Text(errorMessage!, style: const TextStyle(color: AppColors.error)),
-          ),
+        if (errorMessage != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          AppNotice(text: errorMessage!, tone: AppTone.error),
+        ],
       ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: AppTwoPane(
+        breakpoint: 700,
+        sideWidth: 400,
+        sideLeading: true,
+        sideFirst: true,
+        side: classification,
+        primary: meaningFields,
+      ),
     );
   }
 }
@@ -522,10 +565,11 @@ class _MeaningRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.smd),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.disabled),
-        borderRadius: BorderRadius.circular(AppRadius.small),
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -538,11 +582,17 @@ class _MeaningRow extends StatelessWidget {
                 Text('Makna ${index + 1}', style: AppTextStyles.badgeLabel),
               const Spacer(),
               if (canRemove)
-                IconButton(icon: const Icon(Icons.close, size: 18), onPressed: onRemove),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Hapus makna',
+                  onPressed: onRemove,
+                ),
             ],
           ),
           TextField(
-            decoration: const InputDecoration(labelText: 'Part of speech (POS)'),
+            decoration: const InputDecoration(
+              labelText: 'Part of speech (POS)',
+            ),
             controller: TextEditingController(text: draft.pos)
               ..selection = TextSelection.collapsed(offset: draft.pos.length),
             onChanged: onPosChanged,
@@ -555,11 +605,15 @@ class _MeaningRow extends StatelessWidget {
                   draft.isGenerating
                       ? 'Membuat terjemahan...'
                       : (draft.translation ?? 'Belum ada terjemahan'),
-                  style: AppTextStyles.body,
+                  style: draft.translation == null
+                      ? AppTextStyles.bodyMuted
+                      : AppTextStyles.bodyStrong,
                 ),
               ),
               TextButton(
-                onPressed: draft.pos.trim().isEmpty || draft.isGenerating ? null : onGenerate,
+                onPressed: draft.pos.trim().isEmpty || draft.isGenerating
+                    ? null
+                    : onGenerate,
                 child: const Text('Buat Terjemahan'),
               ),
             ],

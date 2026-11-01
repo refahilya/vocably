@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/sign_up_controller.dart';
+import '../../theme/theme.dart';
+import '../../widgets/app_brand.dart';
+import '../../widgets/app_feedback.dart';
 import 'login_screen.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
@@ -62,91 +65,88 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(signUpControllerProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Daftar')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+    return AppAuthScaffold(
+      title: 'Daftar',
+      child: Form(
+        key: _formKey,
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Nama'),
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.name],
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.email],
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                autofillHints: const [AutofillHints.newPassword],
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Daftar sebagai Guru?'),
+                value: _asTeacher,
+                onChanged: (value) => setState(() => _asTeacher = value),
+              ),
+              if (_asTeacher) ...[
+                const SizedBox(height: AppSpacing.xs),
                 TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Nama'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  keyboardType: TextInputType.emailAddress,
+                  controller: _teacherCodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Kode Akses Guru',
+                    prefixIcon: Icon(Icons.key_outlined),
+                  ),
                   autocorrect: false,
+                  textCapitalization: TextCapitalization.none,
                   validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Daftar sebagai Guru?'),
-                  value: _asTeacher,
-                  onChanged: (value) => setState(() => _asTeacher = value),
-                ),
-                if (_asTeacher) ...[
-                  const SizedBox(height: 4),
-                  TextFormField(
-                    controller: _teacherCodeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Kode Akses Guru',
-                    ),
-                    autocorrect: false,
-                    textCapitalization: TextCapitalization.none,
-                    validator: (v) =>
-                        (_asTeacher && (v == null || v.trim().isEmpty))
-                        ? 'Wajib diisi'
-                        : null,
-                  ),
-                ],
-                const SizedBox(height: 24),
-                if (state.hasError)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      _friendlyError(state.error!),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ),
-                FilledButton(
-                  onPressed: state.isLoading ? null : _submit,
-                  child: state.isLoading
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Daftar'),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  ),
-                  child: const Text('Sudah punya akun? Masuk'),
+                      (_asTeacher && (v == null || v.trim().isEmpty))
+                      ? 'Wajib diisi'
+                      : null,
                 ),
               ],
-            ),
+              const SizedBox(height: AppSpacing.lg),
+              if (state.hasError)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.smd),
+                  child: AppNotice(
+                    text: _friendlyError(state.error!),
+                    tone: AppTone.error,
+                  ),
+                ),
+              FilledButton(
+                onPressed: state.isLoading ? null : _submit,
+                child: state.isLoading
+                    ? const AppButtonSpinner()
+                    : const Text('Daftar'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                ),
+                child: const Text('Sudah punya akun? Masuk'),
+              ),
+            ],
           ),
         ),
       ),

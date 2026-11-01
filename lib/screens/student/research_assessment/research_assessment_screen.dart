@@ -5,6 +5,7 @@ import '../../../models/research_attempt.dart';
 import '../../../providers/research_assessment_providers.dart';
 import '../../../services/research_assessment_service.dart';
 import '../../../theme/theme.dart';
+import '../../../widgets/app_layout.dart';
 import '../../../widgets/assessment_widgets.dart';
 import 'research_instructions.dart';
 
@@ -51,11 +52,7 @@ class ResearchAssessmentScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(title: Text(_title)),
         body: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: switch (state) {
+          child: switch (state) {
                 ResearchAssessmentLoading() => const AssessmentBusy(
                   label: 'Memuat tes…',
                 ),
@@ -115,9 +112,7 @@ class ResearchAssessmentScreen extends ConsumerWidget {
                   actionLabel: 'Kembali',
                   onAction: () => Navigator.of(context).maybePop(),
                 ),
-              },
-            ),
-          ),
+          },
         ),
       ),
     );
@@ -183,66 +178,85 @@ class _Intro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.infoBackground,
-              borderRadius: BorderRadius.circular(AppRadius.medium),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      children: [
+        Expanded(
+          child: AppScrollPage(
+            maxWidth: AppContentWidth.assessment,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  kResearchInstructionsTitle,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                const AppSheet(
+                  padding: EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        kResearchInstructionsTitle,
+                        style: AppTextStyles.pageTitle,
+                      ),
+                      SizedBox(height: AppSpacing.sm),
+                      Text(
+                        kResearchInstructionsParagraph1,
+                        style: AppTextStyles.body,
+                      ),
+                      SizedBox(height: AppSpacing.sm),
+                      Text(
+                        kResearchInstructionsParagraph2,
+                        style: AppTextStyles.body,
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: AppSpacing.sm),
-                Text(
-                  kResearchInstructionsParagraph1,
-                  style: AppTextStyles.body,
+                const SizedBox(height: AppSpacing.md),
+                AppSheet(
+                  color: AppColors.primaryTint,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        kResearchExampleHeading,
+                        style: AppTextStyles.bodyStrong,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const _WordHeading(
+                        word: kResearchExampleWord,
+                        posLabel: kResearchExamplePosLabel,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      for (var i = 0; i < kResearchExampleOptions.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            '${kResearchOptionLetters[i]}) ${kResearchExampleOptions[i]}',
+                            style: AppTextStyles.body,
+                          ),
+                        ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const Text(
+                        kResearchExampleExplanation,
+                        style: AppTextStyles.body,
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: AppSpacing.sm),
-                Text(
-                  kResearchInstructionsParagraph2,
-                  style: AppTextStyles.body,
-                ),
+                if (errorText != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AssessmentErrorBanner(text: errorText!),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          const Text(kResearchExampleHeading, style: AppTextStyles.body),
-          const SizedBox(height: AppSpacing.sm),
-          const _WordHeading(
-            word: kResearchExampleWord,
-            posLabel: kResearchExamplePosLabel,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          for (var i = 0; i < kResearchExampleOptions.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(left: AppSpacing.md, bottom: 2),
-              child: Text(
-                '${kResearchOptionLetters[i]}) ${kResearchExampleOptions[i]}',
-                style: AppTextStyles.body,
-              ),
-            ),
-          const SizedBox(height: AppSpacing.sm),
-          const Text(kResearchExampleExplanation, style: AppTextStyles.body),
-          const SizedBox(height: AppSpacing.lg),
-          if (errorText != null) ...[
-            AssessmentErrorBanner(text: errorText!),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          FilledButton(
+        ),
+        AppBottomBar(
+          maxWidth: AppContentWidth.assessment,
+          child: FilledButton(
             onPressed: busy ? null : onPressed,
             child: busy ? const AssessmentButtonSpinner() : Text(buttonLabel),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -260,9 +274,7 @@ class _WordHeading extends StatelessWidget {
         children: [
           TextSpan(
             text: word,
-            style: AppTextStyles.wordTitle.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: AppTextStyles.wordTitle,
           ),
           TextSpan(text: ' ($posLabel)', style: AppTextStyles.body),
         ],
@@ -287,47 +299,55 @@ class _ItemView extends StatelessWidget {
     final item = state.currentItem;
     final options = item.displayOptions;
     final canSubmit = state.selectedOptionId != null && !state.saving;
-    return SingleChildScrollView(
-      key: ValueKey('research-item-${item.itemId}'),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _WordHeading(word: item.word, posLabel: item.posLabel),
-          const SizedBox(height: AppSpacing.md),
-          Semantics(
-            container: true,
-            label: 'Pilihan jawaban',
+    return Column(
+      children: [
+        Expanded(
+          child: AppScrollPage(
+            key: ValueKey('research-item-${item.itemId}'),
+            maxWidth: AppContentWidth.assessment,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var i = 0; i < options.length; i++)
-                  AssessmentOptionTile(
-                    key: ValueKey('research-option-${options[i].id}'),
-                    label: '${kResearchOptionLetters[i]}) ${options[i].text}',
-                    selected: state.selectedOptionId == options[i].id,
-                    enabled: !state.saving && !state.selectionLocked,
-                    onTap: () => onSelect(options[i].id),
+                _WordHeading(word: item.word, posLabel: item.posLabel),
+                const SizedBox(height: AppSpacing.md),
+                Semantics(
+                  container: true,
+                  label: 'Pilihan jawaban',
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < options.length; i++)
+                        AssessmentOptionTile(
+                          key: ValueKey('research-option-${options[i].id}'),
+                          label: '${kResearchOptionLetters[i]}) ${options[i].text}',
+                          selected: state.selectedOptionId == options[i].id,
+                          enabled: !state.saving && !state.selectionLocked,
+                          onTap: () => onSelect(options[i].id),
+                        ),
+                    ],
                   ),
+                ),
+                if (state.error != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  const AssessmentErrorBanner(
+                    text:
+                        'Jawaban belum tersimpan. Periksa koneksi internet, lalu '
+                        'tekan tombol lagi.',
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          if (state.error != null) ...[
-            const AssessmentErrorBanner(
-              text:
-                  'Jawaban belum tersimpan. Periksa koneksi internet, lalu '
-                  'tekan tombol lagi.',
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          FilledButton(
+        ),
+        AppBottomBar(
+          maxWidth: AppContentWidth.assessment,
+          child: FilledButton(
             onPressed: canSubmit ? onSubmit : null,
             child: state.saving
                 ? const AssessmentButtonSpinner()
                 : Text(state.isLastItem ? 'Kirim' : 'Lanjut'),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

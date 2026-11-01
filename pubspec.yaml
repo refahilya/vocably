@@ -91,6 +91,29 @@ flutter:
     - assets/research/
     - assets/placement/
 
+  # UI and reading typefaces (SIL Open Font License, see assets/fonts/OFL-*).
+  # Static, Latin + IPA subsets rather than the variable originals: Flutter web
+  # matches FontWeight to a font asset, and school connections are slow.
+  # The Literata italic is used for dictionary example sentences.
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700
+    - family: Literata
+      fonts:
+        - asset: assets/fonts/Literata-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Literata-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Literata-Bold.ttf
+          weight: 700
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

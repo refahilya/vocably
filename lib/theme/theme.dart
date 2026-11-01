@@ -1,240 +1,558 @@
 import 'package:flutter/material.dart';
 
-/// Vocably design-system tokens — single source of truth for colors,
-/// spacing, corner radii, and typography treatment (`CLAUDE.md` §5: "Semua
-/// warna, font, radius, spacing didefinisikan di `lib/theme/theme.dart` —
-/// jangan hardcode nilai style di widget individual").
+/// Vocably design system: the single source of truth for colors, type,
+/// spacing, radii and component theming (`CLAUDE.md` §5, `DESIGN_REFERENCE.md`
+/// §1–§2).
 ///
-/// Source: `DESIGN_REFERENCE.md` §1 (palette) and §2 (typography), carried
-/// over from the deprecated native-Android v1 app — only the color
-/// identity and shape language are preserved, not its layout (see that
-/// document's own framing note). The hex values there are explicitly
-/// flagged as **visual estimates from screenshots**, not exact values from
-/// the old app's code — treat the values below the same way; adjust with a
-/// color picker later if a more precise reference turns up.
+/// The direction is a student's exercise book: a navy cover, cool paper
+/// pages, and one highlighter ("stabilo") that marks what matters. The
+/// highlighter is the only loud element, so it stays reserved for the current
+/// focus (target words, the active step, the active destination).
 ///
-/// Stage 1 (tokens: [AppColors]/[AppSpacing]/[AppRadius]/[AppTextStyles])
-/// and Stage 2 ([AppTheme], which turns those tokens into the actual
-/// [ThemeData] wired into `MaterialApp` in `app.dart`) both live here —
-/// `theme.dart` stays the single file for design-system code per
-/// `CLAUDE.md` §5/§6, not split prematurely.
+/// `theme.dart` stays the single file for design-system code. Layout tokens
+/// that widgets need at build time live in `widgets/app_layout.dart`.
+abstract final class AppFonts {
+  /// Interface text: labels, buttons, forms. Plus Jakarta Sans, designed by
+  /// Indonesian foundry Tokotype.
+  static const String ui = 'PlusJakartaSans';
 
-/// Color tokens. Where `DESIGN_REFERENCE.md` §1 pairs a role with a "muda"
-/// (light) background variant, both are kept here — e.g. [success] +
-/// [successBackground] — mirroring the palette table's own "Warna X + latar
-/// Y" structure rather than inventing new pairings.
-abstract final class AppColors {
-  /// App bar, tombol utama, header stepper, item navigasi aktif, avatar
-  /// user di chat. The doc gives a range (`#1B1F5C`–`#26307A`); the darker
-  /// end is used as the canonical value.
-  static const Color primary = Color(0xFF1B1F5C);
-
-  /// Avatar AI di co-write, aksen ikon.
-  static const Color accent = Color(0xFF4DD0E1);
-
-  /// Jawaban benar di cloze test, banner "semua kata target sudah
-  /// digunakan", badge mastery `mastered`.
-  static const Color success = Color(0xFF2E7D32);
-  static const Color successBackground = Color(0xFFE8F5E9);
-
-  /// Jawaban salah di cloze test, inline error form.
-  static const Color error = Color(0xFFC62828);
-  static const Color errorBackground = Color(0xFFFCE4EC);
-
-  /// Feedback co-write "perlu perbaikan" (ikon bohlam).
-  static const Color warning = Color(0xFFFFA000);
-  static const Color warningBackground = Color(0xFFFFF8E1);
-
-  /// Feedback co-write netral: pengingat memakai kata target / menulis
-  /// dalam bahasa Inggris (ikon pesan).
-  static const Color info = Color(0xFF1565C0);
-  static const Color infoBackground = Color(0xFFE3F2FD);
-
-  /// Dot penanda kata `difficult` (§5.3) — solid, unlike the
-  /// solid+background pairs above.
-  static const Color masteryDifficult = Color(0xFFF57C00);
-
-  /// Highlight kata target di dalam cerita (Baca Cerita) — latar
-  /// oranye/tan muda dengan teks oranye tua.
-  static const Color storyHighlightBackground = Color(0xFFFFE0B2);
-  static const Color storyHighlightText = Color(0xFFE65100);
-
-  /// Background utama layar.
-  static const Color background = Color(0xFFFFFFFF);
-
-  /// Latar sekunder yang sedikit lebih gelap dari [background] — mis. buat
-  /// banner instruksi abu muda (§3.5), tanpa jatuh ke putih polos.
-  static const Color surfaceAlt = Color(0xFFF5F5F5);
-
-  /// Netral/disabled — entry point "Segera" (pre/post test), tombol
-  /// disabled, pill C2.
-  static const Color disabled = Color(0xFFBDBDBD);
-  static const Color disabledBackground = Color(0xFFEEEEEE);
+  /// Reading text: stories, headwords, page titles. Literata was drawn for
+  /// long-form reading on screens.
+  static const String reading = 'Literata';
 }
 
-/// Spacing scale, in logical pixels. `DESIGN_REFERENCE.md` doesn't specify
-/// exact spacing numbers (only qualitative treatment), so this is a
-/// conventional 4pt-based scale — an implementation choice, not a literal
-/// document value. Change freely if a stricter reference emerges.
+abstract final class AppColors {
+  /// The navy cover: app bar, primary buttons, stepper band, selected state.
+  static const Color primary = Color(0xFF1B1F5C);
+
+  /// Darker navy for the wide-layout navigation spine.
+  static const Color primaryDeep = Color(0xFF14173F);
+
+  /// Lightest navy tint: answered states, student chat bubbles.
+  static const Color primaryTint = Color(0xFFE8EAF6);
+
+  /// Second navy tint, for filled-but-quiet surfaces such as reached levels.
+  static const Color primaryTintStrong = Color(0xFFCFD3EC);
+
+  /// The highlighter. Ink text only on top of it, never white.
+  static const Color marker = Color(0xFFFFCF56);
+
+  /// Pale highlighter wash for quiet emphasis.
+  static const Color markerSoft = Color(0xFFFFF1C9);
+
+  /// AI avatar on navy-free surfaces.
+  static const Color accent = Color(0xFF4DD0E1);
+
+  /// Teal dark enough for white icons and small text.
+  static const Color accentStrong = Color(0xFF0B7285);
+
+  static const Color success = Color(0xFF1F7A3A);
+  static const Color successBackground = Color(0xFFE5F4E9);
+
+  static const Color error = Color(0xFFB3261E);
+  static const Color errorBackground = Color(0xFFFBE9E7);
+
+  /// Warning fill and icon color on [warningBackground].
+  static const Color warning = Color(0xFF8F5500);
+  static const Color warningBackground = Color(0xFFFFF4DC);
+
+  static const Color info = Color(0xFF1558A8);
+  static const Color infoBackground = Color(0xFFE4EFFB);
+
+  /// Mastery dot for `difficult` (`DESIGN_REFERENCE.md` §5.3).
+  static const Color masteryDifficult = Color(0xFFE07A00);
+
+  /// Target-word highlight in a story.
+  static const Color storyHighlightBackground = marker;
+  static const Color storyHighlightText = primaryDeep;
+
+  /// Cool paper: the page behind every sheet. Deliberately not cream.
+  static const Color paper = Color(0xFFF2F4FA);
+
+  /// A sheet of paper on top of [paper]; also fields and bars.
+  static const Color surface = Color(0xFFFFFFFF);
+
+  /// Quiet panel inside a sheet.
+  static const Color surfaceAlt = Color(0xFFF2F4FA);
+
+  /// Hairline rule between and around surfaces.
+  static const Color line = Color(0xFFDADEEC);
+
+  /// Field outlines: must stay visible against white (3:1).
+  static const Color lineStrong = Color(0xFF8E93B2);
+
+  /// Body text.
+  static const Color ink = Color(0xFF1A1D3A);
+
+  /// Secondary text, at least 4.5:1 on [surface] and [paper].
+  static const Color inkMuted = Color(0xFF555A78);
+
+  /// Tertiary text and disabled labels, at least 4.5:1 on [surface].
+  static const Color inkFaint = Color(0xFF5F6484);
+
+  /// Disabled control fill and the muted C2 level.
+  static const Color disabledBackground = Color(0xFFE6E8F1);
+
+  static const Color onNavyMuted = Color(0xFFC6CAE6);
+}
+
+/// 4pt spacing scale.
 abstract final class AppSpacing {
   static const double xs = 4;
   static const double sm = 8;
+  static const double smd = 12;
   static const double md = 16;
   static const double lg = 24;
   static const double xl = 32;
   static const double xxl = 48;
 }
 
-/// Corner-radius tokens. The "rounded corner, pill chip" shape language is
-/// preserved from v1 per `DESIGN_REFERENCE.md`'s intro note; the specific
-/// values are an implementation choice, not literal document numbers.
+/// Corner radii scale with the size of the thing: small controls stay crisp
+/// and only true pills are fully round.
 abstract final class AppRadius {
-  static const double small = 8;
-  static const double medium = 12;
-  static const double large = 16;
-
-  /// For fully-rounded "pill" shapes (chips, pill buttons) — pass to
-  /// `BorderRadius.circular(AppRadius.pill)`; large enough to fully round
-  /// regardless of the shape's height.
+  static const double small = 6;
+  static const double medium = 10;
+  static const double large = 14;
   static const double pill = 999;
 }
 
-/// Typography treatments from `DESIGN_REFERENCE.md` §2. These are plain
-/// [TextStyle] tokens, not a [TextTheme]/[ThemeData] — building and wiring
-/// the actual theme is Stage 2.
-///
-/// Note on [wordTitle]: the doc's word-title example ("SOUVENIR",
-/// "DESTINATION") is uppercase, but that's a text-case transform, not a
-/// [TextStyle] property — callers apply `.toUpperCase()` to the string
-/// themselves; this token only carries weight/size/color.
+/// Type scale. Literata carries reading and titles, Plus Jakarta Sans carries
+/// the interface. Every token names its family because `RichText` does not
+/// inherit the theme's default.
 abstract final class AppTextStyles {
-  /// App bar title — bold, putih, di atas background navy.
   static const TextStyle appBarTitle = TextStyle(
-    fontSize: 20,
-    fontWeight: FontWeight.bold,
+    fontFamily: AppFonts.ui,
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
     color: Colors.white,
   );
 
-  /// Judul kata di kartu detail — huruf besar semua (lihat catatan di atas
-  /// soal uppercasing), bold, ukuran besar, navy/gelap.
-  static const TextStyle wordTitle = TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
+  /// Page titles.
+  static const TextStyle pageTitle = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 26,
+    height: 1.25,
+    fontWeight: FontWeight.w700,
     color: AppColors.primary,
   );
 
-  /// Kalimat soal tes — ukuran dan warna sama dengan [wordTitle], tetapi
-  /// regular, supaya kata target ([assessmentTarget]) bisa menonjol.
-  static const TextStyle assessmentSentence = TextStyle(
+  /// Section headings inside a page.
+  static const TextStyle sectionTitle = TextStyle(
+    fontFamily: AppFonts.ui,
+    fontSize: 16,
+    height: 1.35,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ink,
+  );
+
+  /// Message titles on status screens.
+  static const TextStyle statusTitle = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 22,
+    height: 1.3,
+    fontWeight: FontWeight.w700,
+    color: AppColors.primary,
+  );
+
+  /// Dictionary headword and tested word.
+  static const TextStyle wordTitle = TextStyle(
+    fontFamily: AppFonts.reading,
     fontSize: 24,
+    height: 1.3,
+    fontWeight: FontWeight.w700,
+    color: AppColors.primary,
+  );
+
+  /// A word in a list.
+  static const TextStyle wordRow = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 18,
+    height: 1.3,
+    fontWeight: FontWeight.w700,
+    color: AppColors.primary,
+  );
+
+  /// Test sentence: same size and color as [wordTitle], but regular so the
+  /// target word ([assessmentTarget]) stands out.
+  static const TextStyle assessmentSentence = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 24,
+    height: 1.45,
     fontWeight: FontWeight.normal,
     color: AppColors.primary,
   );
 
-  /// Kata target di dalam [assessmentSentence] — tebal dan bergaris bawah.
-  /// Hanya menimpa yang berbeda; ukuran dan warna diwarisi dari kalimat.
+  /// Target word inside [assessmentSentence]. Only overrides what differs.
   static const TextStyle assessmentTarget = TextStyle(
     fontWeight: FontWeight.bold,
     decoration: TextDecoration.underline,
   );
 
-  /// Body text — regular weight, warna gelap netral.
+  /// Story title on the reading page.
+  static const TextStyle storyTitle = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 22,
+    height: 1.3,
+    fontWeight: FontWeight.w700,
+    color: AppColors.primary,
+  );
+
+  /// Story body.
+  static const TextStyle story = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 18,
+    height: 1.75,
+    color: AppColors.ink,
+  );
+
+  /// Story body with room for inline cloze dropdowns.
+  static const TextStyle clozeStory = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 18,
+    height: 2.2,
+    color: AppColors.ink,
+  );
+
+  /// Target word in a story. The highlighter stroke sits behind the glyphs.
+  static TextStyle get storyHighlight => TextStyle(
+    color: AppColors.storyHighlightText,
+    fontWeight: FontWeight.w700,
+    background: Paint()..color = AppColors.storyHighlightBackground,
+  );
+
   static const TextStyle body = TextStyle(
-    fontSize: 14,
-    color: Colors.black87,
+    fontFamily: AppFonts.ui,
+    fontSize: 15,
+    height: 1.5,
+    color: AppColors.ink,
   );
 
-  /// Label kecil di badge (POS tag, dsb).
-  static const TextStyle badgeLabel = TextStyle(
-    fontSize: 11,
+  static const TextStyle bodyStrong = TextStyle(
+    fontFamily: AppFonts.ui,
+    fontSize: 15,
+    height: 1.5,
     fontWeight: FontWeight.w600,
-    color: Colors.black87,
+    color: AppColors.ink,
   );
 
-  /// Small secondary text — smaller than [body], for auxiliary UI chrome
-  /// that shouldn't compete visually with the main content (e.g. the
-  /// vocab-browser pagination indicator, Milestone 4 finalization).
-  static const TextStyle caption = TextStyle(
+  static const TextStyle bodyMuted = TextStyle(
+    fontFamily: AppFonts.ui,
+    fontSize: 15,
+    height: 1.5,
+    color: AppColors.inkMuted,
+  );
+
+  /// Dictionary example sentence.
+  static const TextStyle example = TextStyle(
+    fontFamily: AppFonts.reading,
+    fontSize: 15,
+    height: 1.55,
+    fontStyle: FontStyle.italic,
+    color: AppColors.inkMuted,
+  );
+
+  static const TextStyle badgeLabel = TextStyle(
+    fontFamily: AppFonts.ui,
     fontSize: 12,
-    color: Colors.black87,
+    height: 1.3,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ink,
+  );
+
+  static const TextStyle caption = TextStyle(
+    fontFamily: AppFonts.ui,
+    fontSize: 13,
+    height: 1.45,
+    color: AppColors.inkMuted,
+  );
+
+  static const TextStyle button = TextStyle(
+    fontFamily: AppFonts.ui,
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
   );
 }
 
-/// Builds the application [ThemeData] from the tokens above — the only
-/// place raw Flutter theming APIs meet the Vocably tokens. Nothing outside
-/// this file should reference [AppColors]/[AppTextStyles]/[AppRadius] to
-/// build theme-level styling, and nothing outside this file should
-/// hardcode a raw color/style meant to represent one of the roles above
-/// (`CLAUDE.md` §5: "jangan hardcode nilai style di widget individual").
+/// Turns the tokens into the [ThemeData] used by `MaterialApp`, so screens
+/// get the system by default and only reach for tokens when composing.
 abstract final class AppTheme {
+  static const _controlHeight = 48.0;
+
   static ThemeData get themeData {
-    // Seeded from AppColors.primary so every M3-generated tonal role
-    // (containers, tertiary, etc.) that DESIGN_REFERENCE.md doesn't
-    // explicitly specify still stays harmonious with the brand color,
-    // rather than falling back to Flutter's unrelated default purple.
-    // The roles the doc *does* specify (§1) are then pinned explicitly via
-    // copyWith so they match the documented tokens exactly, not whatever
-    // the seed algorithm would have derived for them.
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
-      brightness: Brightness.light,
-    ).copyWith(
-      primary: AppColors.primary,
-      onPrimary: Colors.white,
-      secondary: AppColors.accent,
-      error: AppColors.error,
-      onError: Colors.white,
-      surface: AppColors.background,
-      onSurface: Colors.black87,
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          brightness: Brightness.light,
+        ).copyWith(
+          primary: AppColors.primary,
+          onPrimary: Colors.white,
+          primaryContainer: AppColors.primaryTint,
+          onPrimaryContainer: AppColors.primary,
+          secondary: AppColors.accentStrong,
+          onSecondary: Colors.white,
+          error: AppColors.error,
+          onError: Colors.white,
+          surface: AppColors.surface,
+          onSurface: AppColors.ink,
+          onSurfaceVariant: AppColors.inkMuted,
+          surfaceContainerHighest: AppColors.surfaceAlt,
+          outline: AppColors.lineStrong,
+          outlineVariant: AppColors.line,
+        );
+
+    final controlShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.medium),
     );
 
     return ThemeData(
+      useMaterial3: true,
+      // Flutter otherwise compacts controls on desktop browsers, which would
+      // drop buttons below the 48px touch target on touch laptops and make
+      // the same screen differ between devices.
+      visualDensity: VisualDensity.standard,
       colorScheme: colorScheme,
-      // §1: "Background utama — Putih / abu sangat muda".
-      scaffoldBackgroundColor: AppColors.background,
-      // §2: "Header/app bar: bold, putih, di atas background navy".
+      fontFamily: AppFonts.ui,
+      scaffoldBackgroundColor: AppColors.paper,
+      disabledColor: AppColors.inkFaint,
+      focusColor: AppColors.primary.withAlpha(36),
+      hoverColor: AppColors.primary.withAlpha(14),
+      splashFactory: InkRipple.splashFactory,
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: AppSpacing.md,
         titleTextStyle: AppTextStyles.appBarTitle,
       ),
-      // Maps the tokens that have an obvious TextTheme slot; the rest of
-      // the slots keep Flutter's Material defaults — DESIGN_REFERENCE.md
-      // §2 only documents these three treatments plus the app bar above.
       textTheme: const TextTheme(
         headlineSmall: AppTextStyles.wordTitle,
+        titleLarge: AppTextStyles.statusTitle,
+        titleMedium: AppTextStyles.bodyStrong,
+        titleSmall: AppTextStyles.bodyStrong,
+        bodyLarge: AppTextStyles.body,
         bodyMedium: AppTextStyles.body,
+        bodySmall: AppTextStyles.caption,
+        labelLarge: AppTextStyles.button,
+        labelMedium: AppTextStyles.badgeLabel,
         labelSmall: AppTextStyles.badgeLabel,
       ),
-      // Existing auth screens (login/sign-up/complete-registration) already
-      // use FilledButton/OutlinedButton and TextFormField with no local
-      // style overrides, so this directly restyles those already-built
-      // screens to the documented rounded shape language (§1 intro:
-      // "rounded corner, pill chip") without touching those files.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
+          minimumSize: const Size(64, _controlHeight),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.smd,
           ),
-        ),
+          disabledBackgroundColor: AppColors.disabledBackground,
+          disabledForegroundColor: AppColors.inkFaint,
+          textStyle: AppTextStyles.button,
+          shape: controlShape,
+        ).copyWith(side: _focusRing(AppColors.marker)),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
+          foregroundColor: AppColors.primary,
+          disabledForegroundColor: AppColors.inkFaint,
+          backgroundColor: AppColors.surface,
+          minimumSize: const Size(64, _controlHeight),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.smd,
+          ),
+          textStyle: AppTextStyles.button,
+          shape: controlShape,
+        ).copyWith(side: _focusRing(AppColors.primary, idle: AppColors.lineStrong)),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          disabledForegroundColor: AppColors.inkFaint,
+          minimumSize: const Size(48, 44),
+          textStyle: AppTextStyles.button,
+          shape: controlShape,
+        ).copyWith(side: _focusRing(AppColors.primary)),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(44, 44),
+          shape: controlShape,
+        ).copyWith(side: _focusRing(AppColors.primary)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 14,
+        ),
+        labelStyle: AppTextStyles.bodyMuted,
+        hintStyle: AppTextStyles.bodyMuted,
+        border: _inputBorder(AppColors.lineStrong),
+        enabledBorder: _inputBorder(AppColors.lineStrong),
+        disabledBorder: _inputBorder(AppColors.line),
+        focusedBorder: _inputBorder(AppColors.primary, width: 2),
+        errorBorder: _inputBorder(AppColors.error),
+        focusedErrorBorder: _inputBorder(AppColors.error, width: 2),
+      ),
+      chipTheme: ChipThemeData(
+        color: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.surface,
+        ),
+        side: const BorderSide(color: AppColors.line),
+        checkmarkColor: AppColors.marker,
+        labelStyle: AppTextStyles.badgeLabel.copyWith(
+          fontSize: 13,
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? Colors.white
+                : AppColors.ink,
+          ),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        showCheckmark: true,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        selectedIcon: const SizedBox.shrink(),
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
+          visualDensity: VisualDensity.standard,
+          textStyle: const WidgetStatePropertyAll(AppTextStyles.badgeLabel),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? Colors.white
+                : AppColors.primary,
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.surface,
+          ),
+          side: const WidgetStatePropertyAll(
+            BorderSide(color: AppColors.lineStrong),
+          ),
+          shape: WidgetStatePropertyAll(controlShape),
+        ),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: AppColors.primary,
+        unselectedLabelColor: AppColors.inkMuted,
+        indicatorColor: AppColors.primary,
+        dividerColor: AppColors.line,
+        labelStyle: AppTextStyles.bodyStrong,
+        unselectedLabelStyle: AppTextStyles.body,
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: AppColors.primaryDeep,
+        indicatorColor: AppColors.marker,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.medium),
+        ),
+        selectedIconTheme: const IconThemeData(color: AppColors.primaryDeep),
+        unselectedIconTheme: const IconThemeData(color: AppColors.onNavyMuted),
+        selectedLabelTextStyle: AppTextStyles.badgeLabel.copyWith(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedLabelTextStyle: AppTextStyles.badgeLabel.copyWith(
+          color: AppColors.onNavyMuted,
+          fontSize: 13,
+        ),
+      ),
+      listTileTheme: const ListTileThemeData(
+        titleTextStyle: AppTextStyles.bodyStrong,
+        subtitleTextStyle: AppTextStyles.caption,
+        iconColor: AppColors.primary,
+      ),
+      checkboxTheme: CheckboxThemeData(
+        side: const BorderSide(color: AppColors.lineStrong, width: 1.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.small - 2),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: AppColors.line),
+          borderRadius: BorderRadius.circular(AppRadius.large),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: AppTextStyles.statusTitle,
+        contentTextStyle: AppTextStyles.body,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.large),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        constraints: BoxConstraints(maxWidth: 640),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.large),
           ),
         ),
       ),
-      // §5.6: form fields "rounded, border tipis, focus state navy".
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.primaryDeep,
+        contentTextStyle: AppTextStyles.body.copyWith(color: Colors.white),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.medium),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.line,
+        thickness: 1,
+        space: 1,
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.primary,
+        linearTrackColor: AppColors.primaryTint,
+      ),
+      tooltipTheme: TooltipThemeData(
+        textStyle: AppTextStyles.badgeLabel.copyWith(color: Colors.white),
+        decoration: BoxDecoration(
+          color: AppColors.primaryDeep,
+          borderRadius: BorderRadius.circular(AppRadius.small),
         ),
       ),
     );
   }
+
+  /// A 2px ring on keyboard focus. Flutter's default focus overlay alone is
+  /// too faint on filled buttons for keyboard users.
+  static WidgetStateProperty<BorderSide?> _focusRing(
+    Color color, {
+    Color? idle,
+  }) => WidgetStateProperty.resolveWith((states) {
+    if (states.contains(WidgetState.focused)) {
+      return BorderSide(color: color, width: 2);
+    }
+    if (idle == null) return null;
+    return BorderSide(
+      color: states.contains(WidgetState.disabled) ? AppColors.line : idle,
+    );
+  });
+
+  static OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        borderSide: BorderSide(color: color, width: width),
+      );
 }

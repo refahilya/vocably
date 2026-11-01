@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/login_controller.dart';
+import '../../theme/theme.dart';
+import '../../widgets/app_brand.dart';
+import '../../widgets/app_feedback.dart';
 import 'sign_up_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -51,62 +54,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(loginControllerProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Masuk')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  keyboardType: TextInputType.emailAddress,
-                  autocorrect: false,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                ),
-                const SizedBox(height: 24),
-                if (state.hasError)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      _friendlyError(state.error!),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
+    return AppAuthScaffold(
+      title: 'Masuk',
+      child: Form(
+        key: _formKey,
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.email],
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                autofillHints: const [AutofillHints.password],
+                onFieldSubmitted: (_) {
+                  if (!state.isLoading) _submit();
+                },
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              if (state.hasError)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.smd),
+                  child: AppNotice(
+                    text: _friendlyError(state.error!),
+                    tone: AppTone.error,
                   ),
-                FilledButton(
-                  onPressed: state.isLoading ? null : _submit,
-                  child: state.isLoading
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Masuk'),
                 ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SignUpScreen()),
-                  ),
-                  child: const Text('Belum punya akun? Daftar'),
+              FilledButton(
+                onPressed: state.isLoading ? null : _submit,
+                child: state.isLoading
+                    ? const AppButtonSpinner()
+                    : const Text('Masuk'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SignUpScreen()),
                 ),
-              ],
-            ),
+                child: const Text('Belum punya akun? Daftar'),
+              ),
+            ],
           ),
         ),
       ),

@@ -12,6 +12,8 @@ import 'screens/teacher/target_words/target_words_screen.dart';
 import 'screens/teacher/vocab_management/vocab_management_screen.dart';
 import 'theme/theme.dart';
 import 'utils/role.dart';
+import 'widgets/app_brand.dart';
+import 'widgets/app_feedback.dart';
 import 'widgets/app_nav_shell.dart';
 
 /// Root widget of the Vocably app.
@@ -109,6 +111,18 @@ class _LoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const Scaffold(
+      backgroundColor: AppColors.primary,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppWordmark(fontSize: 32),
+            SizedBox(height: AppSpacing.lg),
+            AppButtonSpinner(color: AppColors.marker, size: 24),
+          ],
+        ),
+      ),
+    );
   }
 }

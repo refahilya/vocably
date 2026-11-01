@@ -846,5 +846,33 @@ void main() {
       );
     });
   });
+
+  testWidgets('the conversation follows the newest turn on a short screen', (tester) async {
+    tester.view.physicalSize = const Size(390, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    var turn = 0;
+    final ai = _FakeAiWorkerService()
+      ..handler = (transcript, remaining, requestSuggestion) {
+        turn++;
+        return CowriteTurnResult(
+          aiTurn: 'Reply number $turn. ${'And the story goes on for a while. ' * 12}',
+          feedback: null,
+          hasError: false,
+          wordsUsedCorrectly: const [],
+          suggestion: null,
+          aiUsedWords: const [],
+        );
+      };
+    await _pumpCowrite(tester, ai: ai);
+
+    for (final text in ['First sentence here.', 'Second sentence here.']) {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.textContaining('Reply number 2').hitTestable(), findsOneWidget);
+  });
 }
 

@@ -367,6 +367,56 @@ void main() {
     });
   });
 
+  group('DashboardScreen — layout', () {
+    testWidgets('the level ladder rises and marks the active level', (tester) async {
+      await _pumpDashboard(
+        tester,
+        profile: AppUser(
+          uid: 'student-1',
+          email: 'siswa@example.com',
+          name: 'Siswa Uji',
+          role: Role.siswa,
+          createdAt: DateTime(2026, 1, 1),
+          resultLevel: 'B1',
+          placementTestCompleted: true,
+          placementTestPrompted: true,
+        ),
+      );
+      expect(find.text('Level kamu saat ini: B1'), findsOneWidget);
+      final a1 = tester.getBottomLeft(find.text('A1'));
+      final c1 = tester.getBottomLeft(find.text('C1'));
+      expect(c1.dy, a1.dy, reason: 'rungs stand on one baseline');
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('B1')),
+        matchesSemantics(
+          label: 'B1',
+          isButton: true,
+          isSelected: true,
+          hasSelectedState: true,
+          hasTapAction: true,
+          isFocusable: true,
+          hasFocusAction: true,
+        ),
+      );
+    });
+
+    testWidgets('the two main panels stack on phones and sit side by side on tablets', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await _pumpDashboard(tester, profile: _studentProfile);
+      final phoneTarget = tester.getTopLeft(find.text('Target Kata Hari Ini'));
+      final phoneLevel = tester.getTopLeft(find.text('Level'));
+      expect(phoneLevel.dy, greaterThan(phoneTarget.dy));
+
+      tester.view.physicalSize = const Size(1024, 768);
+      await tester.pumpAndSettle();
+      final wideTarget = tester.getTopLeft(find.text('Target Kata Hari Ini'));
+      final wideLevel = tester.getTopLeft(find.text('Level'));
+      expect(wideLevel.dx, greaterThan(wideTarget.dx));
+    });
+  });
+
   group('DashboardScreen — no duplicate logout', () {
     testWidgets(
       'does not render a standalone Keluar button in the dashboard body',

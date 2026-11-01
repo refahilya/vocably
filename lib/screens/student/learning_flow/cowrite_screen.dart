@@ -5,6 +5,8 @@ import '../../../models/learning_session.dart';
 import '../../../providers/learning_session_controller.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/cowrite_suggestion.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
 import '../../../widgets/stepper_header.dart';
 
 /// Fase 3 — Co-write dengan AI (`SPEC.md` §5.3, `DESIGN_REFERENCE.md`
@@ -21,12 +23,27 @@ class CowriteScreen extends ConsumerStatefulWidget {
 class _CowriteScreenState extends ConsumerState<CowriteScreen> {
   final _textController = TextEditingController();
   final _inputFocusNode = FocusNode();
+  final _chatScrollController = ScrollController();
+  int _lastTranscriptLength = 0;
 
   @override
   void dispose() {
+    _chatScrollController.dispose();
     _inputFocusNode.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  /// Keeps the newest turn in view as the conversation grows.
+  void _followTranscript(int length) {
+    if (length == _lastTranscriptLength) return;
+    _lastTranscriptLength = length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_chatScrollController.hasClients) return;
+      _chatScrollController.jumpTo(
+        _chatScrollController.position.maxScrollExtent,
+      );
+    });
   }
 
   void _activateComposerInput() {
@@ -88,14 +105,17 @@ class _CowriteScreenState extends ConsumerState<CowriteScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(learningFlowControllerProvider);
     final controller = ref.read(learningFlowControllerProvider.notifier);
+    _followTranscript(state.cowriteTranscript.length);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Tulis Bersama AI')),
-      body: Column(
-        children: [
-          const StepperHeader(activeIndex: 2),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+    final header = <Widget>[
+      const StepperHeader(activeIndex: 2),
+      ColoredBox(
+        color: AppColors.surface,
+        child: AppContent(
+          maxWidth: AppContentWidth.chat,
+          vertical: AppSpacing.smd,
+          child: Align(
+            alignment: Alignment.centerLeft,
             child: Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
@@ -108,51 +128,72 @@ class _CowriteScreenState extends ConsumerState<CowriteScreen> {
               ],
             ),
           ),
+        ),
+      ),
+      const Divider(),
+    ];
+    // A short window keeps its height for the conversation and the composer:
+    // the header scrolls away with the chat instead of staying pinned.
+    final short = isShortWindow(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Tulis Bersama AI')),
+      body: Column(
+        children: [
+          if (!short) ...header,
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              controller: _chatScrollController,
+              padding: EdgeInsets.only(
+                top: short ? 0 : AppSpacing.sm,
+                bottom: AppSpacing.sm,
+              ),
               children: [
-                for (final turn in state.cowriteTranscript) _ChatBubble(turn: turn),
+                if (short) ...header,
+                for (final turn in state.cowriteTranscript)
+                  AppContent(
+                    maxWidth: AppContentWidth.chat,
+                    child: _ChatBubble(turn: turn),
+                  ),
               ],
             ),
           ),
           state.turnError != null
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Text(
-                    state.turnError!,
-                    style: AppTextStyles.body.copyWith(color: AppColors.error),
-                  ),
+              ? AppContent(
+                  maxWidth: AppContentWidth.chat,
+                  vertical: AppSpacing.xs,
+                  child: AppNotice(text: state.turnError!, tone: AppTone.error),
                 )
               : const SizedBox.shrink(),
-          SafeArea(
+          AppBottomBar(
             key: const ValueKey('cowrite-bottom-area'),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: state.allWordsUsed
-                  ? _FinishedBanner(
-                      isCompleting: state.isCompletingCowrite,
-                      onFinish: () => _finish(context, controller),
-                    )
-                  : _ComposeBar(
-                      textController: _textController,
-                      focusNode: _inputFocusNode,
-                      suggestion: state.pendingSuggestion == null
-                          ? null
-                          : formatWritingSuggestion(state.pendingSuggestion!),
-                      isSending: state.isSendingTurn,
-                      isRequestingSuggestion: state.isRequestingSuggestion,
-                      onRequestSuggestion: controller.requestSuggestion,
-                      onSend: () => _handleSend(controller),
-                    ),
-            ),
+            maxWidth: AppContentWidth.chat,
+            child: state.allWordsUsed
+                ? _FinishedBanner(
+                    isCompleting: state.isCompletingCowrite,
+                    onFinish: () => _finish(context, controller),
+                  )
+                : _ComposeBar(
+                    textController: _textController,
+                    focusNode: _inputFocusNode,
+                    suggestion: state.pendingSuggestion == null
+                        ? null
+                        : formatWritingSuggestion(state.pendingSuggestion!),
+                    isSending: state.isSendingTurn,
+                    isRequestingSuggestion: state.isRequestingSuggestion,
+                    onRequestSuggestion: controller.requestSuggestion,
+                    onSend: () => _handleSend(controller),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _finish(BuildContext context, LearningFlowController controller) async {
+  Future<void> _finish(
+    BuildContext context,
+    LearningFlowController controller,
+  ) async {
     await controller.completeCowrite();
     // `completeCowrite` no longer throws on failure (Milestone 7 Phase 2
     // Stage 3) — check the freshly-updated state to see whether the write
@@ -160,7 +201,8 @@ class _CowriteScreenState extends ConsumerState<CowriteScreen> {
     // `turnError` set and `currentPhase` still `coWrite`, so the student
     // stays here and can retry by tapping "✓ Selesai" again.
     final succeeded =
-        ref.read(learningFlowControllerProvider).currentPhase == LearningSessionPhase.selesai;
+        ref.read(learningFlowControllerProvider).currentPhase ==
+        LearningSessionPhase.selesai;
     if (succeeded && context.mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
@@ -176,25 +218,31 @@ class _TargetWordPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.smd,
+        vertical: 6,
+      ),
       decoration: BoxDecoration(
-        color: used ? AppColors.primary : Colors.transparent,
-        border: Border.all(color: used ? AppColors.primary : AppColors.disabled),
+        color: used ? AppColors.primary : AppColors.surface,
+        border: Border.all(
+          color: used ? AppColors.primary : AppColors.lineStrong,
+        ),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (used) ...[
-            const Icon(Icons.check, size: 12, color: Colors.white),
+            const Icon(Icons.check, size: 14, color: AppColors.marker),
             const SizedBox(width: 4),
           ],
-          Text(
-            word,
-            style: TextStyle(
-              color: used ? Colors.white : Colors.black87,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+          Flexible(
+            child: Text(
+              word,
+              style: AppTextStyles.badgeLabel.copyWith(
+                fontSize: 13,
+                color: used ? Colors.white : AppColors.ink,
+              ),
             ),
           ),
         ],
@@ -211,42 +259,67 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isStudent = turn.sender == CowriteSender.siswa;
+    final avatar = CircleAvatar(
+      radius: 13,
+      backgroundColor: isStudent ? AppColors.primary : AppColors.accentStrong,
+      child: Icon(
+        isStudent ? Icons.person : Icons.smart_toy,
+        size: 15,
+        color: Colors.white,
+      ),
+    );
+    final bubble = Flexible(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.smd,
+          vertical: AppSpacing.sm + 2,
+        ),
+        decoration: BoxDecoration(
+          color: isStudent ? AppColors.primaryTint : AppColors.surface,
+          border: isStudent ? null : Border.all(color: AppColors.line),
+          borderRadius: BorderRadius.circular(AppRadius.large),
+        ),
+        child: Text(turn.text, style: AppTextStyles.body),
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: isStudent
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: isStudent
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 12,
-                backgroundColor: isStudent ? AppColors.primary : AppColors.accent,
-                child: Icon(
-                  isStudent ? Icons.person : Icons.smart_toy,
-                  size: 14,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: isStudent ? AppColors.background : AppColors.surfaceAlt,
-                    border: isStudent ? Border.all(color: AppColors.disabled) : null,
-                    borderRadius: BorderRadius.circular(AppRadius.medium),
-                  ),
-                  child: Text(turn.text, style: AppTextStyles.body),
-                ),
-              ),
-            ],
+            children: isStudent
+                ? [
+                    const SizedBox(width: AppSpacing.xl),
+                    bubble,
+                    const SizedBox(width: AppSpacing.sm),
+                    avatar,
+                  ]
+                : [
+                    avatar,
+                    const SizedBox(width: AppSpacing.sm),
+                    bubble,
+                    const SizedBox(width: AppSpacing.xl),
+                  ],
           ),
           if (turn.feedback != null)
             Padding(
-              padding: const EdgeInsets.only(left: 32, top: AppSpacing.xs),
-              child: _FeedbackNote(feedback: turn.feedback!, kind: turn.feedbackKind),
+              padding: const EdgeInsets.only(
+                left: AppSpacing.xl,
+                right: 34,
+                top: AppSpacing.xs,
+              ),
+              child: _FeedbackNote(
+                feedback: turn.feedback!,
+                kind: turn.feedbackKind,
+              ),
             ),
         ],
       ),
@@ -266,7 +339,12 @@ class _FeedbackNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (IconData icon, Color color, Color background, String label) = switch (kind) {
+    final (
+      IconData icon,
+      Color color,
+      Color background,
+      String label,
+    ) = switch (kind) {
       CowriteFeedbackKind.positive => (
         Icons.check_circle,
         AppColors.success,
@@ -289,17 +367,24 @@ class _FeedbackNote extends StatelessWidget {
 
     return Container(
       key: ValueKey('cowrite-feedback-${kind?.name ?? 'neutral'}'),
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.smd,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(AppRadius.medium),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: color, semanticLabel: label),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 18, color: color, semanticLabel: label),
+          ),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(feedback, style: AppTextStyles.body)),
+          Flexible(child: Text(feedback, style: AppTextStyles.body)),
         ],
       ),
     );
@@ -333,9 +418,12 @@ class _ComposeBar extends StatelessWidget {
         suggestion != null
             ? Container(
                 margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                padding: const EdgeInsets.all(AppSpacing.sm),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.smd,
+                  vertical: AppSpacing.sm,
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceAlt,
+                  color: AppColors.markerSoft,
                   borderRadius: BorderRadius.circular(AppRadius.medium),
                 ),
                 child: Text('💡 $suggestion', style: AppTextStyles.body),
@@ -350,7 +438,9 @@ class _ComposeBar extends StatelessWidget {
                   focusNode: focusNode,
                   enabled: !isSending,
                   autofillHints: null,
-                  decoration: const InputDecoration(hintText: 'Tulis kalimatmu...'),
+                  decoration: const InputDecoration(
+                    hintText: 'Tulis kalimatmu...',
+                  ),
                   minLines: 1,
                   maxLines: 3,
                   onSubmitted: (_) => onSend(),
@@ -358,13 +448,11 @@ class _ComposeBar extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.sm),
               IconButton.filled(
+                tooltip: 'Kirim',
+                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: isSending || isRequestingSuggestion ? null : onSend,
                 icon: isSending
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
+                    ? const AppButtonSpinner(size: 16)
                     : const Icon(Icons.send),
               ),
             ],
@@ -374,7 +462,9 @@ class _ComposeBar extends StatelessWidget {
         Align(
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
-            onPressed: isRequestingSuggestion || isSending ? null : onRequestSuggestion,
+            onPressed: isRequestingSuggestion || isSending
+                ? null
+                : onRequestSuggestion,
             icon: const Icon(Icons.lightbulb_outline, size: 16),
             label: const Text('Saran menulis'),
           ),
@@ -396,7 +486,7 @@ class _FinishedBanner extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.smd),
           decoration: BoxDecoration(
             color: AppColors.successBackground,
             borderRadius: BorderRadius.circular(AppRadius.medium),
@@ -404,7 +494,7 @@ class _FinishedBanner extends StatelessWidget {
           child: const Text(
             '🎉 Selamat! Semua kata target sudah digunakan!',
             textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: AppTextStyles.bodyStrong,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),

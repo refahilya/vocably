@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,12 +18,13 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Belajar kosakata bahasa Inggris lewat cerita.">
+  <meta name="theme-color" content="#1B1F5C">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="vocably">
+  <meta name="apple-mobile-web-app-title" content="Vocably">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
@@ -31,8 +32,29 @@
 
   <title>Vocably</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Shown until Flutter paints its first frame, so a slow connection sees
+       the navy cover instead of a blank page. -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #1B1F5C; }
+    #app-splash {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #FFFFFF; font: 700 28px Georgia, 'Times New Roman', serif;
+    }
+    #app-splash span { border-bottom: 5px solid #FFCF56; padding: 0 2px 2px; }
+  </style>
 </head>
 <body>
+  <div id="app-splash"><span>Vocably</span></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('app-splash');
+      if (splash) splash.remove();
+      document.documentElement.style.background = '#F2F4FA';
+      document.body.style.background = '#F2F4FA';
+    });
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

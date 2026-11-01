@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/app_user.dart';
 import '../../../providers/placement_test_providers.dart';
 import '../../../theme/theme.dart';
+import '../../../widgets/app_brand.dart';
+import '../../../widgets/app_layout.dart';
 import 'placement_test_screen.dart';
 
 /// The one-time automatic placement-test offer (`SPEC.md` §3.1,
@@ -37,44 +39,39 @@ class PlacementTestOfferScreen extends ConsumerWidget {
     }
 
     return Scaffold(
+      appBar: AppBar(title: const AppWordmark()),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.school, size: 56, color: AppColors.primary),
-              const SizedBox(height: AppSpacing.md),
-              const Text(
-                'Tes Penempatan',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                textAlign: TextAlign.center,
+        child: SingleChildScrollView(
+          child: AppContent(
+            maxWidth: AppContentWidth.message,
+            vertical: AppSpacing.lg,
+            child: AppSheet(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Tes Penempatan', style: AppTextStyles.pageTitle),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    'Ingin mengerjakan tes penempatan untuk menentukan level '
+                    'CEFR awalmu? Tes ini opsional, dan kamu selalu bisa '
+                    'mengambilnya nanti lewat menu Level.',
+                    style: AppTextStyles.body,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  FilledButton(
+                    onPressed: isSubmitting ? null : () => handleChoice(startNow: true),
+                    child: const Text('Mulai Tes'),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton(
+                    onPressed: isSubmitting ? null : () => handleChoice(startNow: false),
+                    child: const Text('Nanti Saja'),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              const Text(
-                'Ingin mengerjakan tes penempatan untuk menentukan level '
-                'CEFR awalmu? Tes ini opsional, dan kamu selalu bisa '
-                'mengambilnya nanti lewat menu Level.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.body,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: isSubmitting ? null : () => handleChoice(startNow: true),
-                  child: const Text('Mulai Tes'),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: isSubmitting ? null : () => handleChoice(startNow: false),
-                  child: const Text('Nanti Saja'),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

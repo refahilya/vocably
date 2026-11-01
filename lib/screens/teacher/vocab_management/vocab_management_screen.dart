@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/app_user.dart';
 import '../../../theme/theme.dart';
+import '../../../widgets/app_layout.dart';
 import 'edit_kata_screen.dart';
 import 'tambah_kosakata_screen.dart';
 
@@ -29,13 +30,9 @@ class _VocabManagementScreenState extends State<VocabManagementScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.md,
-            AppSpacing.md,
-            AppSpacing.sm,
-          ),
+        AppContent(
+          maxWidth: AppContentWidth.page,
+          vertical: AppSpacing.md,
           child: SegmentedButton<VocabManagementTab>(
             segments: const [
               ButtonSegment(
@@ -57,7 +54,6 @@ class _VocabManagementScreenState extends State<VocabManagementScreen> {
             },
           ),
         ),
-        const Divider(height: 1),
         Expanded(
           child: switch (_selectedTab) {
             VocabManagementTab.tambahKosakata =>

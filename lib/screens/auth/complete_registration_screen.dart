@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_providers.dart';
 import '../../providers/complete_registration_controller.dart';
+import '../../theme/theme.dart';
+import '../../widgets/app_brand.dart';
+import '../../widgets/app_feedback.dart';
 
 /// Shown when Firebase Auth has a signed-in user but `users/{uid}` doesn't
 /// exist yet (see [AppAuthNeedsProfile]). Always completes registration as
@@ -48,51 +51,43 @@ class _CompleteRegistrationScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(completeRegistrationControllerProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Lengkapi Pendaftaran')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Akun kamu belum lengkap. Lengkapi sebagai siswa untuk '
-                  'melanjutkan.',
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Nama'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
-                ),
-                const SizedBox(height: 24),
-                if (state.hasError)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: Text('Gagal menyimpan profil. Silakan coba lagi.'),
-                  ),
-                FilledButton(
-                  onPressed: state.isLoading ? null : _submit,
-                  child: state.isLoading
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Lengkapi sebagai Siswa'),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => ref.read(authServiceProvider).signOut(),
-                  child: const Text('Keluar'),
-                ),
-              ],
+    return AppAuthScaffold(
+      title: 'Lengkapi Pendaftaran',
+      subtitle:
+          'Akun kamu belum lengkap. Lengkapi sebagai siswa untuk '
+          'melanjutkan.',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Nama'),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            if (state.hasError)
+              const Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.smd),
+                child: AppNotice(
+                  text: 'Gagal menyimpan profil. Silakan coba lagi.',
+                  tone: AppTone.error,
+                ),
+              ),
+            FilledButton(
+              onPressed: state.isLoading ? null : _submit,
+              child: state.isLoading
+                  ? const AppButtonSpinner()
+                  : const Text('Lengkapi sebagai Siswa'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              onPressed: () => ref.read(authServiceProvider).signOut(),
+              child: const Text('Keluar'),
+            ),
+          ],
         ),
       ),
     );

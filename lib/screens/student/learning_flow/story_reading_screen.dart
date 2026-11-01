@@ -7,6 +7,8 @@ import '../../../providers/learning_session_controller.dart';
 import '../../../providers/word_lookup_providers.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/story_markers.dart';
+import '../../../widgets/app_feedback.dart';
+import '../../../widgets/app_layout.dart';
 import '../../../widgets/stepper_header.dart';
 import '../vocab_browser/word_detail_screen.dart';
 import 'cloze_test_screen.dart';
@@ -16,6 +18,10 @@ import 'cloze_test_screen.dart';
 /// already called `LearningFlowController.startFlow` — this screen only
 /// ever reads/drives the already-started flow, it never initializes one
 /// itself.
+///
+/// The story is the point of the page: a white sheet at a comfortable line
+/// length. The title field and generate button sit above it on phones and in
+/// a side panel on wide windows, so a reader keeps the page to themselves.
 class StoryReadingScreen extends ConsumerStatefulWidget {
   const StoryReadingScreen({super.key});
 
@@ -45,190 +51,171 @@ class _StoryReadingScreenState extends ConsumerState<StoryReadingScreen> {
     // Generate/Generate Ulang must not attempt to write a now-locked story.
     final isStoryLocked = state.currentPhase != LearningSessionPhase.membaca;
 
+    final composer = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _titleController,
+          enabled: !state.isGenerating,
+          decoration: const InputDecoration(
+            labelText: 'Judul / konteks cerita',
+            hintText: 'mis. liburan',
+            prefixIcon: Icon(Icons.edit_outlined),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        FilledButton(
+          onPressed: state.isGenerating || isStoryLocked
+              ? null
+              : () {
+                  final title = _titleController.text.trim();
+                  if (title.isEmpty) return;
+                  controller.generateStory(prompt: title);
+                },
+          child: state.isGenerating
+              ? const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppButtonSpinner(size: 16),
+                    SizedBox(width: AppSpacing.sm),
+                    Flexible(child: Text('Menghasilkan cerita...')),
+                  ],
+                )
+              : Text(state.storyContent == null ? 'Generate' : 'Generate Ulang'),
+        ),
+        if (isStoryLocked) ...[
+          const SizedBox(height: AppSpacing.sm),
+          const AppNotice(
+            text: 'Cerita sudah dikunci dan tidak dapat diubah lagi.',
+            tone: AppTone.neutral,
+          ),
+        ],
+        if (state.generateError != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          AppNotice(
+            text: state.generateError!,
+            tone: AppTone.error,
+            action: TextButton(
+              onPressed: () {
+                final title = _titleController.text.trim();
+                if (title.isEmpty) return;
+                controller.generateStory(prompt: title);
+              },
+              child: const Text('Coba lagi'),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    final page = state.storyContent == null
+        ? const AppSheet(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+            child: AppStateMessage(
+              icon: Icons.auto_stories_outlined,
+              title: 'Cerita akan muncul di sini',
+              body: 'Tulis judul atau konteks, lalu tekan Generate.',
+            ),
+          )
+        : AppSheet(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(state.storyTitle ?? '', style: AppTextStyles.storyTitle),
+                const SizedBox(height: AppSpacing.smd),
+                _HighlightedStory(
+                  markedText: state.storyContent!,
+                  onTapWord: (targetWord) =>
+                      _openDictionary(context, targetWord),
+                ),
+                if (state.storyTranslation != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton(
+                      onPressed: () => setState(
+                        () => _showTranslation = !_showTranslation,
+                      ),
+                      child: Text(
+                        _showTranslation
+                            ? 'Sembunyikan Terjemahan'
+                            : 'Terjemahan',
+                      ),
+                    ),
+                  ),
+                  if (_showTranslation) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      stripTranslationMarkers(state.storyTranslation!),
+                      style: AppTextStyles.bodyMuted,
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Baca Cerita')),
       body: Column(
         children: [
           const StepperHeader(activeIndex: 0),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    enabled: !state.isGenerating,
-                    decoration: const InputDecoration(
-                      labelText: 'Judul / konteks cerita',
-                      hintText: 'mis. liburan',
-                      prefixIcon: Icon(Icons.edit),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  FilledButton(
-                    onPressed: state.isGenerating || isStoryLocked
-                        ? null
-                        : () {
-                            final title = _titleController.text.trim();
-                            if (title.isEmpty) return;
-                            controller.generateStory(prompt: title);
-                          },
-                    child: state.isGenerating
-                        ? const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(width: AppSpacing.sm),
-                              Text('Menghasilkan cerita...'),
-                            ],
-                          )
-                        : Text(
-                            state.storyContent == null
-                                ? 'Generate'
-                                : 'Generate Ulang',
-                          ),
-                  ),
-                  if (isStoryLocked) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.disabledBackground,
-                        borderRadius: BorderRadius.circular(AppRadius.medium),
-                      ),
-                      child: const Text(
-                        'Cerita sudah dikunci dan tidak dapat diubah lagi.',
-                        style: AppTextStyles.body,
-                      ),
-                    ),
-                  ],
-                  if (state.generateError != null) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.errorBackground,
-                        borderRadius: BorderRadius.circular(AppRadius.medium),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              state.generateError!,
-                              style: AppTextStyles.body,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              final title = _titleController.text.trim();
-                              if (title.isEmpty) return;
-                              controller.generateStory(prompt: title);
-                            },
-                            child: const Text('Coba lagi'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if (state.storyContent != null) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      state.storyTitle ?? '',
-                      style: AppTextStyles.wordTitle.copyWith(fontSize: 18),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _HighlightedStory(
-                      markedText: state.storyContent!,
-                      onTapWord: (targetWord) =>
-                          _openDictionary(context, targetWord),
-                    ),
-                    if (state.storyTranslation != null) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      OutlinedButton(
-                        onPressed: () => setState(
-                          () => _showTranslation = !_showTranslation,
-                        ),
-                        child: Text(
-                          _showTranslation
-                              ? 'Sembunyikan Terjemahan'
-                              : 'Terjemahan',
-                        ),
-                      ),
-                      if (_showTranslation) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          stripTranslationMarkers(state.storyTranslation!),
-                          style: AppTextStyles.body,
-                        ),
-                      ],
-                    ],
-                  ],
-                  if (state.advanceToClozeError != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.errorBackground,
-                        borderRadius: BorderRadius.circular(AppRadius.medium),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.error_outline,
-                            color: AppColors.error,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              state.advanceToClozeError!,
-                              style: AppTextStyles.body,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
+            child: AppScrollPage(
+              maxWidth: AppContentWidth.reading + 344,
+              child: AppTwoPane(
+                primary: page,
+                side: composer,
+                sideFirst: true,
+                breakpoint: AppBreakpoints.medium,
               ),
             ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: FilledButton(
-                onPressed: state.storyContent == null
-                    ? null
-                    : () async {
-                        await controller.advanceToClozeTest();
-                        // `advanceToClozeTest` no longer throws on failure
-                        // (Milestone 7 Phase 2 Stage 6) — check the
-                        // freshly-updated state to see whether the write
-                        // actually succeeded before navigating on; a
-                        // failure leaves `advanceToClozeError` set and
-                        // `currentPhase` still `membaca`, so the student
-                        // stays here and can retry.
-                        final succeeded =
-                            ref
-                                .read(learningFlowControllerProvider)
-                                .advanceToClozeError ==
-                            null;
-                        if (succeeded && context.mounted) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ClozeTestScreen(),
-                            ),
-                          );
-                        }
-                      },
-                child: const Text('Selanjutnya →'),
+          if (state.advanceToClozeError != null)
+            AppContent(
+              maxWidth: AppContentWidth.reading,
+              vertical: AppSpacing.sm,
+              child: AppNotice(
+                text: state.advanceToClozeError!,
+                tone: AppTone.error,
+              ),
+            ),
+          AppBottomBar(
+            maxWidth: AppContentWidth.reading + 344,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: MediaQuery.sizeOf(context).width < AppBreakpoints.compact
+                    ? double.infinity
+                    : 240,
+                child: FilledButton(
+                  onPressed: state.storyContent == null
+                      ? null
+                      : () async {
+                          await controller.advanceToClozeTest();
+                          // `advanceToClozeTest` no longer throws on failure
+                          // (Milestone 7 Phase 2 Stage 6) — check the
+                          // freshly-updated state to see whether the write
+                          // actually succeeded before navigating on; a
+                          // failure leaves `advanceToClozeError` set and
+                          // `currentPhase` still `membaca`, so the student
+                          // stays here and can retry.
+                          final succeeded =
+                              ref
+                                  .read(learningFlowControllerProvider)
+                                  .advanceToClozeError ==
+                              null;
+                          if (succeeded && context.mounted) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ClozeTestScreen(),
+                              ),
+                            );
+                          }
+                        },
+                  child: const Text('Selanjutnya →'),
+                ),
               ),
             ),
           ),
@@ -270,7 +257,7 @@ class _HighlightedStory extends StatelessWidget {
 
     return Text.rich(
       TextSpan(
-        style: AppTextStyles.body,
+        style: AppTextStyles.story,
         children: [
           for (final segment in segments)
             switch (segment) {
@@ -278,11 +265,8 @@ class _HighlightedStory extends StatelessWidget {
               MarkedStorySegment(:final targetWord, :final surfaceForm) =>
                 TextSpan(
                   text: surfaceForm,
-                  style: const TextStyle(
-                    backgroundColor: AppColors.storyHighlightBackground,
-                    color: AppColors.storyHighlightText,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTextStyles.storyHighlight,
+                  mouseCursor: SystemMouseCursors.click,
                   recognizer: TapGestureRecognizer()
                     ..onTap = () => onTapWord(targetWord),
                 ),
