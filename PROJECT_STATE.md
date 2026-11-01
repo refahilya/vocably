@@ -1612,6 +1612,35 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 **Verification (2026-11-02, agent):** the 6 regression tests that exercise the new behaviour failed before the fix and passed after it. `flutter analyze` 0 issues; `flutter test --concurrency=1` 652/652; `npm test` 93 passed + 2 skipped with `VOCABLY_PLACEMENT_SOURCE`, and those 2 (`sourcePdf.test.js`) passed separately with the researcher's PDF and pretest key; `npm run test:rules` 129/129; `status` checked on four emulator results reached through the real rules with the client SDK; release web build OK; `build/web` scan found 0 key pairs, 0 key field names and 0 secret patterns. `firestore.rules`, both banks, `firebase.json` and `pubspec.yaml` unchanged. Not tested: a repeat click-through in Chrome after these fixes, real tokens, production.
 
+### 5zc. Firestore Rules and Indexes Deployed to Production (2026-11-02, 00:52 WIB)
+
+**Input:** after the owner hand-edited the placement source JSON, a focused pre-deployment audit, with the owner's explicit authorisation to deploy rules and indexes if the audit found it safe. Outside that authorisation: Hosting, the Worker, private keys, production data, opening a test window.
+
+**What happened:** the agent ran `firebase deploy --only firestore:rules,firestore:indexes --project vocably-idn-en --non-interactive`. The output confirmed that the rules compiled, "released rules firestore.rules to cloud.firestore", and "deployed indexes in firestore.indexes.json successfully". This single deploy carried the Milestone 8 `targetWordSets` rule, the research rules and the placement rules. The owner then committed `4929b4d` and `ef55afd` and pushed them.
+
+**Not done:** no data was written; the research stages stay closed because `researchStudy/current` does not exist, so research tests fail closed. The ruleset ID was not recorded and the build state of each index was not checked afterwards. Two comments in `firestore.rules` still say "NOT deployed"; they were left for the next rules change.
+
+### 5zd. UI Redesign and Responsive Layout (2026-11-02 — implemented and verified locally; NOT committed; not hosted)
+
+**Input:** the owner's request for a comprehensive UI redesign with regression assurance, with behaviour, roles, Firestore structures and rules, Worker contracts, AI prompts, scoring, instruments and session state all out of scope.
+
+**Decisions:**
+- **Visual direction "buku latihan":** navy cover, cool paper, and one marker colour reserved for the current focus (`DESIGN_REFERENCE.md` §0). The Android version's colour identity and shape language stay; layouts were rebuilt for the web. No gradients, card shadows or decorative animation.
+- **Local fonts:** Plus Jakarta Sans for UI and Literata for reading, subset to Latin + IPA, SIL OFL, bundled in `assets/fonts/` (about 484 KB). No new dependency. Literata carries the stories so long reading feels different from controls.
+- **One responsive frame:** `widgets/app_layout.dart` holds the breakpoints (600, 900, 1200, plus short height 520) and a maximum width per screen type, and `widgets/app_feedback.dart` holds the shared states. Screens gain columns or side panes on wide windows instead of stretching; test screens stay one column so they match across devices. Short windows keep their height for the content: filters move to a side panel and the Co-Write header scrolls with the chat.
+- **Navigation:** tabs below 600 px, rail from 600 px, extended rail from 1200 px, with each destination's state preserved across breakpoints.
+- **Contrast:** `inkFaint` and `warning` were darkened to meet WCAG AA.
+
+**Interaction changes the owner should review** (all UI-level, none touching data or logic): Enter submits the login form; Co-Write auto-scrolls to the newest turn; the manifest no longer locks orientation; Placement shows a progress line; a wrong answer shows a notice above the story and a marking icon in Cloze; new copy ("Halo, {nama}", "Tes penelitian", "Cerita akan muncul di sini", a cover quotation).
+
+**Problems found and fixed during the work:** overflows on real layouts (topic dropdown at 320 px, stepper + cloze at 130% text, 14–28 px on the vocabulary screen in landscape); semantics changes that had removed tap actions from the level ladder and nav tabs; a `ref` use after resize, fixed by reading the container through a global key on the shell body; the Login screen pushed from Sign Up had lost its back button, now derived from `Navigator.canPop`; a `<meta viewport>` of mine that triggered a Flutter warning, removed; the navy splash showing through on resize, fixed by restoring the page background after the first frame. 16 tests failed part-way through; each was traced to a real cause in the redesign and fixed there, and no existing expectation was loosened.
+
+**Found, not fixed:** the dashboard level ladder always opens A1, because `vocabBrowserFilterProvider` is auto-dispose and loses the value before the vocabulary screen reads it. The code predates the redesign. Fixing it changes state lifetime, so it waits for the owner's decision.
+
+**Incident:** with a stored session, emulator mode reaches the real Auth endpoint before `useAuthEmulator` takes effect. During an early browser tour, about 3–4 dummy-account login attempts reached `identitytoolkit.googleapis.com` and were rejected with 400; no production data changed. Production hosts were blocked in the browser from then on, and the risk is documented in `tools/research/README.md`.
+
+**Verification (2026-11-02, agent):** `flutter analyze` 0 issues; `flutter test --concurrency=1` 913/913, including `test/responsive/responsive_screens_test.dart`; `npm test` 93 passed + 2 skipped (the PDF checks) with the placement rebuild included; the rules suite 129/129, run on ports 8091/9091 through a temporary config because a leftover harness emulator held 9099; release web build OK; `build/web` scan found 0 key pairs, 0 key field names, 0 secret patterns and no emulator hosts. Browser tour on a profile build with the emulators and a mock Worker: sign-in, the three learning phases through to Selesai, History, Pelajari Kembali, the cart, a 20-item Pre-Test, Placement, teacher target and vocabulary flows; 0 horizontal overflow on 8 viewports plus 2 landscape sizes. `firestore.rules`, indexes, `firebase.json`, both banks, `lib/services`, `lib/providers` and `lib/models` unchanged. Not tested: real tokens, production, the real Worker and LLM, a physical Android phone, on-screen keyboard with landscape on real hardware.
+
 ## 6. Firebase / Firestore State
 
 *Moved 2026-10-26: current Firebase/Firestore and deployment state is in

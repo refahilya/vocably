@@ -126,7 +126,7 @@ lib/
       dashboard/
       target_words/
       vocab_management/   # termasuk tambah kata & edit topik kata
-  widgets/          # komponen UI reusable (button, card, word_chip, nav shell, dsb)
+  widgets/          # komponen UI reusable (layout responsif, feedback, nav shell, dsb)
   theme/            # theme.dart — single source of truth warna, tipografi, spacing
   utils/            # normalizeWord(), parser penanda cerita, konstanta sentinel — lihat §8
 
@@ -134,6 +134,7 @@ assets/
   vocab/            # vocab_a1.json … vocab_c1.json — bundle bank kosakata (§11 DATA_MODEL)
   research/         # instrument_v1.json — bank soal Pre/Post Test, TANPA kunci jawaban (bagian 10)
   placement/        # placement_bank_pt_v1_1.json — bank Placement Test, TANPA kunci (bagian 10)
+  fonts/            # Plus Jakarta Sans & Literata (subset, lisensi OFL)
 
 tools/              # skrip sisi dev, tidak ikut ter-bundle ke app
   vocab_import/     # pipeline CSV Oxford → Firestore + bundle aset (§7 Milestone 4)
@@ -191,13 +192,21 @@ dulu kalau perlu penyesuaian.
   **yang dipertahankan hanya identitas warna & sifat visual** (shape
   language, pola highlight, dsb) — layout dan komponen dibangun dari nol
   sesuai arsitektur web yang sesuai, bukan disalin 1:1 dari layout Android.
+- **Arah visual "buku latihan":** sampul navy, kertas dingin, dan satu stabilo
+  yang hanya menandai fokus saat ini (`DESIGN_REFERENCE.md` §0). Tidak ada
+  gradien, bayangan kartu, atau animasi hias.
+- **Tata letak responsif lewat `widgets/app_layout.dart`** (`AppContent`,
+  `AppScrollPage`, `AppBottomBar`, `AppTwoPane`, `AppResponsiveList`) dan
+  feedback lewat `widgets/app_feedback.dart`; jangan membuat varian per layar.
 - **Navigasi tunggal & responsif:** `NavigationRail` di kiri untuk layar
   lebar, tab horizontal di atas untuk layar sempit/HP. **Bukan bottom nav**
   (itu pola versi Android lama). Bangun sebagai satu widget shell reusable
   yang dipakai baik oleh siswa maupun guru.
 - **Responsif:** desain kanonis di lebar ~390px (ukuran HP, target
-  sesungguhnya). Di layar lebar, jangan diregangkan — bungkus konten dengan
-  max-width terpusat supaya terlihat sengaja, bukan melar.
+  sesungguhnya). Di layar lebar, jangan diregangkan — tiap jenis layar punya
+  lebar maksimum sendiri (`AppContentWidth`) dan layar yang cocok memakai kolom
+  atau panel samping. Layar tes tetap satu kolom agar sama di semua perangkat.
+  Layar baru wajib masuk `test/responsive/responsive_screens_test.dart`.
 - **Fitur browse kosakata (3 mode) tidak punya acuan visual dari versi
   lama** — versi pertama belum punya fitur ini sama sekali. Desain baru,
   konsisten dengan identitas visual yang ada.

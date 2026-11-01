@@ -28,44 +28,79 @@ Android**, deprecated).
 > 7. **§3.6** — keraguan soal penanda used/unused **dihapus**; SPEC §5.3
 >    sudah mewajibkannya.
 
-> Catatan: nilai hex di bawah adalah estimasi visual dari screenshot, bukan
-> nilai exact dari kode lama. Sesuaikan dengan mata/color picker saat
-> implementasi kalau ada referensi yang lebih presisi.
+## 0. Arah Visual: Buku Latihan
+
+Vocably adalah buku latihan siswa SMK: **sampul navy, halaman kertas dingin,
+dan satu stabilo** yang menandai hal terpenting di halaman. Arah ini
+mempertahankan identitas navy dari versi pertama, dan datang dari fitur
+intinya, yaitu kata yang ditandai di dalam cerita.
+
+Prinsip yang mengikat semua layar:
+
+- **Stabilo adalah satu-satunya elemen keras.** Kuning hanya untuk fokus saat
+  ini: kata target, langkah aktif, destinasi aktif. Selain itu warnanya tenang.
+- **Hierarki lewat bentuk, bukan dekorasi.** Tidak ada gradien, bayangan kartu,
+  atau animasi hias. Permukaan dipisahkan oleh garis tipis.
+- **Radius mengikuti ukuran.** Kontrol kecil tetap tegas; hanya pill yang bulat.
+- **Teks untuk dibaca memakai serif, teks antarmuka memakai sans.**
+- **Layar tes tetap netral.** Semua opsi tampil sama sampai dipilih, termasuk
+  "Saya tidak tahu"; tidak ada warna atau urutan yang mengarahkan jawaban.
 
 ## 1. Palet Warna
 
-| Peran | Warna (estimasi) | Kegunaan |
-|---|---|---|
-| Primary (navy) | `#1B1F5C` – `#26307A` (indigo tua) | App bar, tombol utama, header stepper, item navigasi aktif, avatar user di chat |
-| Accent / secondary | Teal/cyan muda | Avatar AI di co-write, aksen ikon |
-| Success / correct | Hijau (`#2E7D32`-ish) + latar hijau muda | Jawaban benar di cloze test, banner "semua kata target sudah digunakan", badge mastery `mastered` |
-| Error / salah | Merah/pink (`#C62828`-ish) + latar pink muda | Jawaban salah di cloze test, inline error form |
-| Warning | Kuning/oranye muda | Feedback co-write "Perlu perbaikan" (ikon bohlam) |
-| Info (netral) | Biru (`#1565C0`) + latar biru muda | Feedback co-write "Pengingat" (ikon pesan) |
-| Mastery `difficult` | Amber/oranye solid | Dot penanda kata difficult (§5.3) |
-| Highlight kata target | Oranye/tan muda dengan teks oranye tua | Highlight target word di dalam cerita (Baca Cerita) |
-| Background utama | Putih / abu sangat muda | Body screen |
-| Chip/pill tidak aktif | Putih dengan border tipis abu | Chip kata belum dipilih |
-| Chip/pill aktif/dipilih | Navy solid dengan teks putih + centang hijau kecil | Kata yang sudah dipilih ke keranjang |
-| Netral/disabled | Abu muda | Latar banner Pre-Test/Post-Test, tombol disabled, pill C2 |
+Nilai di bawah adalah token di `lib/theme/theme.dart` (`AppColors`). Kontras teks
+dikunci oleh `test/theme/theme_tokens_test.dart` pada WCAG AA (4.5:1).
+
+| Peran | Token | Warna | Kegunaan |
+|---|---|---|---|
+| Sampul | `primary` | `#1B1F5C` | App bar, tombol utama, stepper, chip terpilih |
+| Punggung buku | `primaryDeep` | `#14173F` | Rail navigasi, snackbar |
+| Tint navy | `primaryTint`, `primaryTintStrong` | `#E8EAF6`, `#CFD3EC` | Opsi terpilih, bubble siswa, soal terjawab, anak tangga level |
+| Stabilo | `marker`, `markerSoft` | `#FFCF56`, `#FFF1C9` | Kata target, langkah/destinasi aktif, saran menulis |
+| Teal | `accentStrong` | `#0B7285` | Avatar AI |
+| Kertas | `paper` | `#F2F4FA` | Latar semua halaman |
+| Lembar | `surface` | `#FFFFFF` | Lembar, field, bar bawah |
+| Garis | `line`, `lineStrong` | `#DADEEC`, `#8E93B2` | Pemisah; outline field dan opsi |
+| Tinta | `ink`, `inkMuted`, `inkFaint` | `#1A1D3A`, `#555A78`, `#5F6484` | Teks utama, sekunder, nonaktif |
+| Success | `success` + latar | `#1F7A3A`, `#E5F4E9` | Jawaban benar, "Selesai", mastery `mastered` |
+| Error | `error` + latar | `#B3261E`, `#FBE9E7` | Jawaban salah, error form |
+| Warning | `warning` + latar | `#8F5500`, `#FFF4DC` | Feedback "Perlu perbaikan" |
+| Info | `info` + latar | `#1558A8`, `#E4EFFB` | Feedback "Pengingat", instruksi |
+| Mastery `difficult` | `masteryDifficult` | `#E07A00` | Penanda kata difficult (§5.3) |
+| Nonaktif | `disabledBackground` | `#E6E8F1` | Tombol nonaktif, level C2 |
 
 ## 2. Tipografi
 
-- Header/app bar: bold, putih, di atas background navy (contoh: "Vocably",
-  "Baca Cerita", "Cloze Test", "Tulis Bersama AI", "Riwayat Belajar").
-- Judul kata di kartu detail (mis. "SOUVENIR", "DESTINATION"): huruf besar
-  semua (uppercase), bold, ukuran besar, warna navy/gelap.
-- Body text: regular weight, warna gelap netral di atas background terang.
-- Label kecil (POS tag "noun"/"verb", info tambahan): badge kecil rounded
-  dengan warna latar lembut (kuning muda untuk "noun", dst).
+Dua keluarga huruf (lisensi SIL OFL), dibundel di `assets/fonts/` sebagai subset
+Latin + IPA supaya tidak perlu unduhan dari luar:
+
+- **Plus Jakarta Sans** (`AppFonts.ui`, karya Tokotype, Indonesia) untuk
+  antarmuka: label, tombol, form, teks isi.
+- **Literata** (`AppFonts.reading`) untuk bacaan: cerita, judul halaman, kata.
+
+| Token `AppTextStyles` | Ukuran | Dipakai untuk |
+|---|---|---|
+| `pageTitle` | 26 serif tebal | Judul halaman |
+| `wordTitle`, `assessmentSentence` | 24 serif | Kata pada detail/tes, kalimat soal |
+| `statusTitle`, `storyTitle` | 22 serif tebal | Judul pesan status, judul cerita |
+| `story`, `clozeStory` | 18 serif, baris 1,75 / 2,2 | Isi cerita, cerita dengan dropdown |
+| `wordRow` | 18 serif tebal | Kata di dalam daftar |
+| `sectionTitle` | 16 sans tebal | Judul bagian |
+| `body`, `bodyStrong`, `bodyMuted` | 15 sans | Teks isi |
+| `caption` | 13 sans | Keterangan |
+| `badgeLabel` | 12 sans | Badge |
+
+Judul kata di kartu detail tetap huruf besar semua (mis. "SOUVENIR").
 
 ## 3. Komponen & Pola Layout yang Berulang (starting point, bukan cetak biru)
 
 ### 3.1 Stepper 3-fase (dipakai di semua layar Storyfier flow)
-Muncul persis di bawah app bar pada layar Baca Cerita, Cloze Test, Tulis
-Bersama AI: `● Membaca — ○ Cloze Test — ○ Co-Write`, step aktif ditandai
-lingkaran solid + label bold, step selesai ditandai centang, step belum
-ditandai lingkaran outline pucat. **Jadikan satu widget reusable**
+Menyambung app bar navy pada layar Baca Cerita, Cloze Test, Tulis Bersama AI:
+`1 Membaca — 2 Cloze Test — 3 Co-Write`. Step aktif = lingkaran stabilo dengan
+nomor + label bold, step selesai = lingkaran putih dengan centang, step belum =
+outline pucat, dan penghubung yang sudah dilewati berwarna stabilo. Di lebar
+sempit barisnya mengecil utuh, jadi ketiga label selalu terbaca. **Jadikan satu
+widget reusable**
 (`StepperHeader`) dipakai di ketiga screen, bukan re-implementasi per layar.
 
 > Stepper ini muncul sama persis di ketiga jalur masuk sesi belajar (Target
@@ -149,44 +184,50 @@ bawah app bar, style konsisten dengan stepper §3.1 tapi versi 2 opsi.
     menampilkan cerita secara bertahap (streaming) begitu teksnya mulai
     datang — bukan perubahan wajib untuk skripsi, tapi menghindari kesan
     "macet" kalau koneksi sekolah lambat.
-- Setelah generate: judul story ditampilkan sebagai heading, isi cerita
-  sebagai paragraf dengan target word di-highlight (background oranye muda,
-  teks oranye tua, rounded).
+- Input judul + "Generate" ada di atas cerita pada HP, dan di panel samping pada
+  lebar ≥ 900 px, jadi lembar cerita tetap jadi pusat halaman. Sebelum ada
+  cerita, lembar itu berisi petunjuk "Cerita akan muncul di sini".
+- Setelah generate: judul story ditampilkan sebagai heading, isi cerita (serif,
+  18 px, lebar baris nyaman) dengan target word di-highlight **stabilo kuning**
+  dan teks navy tua tebal. Kata itu menampilkan kursor tangan di desktop.
 - **Yang di-highlight adalah bentuk kata yang benar-benar dipakai di
   kalimat**, bukan bentuk dasarnya. Cerita datang dari Worker sudah bertanda
   `[[run|ran]]`, jadi yang tampil di layar adalah *ran* dengan highlight,
   sementara tap-nya membuka kamus detail untuk *run*. Jangan menampilkan
   penanda mentah ke siswa — selalu strip dulu. Detail di `DATA_MODEL.md` §4.
-- Toggle terjemahan cerita (tombol outline "Terjemahan" di footer kiri).
+- Toggle terjemahan cerita: tombol outline "Terjemahan" di bawah cerita, di
+  dalam lembar yang sama.
 - **Generate ulang:** siswa bisa mengubah judul dan menekan "Generate" lagi
   berkali-kali — tiap generate ulang **menimpa** tampilan cerita sebelumnya
   di layar yang sama (bukan menambah cerita baru di bawahnya). Tombol
   "Generate" tetap aktif selama siswa belum menekan "Selanjutnya". Cerita
   yang sedang tampil **persis saat** "Selanjutnya" ditekan itulah yang jadi
   cerita resmi sesi ini.
-- Footer: tombol outline "Terjemahan" (kiri), tombol solid navy
-  "Selanjutnya →" (kanan).
+- Bar bawah menempel: tombol solid navy "Selanjutnya →", penuh selebar layar di
+  HP dan rata kanan di layar lebar.
 - **Error state generate:** kalau Worker gagal (koneksi, OpenAI error, atau
   validasi penanda gagal), tampilkan pesan inline yang ramah + tombol "Coba
   lagi" — jangan layar kosong dan jangan pesan error mentah.
 
 ### 3.5 Cloze Test
-- Instruksi singkat di banner abu muda atas.
+- Instruksi singkat di notice biru muda atas.
 - Paragraf cerita dengan blank berupa **dropdown inline** (border rounded,
-  warna netral sebelum dijawab).
+  warna netral sebelum dijawab), dengan jarak baris yang memberi ruang untuknya.
+  Opsi panjang dipotong dengan elipsis agar tidak melewati lebar cerita.
 - **Blank menggantikan bentuk terpakai** (*ran*), sementara **pilihan di
   dropdown adalah bentuk dasar** (*run*) — sama persis dengan daftar kata
   target sesi ini. Jadi siswa memilih *run* untuk blank yang tadinya *ran*.
 - **Satu blank per kata target.** Kalau satu kata muncul lebih dari sekali
   di cerita, kemunculan berikutnya tetap tampil sebagai teks biasa (boleh
   tetap di-highlight, tidak jadi blank).
-- Setelah submit: border dropdown berubah hijau (benar) atau merah (salah),
-  dan banner muncul di bawah: "Ada jawaban yang salah. Jawaban yang benar
-  ditandai hijau." (background pink muda, ikon info).
+- Setelah submit: dropdown berubah hijau + ikon centang (benar) atau merah +
+  ikon silang (salah), jadi maknanya tidak bergantung pada warna saja. Notice
+  merah muda "Ada jawaban yang salah. Jawaban yang benar ditandai hijau." muncul
+  di **atas** cerita, supaya terlihat tanpa menggulir di HP.
 - Dropdown terbuka menampilkan daftar pilihan kata target sebagai list polos
   (bukan dropdown native OS — custom styled).
-- Tombol "Submit" full-width abu (disabled sampai semua blank terisi);
-  setelah submit, tombol "Selanjutnya →" solid navy di kanan bawah.
+- Bar bawah: "Submit" (nonaktif sampai semua blank terisi), lalu "Selanjutnya →"
+  setelah submit.
 
 ### 3.6 Tulis Bersama AI (Co-write)
 - **Target words ditampilkan sebagai pill chip di bawah stepper, dengan
@@ -195,9 +236,9 @@ bawah app bar, style konsisten dengan stepper §3.1 tapi versi 2 opsi.
   Screenshot versi lama menampilkan semuanya berwarna sama, tapi
   `SPEC.md` §5.3 mewajibkan pembedaan ini — jadi ini elemen yang **ditambah**
   di versi baru, bukan hal yang perlu dikonfirmasi lagi.
-- Chat bubble alternating: avatar bulat kecil di kiri tiap bubble — navy solid
-  untuk user, teal/cyan untuk AI. Bubble user sedikit lebih terang/putih,
-  bubble AI abu muda.
+- Chat bubble: siswa di kanan (tint navy, avatar navy), AI di kiri (lembar putih
+  bergaris, avatar teal), selebar maks 760 px. Daftar percakapan mengikuti
+  giliran terbaru secara otomatis.
 - Feedback muncul sebagai kotak kecil di bawah bubble siswa yang dinilainya
   (bukan banner terpisah), dengan ikon + warna + label semantik sesuai
   jenisnya (CW-02, `SPEC.md` §5.3): ✓ hijau "Sudah tepat", 💡 amber "Perlu
@@ -222,7 +263,8 @@ bawah app bar, style konsisten dengan stepper §3.1 tapi versi 2 opsi.
 - Ikon jam (history/clock) — destinasi "Riwayat".
 - Ikon target — destinasi "Target Kata" (guru).
 - Ikon buku/plus — destinasi "Kosakata" (guru).
-- Ikon gear — pengaturan (kanan atas app bar dashboard).
+- Ikon keluar — logout (kanan atas app bar di HP, dasar rail di layar lebar).
+  Tidak ada layar pengaturan atau profil.
 - Ikon panah kembali (back arrow) putih — app bar screen sekunder.
 - Ikon centang hijau kecil — indikator kata sudah dipilih ke keranjang.
 - Ikon speaker — tombol putar audio pengucapan.
@@ -239,12 +281,12 @@ Android.
 ### 5.1 Dashboard Siswa — destinasi "Belajar"
 
 Destinasi "Belajar" **tidak langsung menampilkan browser kosakata**.
-Isinya layar beranda dengan dua card menu besar (full-width, rounded, style
-konsisten dengan card detail kata di §3.2), ditambah satu section
-Pre-Test/Post-Test di bawahnya:
+Isinya sapaan "Halo, {nama}", dua panel utama (bertumpuk di HP, berdampingan
+mulai ~750 px), dan satu section Pre-Test/Post-Test di bawahnya:
 
-- **Card "Target Kata Hari Ini"** — ikon target di kiri, judul bold, subtitle
-  jumlah kata (mis. "5 kata dari Guru"). **"dari Guru" adalah label generik
+- **Blok "Target Kata Hari Ini"** — satu-satunya blok navy di halaman, karena
+  inilah alasan siswa membuka aplikasi: ikon target stabilo, judul serif putih,
+  subtitle jumlah kata (mis. "5 kata dari Guru"), panah di kanan. **"dari Guru" adalah label generik
   tetap**, bukan nama guru yang sebenarnya — jangan membaca dokumen `users`
   guru untuk menampilkan namanya di sini. (Dokumen `users` dibatasi
   read-only untuk pemiliknya sendiri, lihat `DATA_MODEL.md` §1, justru
@@ -254,21 +296,21 @@ Pre-Test/Post-Test di bawahnya:
   "Belajar Kata Ini dengan Cerita" di bawah.
   - Empty state kalau guru belum men-set target: pesan singkat, bukan card
     kosong (§5.8).
-- **Card "Level"** — menampilkan 6 pill CEFR (A1–C2) dalam satu baris/wrap di
-  dalam card, level yang sedang aktif (`users.resultLevel`, hasil placement
-  test yang sudah dinilai) ditandai ring
-  navy + badge kecil "Level kamu" di atasnya. Pill **C2** ditampilkan dengan
-  style pudar/disabled ringan (tetap bisa di-tap, tapi mengarah ke empty
+- **Panel "Level"** — 6 level CEFR (A1–C2) sebagai **tangga naik**, karena
+  levelnya berurutan dan posisi siswa di tangga itulah informasinya. Level aktif
+  (`users.resultLevel`, hasil placement test yang sudah dinilai) terisi navy, level
+  di bawahnya tint lebih kuat, dan teks "Level kamu saat ini: X" di atasnya.
+  **C2** selalu tampil pudar (tetap bisa di-tap, tapi mengarah ke empty
   state). Tap salah satu level → masuk ke browse kosakata (§5.7), di-scope
-  ke level itu.
+  ke level itu (lihat known issue di `HANDOFF.md` §7).
   - Di dalam card ini juga ada **entry point Placement Test**: teks link
     kecil "Ambil Tes Penempatan" (kalau belum pernah) atau "Lihat Tes
     Penempatan" (kalau sudah) — style link/teks kecil, bukan
     tombol besar. Ini **satu-satunya** jalan masuk setelah tawaran otomatis
     pertama lewat (`SPEC.md` §3.1), jadi pastikan tetap mudah ditemukan
     meski kecil.
-- **Section Pre-Test/Post-Test** — di bawah kedua card, dipisah garis tipis
-  atau spacing yang lebih besar. Lihat §5.5.
+- **Section "Tes penelitian"** — di bawah kedua panel, dua baris Pre-Test dan
+  Post-Test. Lihat §5.5.
 
 **Riwayat Pembelajaran bukan card di layar ini** — dia destinasi navigasi
 tersendiri (§6), dengan desain di §3.3.
@@ -283,18 +325,21 @@ tersendiri (§6), dengan desain di §3.3.
 - **Tawaran otomatis** (sekali seumur akun): layar sambutan dengan dua aksi
   setara "Mulai Tes" (solid navy) dan "Nanti Saja" (outline). "Mulai Tes"
   membuka layar tes.
-- **Petunjuk:** kotak biru muda berisi judul "Tes Penempatan Kosakata",
+- **Petunjuk:** lembar putih berisi judul "Tes Penempatan Kosakata",
   paragraf pembuka, dan 8 butir "Petunjuk" — verbatim dari spesifikasi §3.3.
-  Tombol "Mulai" (baru) atau "Lanjutkan" (melanjutkan attempt).
-- **Butir:** satu per layar, lebar maks 600 px di tengah; caption "Soal x
+  Tombol "Mulai" (baru) atau "Lanjutkan" (melanjutkan attempt) di bar bawah.
+- **Butir:** satu per layar, lebar maks 640 px di tengah; garis kemajuan tipis di
+  bawah app bar; caption "Soal x
   dari 50"; kalimat regular (`AppTextStyles.assessmentSentence`) dengan hanya
   kata target **tebal + bergaris bawah** (`AppTextStyles.assessmentTarget`);
   kartu opsi penuh-lebar "A. …" s.d. "D. …" lalu "E. Saya tidak tahu"; status
   kecil "Menyimpan…"/"Tersimpan"; tombol "Sebelumnya" (outline) dan "Berikutnya"
-  (navy; butir terakhir: "Ringkasan"). Label band tidak pernah tampil.
+  (navy; butir terakhir: "Ringkasan") di bar bawah yang selalu terlihat. Label
+  band tidak pernah tampil.
 - **Ringkasan:** teks spesifikasi §3.4 untuk soal yang belum dijawab, kisi
-  tombol nomor 1–50 (yang terjawab berlatar biru muda, bisa diketuk untuk
-  kembali), dan "Kirim jawaban" yang aktif hanya bila 50 terjawab → dialog
+  tombol nomor 1–50 berukuran 48 px (yang terjawab berlatar tint navy, bisa
+  diketuk untuk kembali), dan "Kirim jawaban" di bar bawah yang aktif hanya bila
+  50 terjawab → dialog
   konfirmasi "Periksa lagi" / "Kirim".
 - **Status lain:** "Tes belum dibuka. Tunggu arahan pengawas." · "Tes
   sedang ditutup. Jawabanmu tersimpan. Tunggu arahan pengawas." · "Mohon
@@ -304,7 +349,7 @@ tersendiri (§6), dengan desain di §3.3.
   sebenarnya; bila status itu masih "siap" (mis. jam perangkat berbeda dari
   server), layar petunjuk menampilkan banner "Tes belum dapat dimulai. Tunggu
   arahan pengawas."
-- **Hasil:** ikon centang, "Terima kasih. Jawabanmu sudah tersimpan.", dan
+- **Hasil:** ikon centang dalam lingkaran, "Terima kasih. Jawabanmu sudah tersimpan.", dan
   "Level kamu: **B1**" — tanpa skor, persentase, benar/salah, atau penanda.
   Tombol "Ulangi tes" hanya untuk tes ulang belajar yang sedang dibuka;
   bila belum boleh, teks kecil kapan bisa diulang.
@@ -314,11 +359,12 @@ tersendiri (§6), dengan desain di §3.3.
 Ditambahkan ke pola chip/card kata di §3.2 dan §3.3, **tanpa bentrok** dengan
 centang hijau kecil yang menandai kata di keranjang pelajari:
 
-- Indikator mastery ditaruh sebagai **dot kecil berwarna di pojok kiri atas**
-  chip/card (posisi berbeda dari centang keranjang yang di kanan):
-  - Hijau solid = `mastered`
-  - Amber/oranye solid = `difficult`
-  - Tidak ada dot = `belum_dipelajari` (default, tanpa penanda supaya UI
+- Indikator mastery ditaruh di **kiri** baris kata (posisi berbeda dari centang
+  keranjang yang di kanan), dan bentuknya ikut berbeda supaya tetap terbaca oleh
+  siswa buta warna:
+  - Lingkaran hijau = `mastered`
+  - Kotak amber = `difficult`
+  - Tidak ada penanda = `belum_dipelajari` (default, tanpa penanda supaya UI
     tetap bersih untuk kata yang belum disentuh)
 - Karena `mastered` bersifat permanen (`SPEC.md` §6), dot hijau tidak pernah
   berubah kembali jadi amber — tidak perlu memikirkan transisi visual mundur.
@@ -329,7 +375,7 @@ centang hijau kecil yang menandai kata di keranjang pelajari:
 Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
 (bukan berarti layout identik):
 
-- App bar navy dengan judul "Vocably" + ikon gear kanan atas.
+- Wordmark "Vocably" + aksi keluar, seperti siswa (§6.1).
 - **Navigasi yang sama polanya dengan siswa** (§6) dengan dua destinasi:
   **"Target Kata"** (ikon target) dan **"Kosakata"** (ikon buku/plus).
 - **Destinasi "Target Kata":** tombol "+ Set Target Baru" di atas, lalu
@@ -371,26 +417,26 @@ Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
 > Layar tes ada di `lib/screens/student/research_assessment/`; perilakunya
 > diatur `SPEC.md` §3.7. Status implementasi dan verifikasi: `HANDOFF.md`.
 
-- **Dashboard** ("Belajar", §5.1): section terpisah di bawah dua card utama,
-  dua banner "Pre-Test" dan "Post-Test" (abu netral, rounded) dengan badge
+- **Dashboard** ("Belajar", §5.1): section "Tes penelitian" di bawah dua panel
+  utama, dua baris "Pre-Test" dan "Post-Test" (lembar putih) dengan badge
   status dari data server: "Belum tersedia" (bukan peserta, atau peserta
   tanpa band / dikeluarkan / dalam tinjauan), "Belum dibuka" (belum
   diotorisasi / posttest terkunci), "Ditutup" (jendela tahap ditutup
-  peneliti), "Siap dikerjakan" (navy),
-  "Lanjutkan" (oranye), "Selesai" (hijau), "Dibatalkan" / "Hubungi peneliti"
-  (merah), "Gagal memuat". Banner selalu bisa diketuk; layar tes menjelaskan
+  peneliti), "Siap dikerjakan" (biru),
+  "Lanjutkan" (kuning), "Selesai" (hijau), "Dibatalkan" / "Hubungi peneliti"
+  (merah), "Gagal memuat". Baris itu selalu bisa diketuk; layar tes menjelaskan
   setiap status. Badge "Segera" lama sudah dihapus.
-- **Petunjuk:** kotak biru muda berisi teks "Petunjuk" PDF §5 persis, lalu
-  "Contoh butir (kata ini bukan bagian dari tes):", contoh *book (kata
-  benda)* a)–e) statis, dan kalimat penjelasannya — semua verbatim dari PDF
+- **Petunjuk:** lembar putih berisi teks "Petunjuk" PDF §5 persis, lalu lembar
+  tint berisi "Contoh butir (kata ini bukan bagian dari tes):", contoh *book
+  (kata benda)* a)–e) statis, dan kalimat penjelasannya — semua verbatim dari PDF
   (`research_instructions.dart`). Tombol "Mulai" (baru) atau "Lanjutkan"
-  (melanjutkan percobaan).
-- **Butir:** satu butir per layar, lebar maks 600 px di tengah; kata target
+  (melanjutkan percobaan) di bar bawah.
+- **Butir:** satu butir per layar, lebar maks 640 px di tengah; kata target
   **tebal** (gaya `wordTitle`) dengan "(kelas kata)" di sampingnya (PDF
   §4.5); 4 opsi berupa kartu penuh-lebar ber-label a)–d) dalam urutan acak
   yang tersimpan, "e) Saya tidak tahu kata ini" selalu terakhir; opsi
-  terpilih = border navy 2 px + latar biru muda + ikon radio terisi.
-  Tombol "Lanjut" (butir terakhir: "Kirim") nonaktif sampai ada pilihan, dan
+  terpilih = border navy 2 px + latar tint navy + ikon radio terisi.
+  Tombol "Lanjut" (butir terakhir: "Kirim") di bar bawah, nonaktif sampai ada pilihan, dan
   menampilkan spinner sampai server mengonfirmasi jawaban. Gagal simpan =
   banner merah muda "Jawaban belum tersimpan…"; pilihan yang sudah dikirim
   tetap dan terkunci (opsi lain nonaktif) sampai tersimpan.
@@ -460,9 +506,12 @@ selama sesi (kalau siswa kembali dari card detail, modenya tidak reset).
   ber-POS berbeda, sama seperti pola multi-topik.
 
 **Keranjang pelajari** (§3.4 SPEC) tampil sebagai bar sticky di bawah layar
-di ketiga mode: jumlah kata terpilih + tombol CTA "Belajar Kata Ini dengan
-Cerita" (disabled kalau kosong). Jangan sembunyikan di balik ikon —
-keranjang adalah aksi utama layar ini.
+di ketiga mode: tombol "Lihat Keranjang Pelajari (N kata)", selalu bisa ditekan.
+Tombol "Belajar Kata Ini dengan Cerita" ada di layar keranjang. Jangan sembunyikan
+di balik ikon — keranjang adalah aksi utama layar ini.
+
+Di lebar ≥ 900 px, pemilih level dan mode pindah ke panel kiri dan kata mengalir
+menjadi beberapa kolom.
 
 ### 5.8 Empty State & Fallback (desain baru)
 
@@ -490,11 +539,16 @@ Firestore, Worker, atau DictionaryAPI.
 Versi Android lama memakai **bottom nav 2 tab**. Untuk versi web, itu
 diganti **satu sistem navigasi yang berubah bentuk mengikuti lebar layar**:
 
-- **Layar lebar (desktop/tablet):** `NavigationRail` di sisi kiri — ikon +
-  label, item aktif ditandai navy.
-- **Layar sempit (HP — target utama):** tab horizontal di atas, di bawah app
-  bar. Rail vertikal memakan lebar yang sudah sempit, jadi tidak dipakai di
-  sini.
+- **< 600 px (HP — target utama):** app bar navy dengan tab horizontal di
+  bawahnya; tab aktif digaris bawahi stabilo. Rail vertikal memakan lebar yang
+  sudah sempit, jadi tidak dipakai di sini.
+- **600–1199 px (tablet):** rail navy tua di kiri, ikon + label bertumpuk, tanpa
+  app bar supaya ruang vertikal tablet tidak terbuang. Item aktif ditandai
+  stabilo, logout di dasar rail.
+- **≥ 1200 px (desktop):** rail yang sama, melebar dengan label di samping ikon.
+
+Isi destinasi yang sedang terbuka tetap hidup saat bentuknya berganti, misalnya
+tablet diputar di tengah mengisi form.
 
 Bangun sebagai **satu widget shell reusable** yang dipakai baik oleh siswa
 (Belajar · Riwayat) maupun guru (Target Kata · Kosakata) — jangan dua
@@ -505,15 +559,31 @@ implementasi terpisah.
 - **Desain kanonis di lebar ~390px.** Ini ukuran HP dan pengguna
   sesungguhnya ada di sini — layar sempit yang harus paling matang, bukan
   desktop.
-- **Di layar lebar, jangan diregangkan.** Bungkus konten utama dengan
-  max-width terpusat (sekitar 480–600px) supaya terlihat sebagai kolom
-  aplikasi yang disengaja, bukan tombol yang melar selebar layar.
-- **Breakpoint desktop yang sesungguhnya** (mis. grid kata jadi lebih banyak
-  kolom, card detail muncul di panel samping alih-alih di bawah grid) adalah
-  **nice-to-have**, bukan syarat skripsi. Kerjakan setelah alur mobile
-  selesai.
-- Target sentuh minimal ~44px untuk semua elemen yang bisa ditekan — chip
-  kata, tombol (+) keranjang, dan dropdown cloze semuanya dipakai dengan
+- **Di layar lebar, jangan diregangkan, tapi juga jangan biarkan kosong.** Lebar
+  ditentukan per jenis layar, bukan satu angka global, lewat widget di
+  `lib/widgets/app_layout.dart`:
+
+| Jenis layar | Lebar maks (`AppContentWidth`) | Perilaku di layar lebar |
+|---|---|---|
+| Form masuk/daftar | 440 | Sampul navy di samping form mulai 900 px |
+| Pesan status | 480 | Terpusat |
+| Tes (placement, pre/post) | 640 | Satu kolom; panjang baris dan posisi opsi tetap sama di semua perangkat |
+| Bacaan (cerita, cloze) | 680 | Satu kolom bacaan; panel judul di samping pada Baca Cerita |
+| Chat Co-Write | 760 | Satu kolom |
+| Daftar (riwayat, keranjang, detail kata) | 960 | Dua kolom |
+| Halaman (dashboard, guru, browse) | 1160 | Dua panel atau beberapa kolom |
+
+- **Tindakan utama selalu terlihat.** Layar tugas memakai `AppBottomBar` yang
+  menempel di bawah, jadi tombol berikutnya tidak tenggelam di bawah konten.
+- **Jendela pendek (< 520 px, mis. HP dimiringkan)** tetap memprioritaskan isi:
+  filter kosakata pindah ke panel samping, dan header Co-Write ikut tergulir
+  bersama percakapan supaya kolom tulis tetap terlihat.
+- **Daftar menambah kolom sendiri** lewat `AppResponsiveList`, tetap lazy.
+- Target sentuh minimal 48 px untuk tombol dan ~44 px untuk kontrol kecil —
+  chip kata, tombol (+) keranjang, dan dropdown cloze semuanya dipakai dengan
   jari di layar kecil.
+- **Delapan ukuran acuan** (320×640 sampai 1920×1080) diuji di
+  `test/responsive/responsive_screens_test.dart` dengan font asli dan konten
+  terpanjang, termasuk teks 130% di lebar 320 px.
 - Uji dengan `flutter run -d chrome` + Chrome DevTools device toolbar, bukan
   emulator Android (`CLAUDE.md` §2).

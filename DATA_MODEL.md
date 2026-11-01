@@ -545,7 +545,7 @@ Pembelajaran tab "per sesi" (SPEC §3.6).
 > perhitungan apa pun dari model.
 >
 > **Cara client memakainya** (parsing regex sederhana, deterministik):
-> - **Fase 1 (membaca):** render `bentukTerpakai` dengan highlight oranye;
+> - **Fase 1 (membaca):** render `bentukTerpakai` dengan highlight stabilo;
 >   `onTap` membuka kamus detail untuk `kataTarget` (bentuk dasar).
 > - **Fase 2 (cloze):** ganti `bentukTerpakai` jadi blank; jawaban benar =
 >   `kataTarget`; dropdown berisi daftar kata target dalam bentuk dasar.
@@ -705,7 +705,7 @@ puluhan set target sepanjang penelitian, bukan ribuan).
 > berisi data). Ditegakkan oleh `firestore.rules` dan diuji terhadap
 > **Firestore + Auth Emulator lokal** (`cd tools/research && npm run
 > test:rules`), termasuk replay payload persis dari app. **Status deploy:
-> `HANDOFF.md`** (belum di-deploy).
+> `HANDOFF.md`.**
 
 **Instrumen.** Spesifikasi peneliti PT-V1.0 (`Vocably_Spesifikasi_Placement_Test_v1.0.pdf`
 + `placement_items_v1.0.json`, di luar repo) dinaikkan ke **PT-V1.1** oleh
