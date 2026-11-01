@@ -302,7 +302,8 @@ mulai ~750 px), dan satu section Pre-Test/Post-Test di bawahnya:
   di bawahnya tint lebih kuat, dan teks "Level kamu saat ini: X" di atasnya.
   **C2** selalu tampil pudar (tetap bisa di-tap, tapi mengarah ke empty
   state). Tap salah satu level → masuk ke browse kosakata (§5.7), di-scope
-  ke level itu (lihat known issue di `HANDOFF.md` §7).
+  ke level itu. Tiap pembukaan layar dimulai bersih: mode Abjad, halaman 1,
+  tanpa filter.
   - Di dalam card ini juga ada **entry point Placement Test**: teks link
     kecil "Ambil Tes Penempatan" (kalau belum pernah) atau "Lihat Tes
     Penempatan" (kalau sudah) — style link/teks kecil, bukan

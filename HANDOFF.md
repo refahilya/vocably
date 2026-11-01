@@ -13,13 +13,12 @@ ulang hari ini.
 
 ## 1. Git
 
-- **`vocably`** [terverifikasi 2026-11-02]: branch `main` di `ef55afd`
-  ("chore: update placement test question options"), sama dengan
-  `origin/main` menurut pelacakan lokal. Placement Test PT-V1.1 sudah masuk
-  commit `4929b4d` dan `ef55afd`. **Redesain UI (§4) ada di working tree,
-  belum di-stage dan belum di-commit:** 40 file terlacak berubah termasuk
-  dokumen, 17 file baru (widget layout/feedback/brand, font, tes). Tidak ada
-  file yang dihapus.
+- **`vocably`** [terverifikasi 2026-11-02]: branch `main` di `17a0001`
+  ("docs: record redesign and rules deployment"), sama dengan `origin/main`
+  menurut pelacakan lokal. Redesain UI ada di commit `af85e69` + `17a0001`.
+  **Perbaikan tangga level (§4) ada di working tree, belum di-stage dan belum
+  di-commit:** 13 file terlacak berubah termasuk dokumen, tanpa file baru
+  atau dihapus.
 - **`vocably-ai-worker`** [catatan 2026-10-28, tidak dicek ulang]: `main` di `5bcb5e4`,
   sama dengan `origin/main`. Satu-satunya perubahan lokal: origin
   `http://localhost:5000` di `wrangler.jsonc` — **khusus lokal; jangan
@@ -34,7 +33,7 @@ ulang hari ini.
 
 | Komponen | Status | Bukti |
 |---|---|---|
-| Flutter web (Firebase Hosting) | **Belum di-hosting**; `firebase.json` tidak punya blok `"hosting"`. Redesain UI belum sampai ke pengguna mana pun | [terverifikasi 2026-11-02] |
+| Flutter web (Firebase Hosting) | **Belum di-hosting**; `firebase.json` tidak punya blok `"hosting"`. Redesain UI dan perbaikan tangga level belum sampai ke pengguna mana pun | [terverifikasi 2026-11-02] |
 | Cloudflare Worker | Versi `0bec79ee-2958-475e-97fe-64ababf31c9c` (deploy 2026-10-15T17:08Z UTC) dengan override `--var ALLOWED_ORIGINS`, mencakup seluruh pekerjaan Co-Write | [catatan] `wrangler deployments list` 2026-10-16 (`PROJECT_STATE.md` §5t) |
 | Firestore rules | **Ter-deploy ke `vocably-idn-en` pada 2026-11-02 00.52 WIB**, oleh agen atas izin eksplisit pemilik: mencakup rule `targetWordSets` Milestone 8, rules riset, dan rules Placement Test. `firestore.rules` tidak berubah sejak itu | Keluaran `firebase deploy --only firestore:rules,firestore:indexes`: "released rules" (`PROJECT_STATE.md` §5zc). ID ruleset tidak dicatat |
 | Index | `firestore.indexes.json` ter-deploy pada kesempatan yang sama | Keluaran deploy: "deployed indexes … successfully". Status pembangunan tiap index setelahnya tidak dicek |
@@ -42,19 +41,20 @@ ulang hari ini.
 
 ## 3. Hasil verifikasi terakhir
 
-Dijalankan agen pada 2026-11-02 terhadap working tree di atas `ef55afd`
-(belum di-commit), setelah redesain UI (§4):
+Dijalankan agen pada 2026-11-02 terhadap working tree di atas `17a0001`
+(belum di-commit), setelah perbaikan tangga level (§4):
 
 | Cek | Perintah | Hasil |
 |---|---|---|
 | Analyzer | `flutter analyze` | 0 isu |
-| Tes Flutter | `flutter test --concurrency=1` | **913/913** lulus, termasuk 210 tes responsif (8 viewport, teks 130% di 320 px, HP miring 844×390 dan 568×320, ukuran target tap) |
+| Tes Flutter | `flutter test --concurrency=1` | **936/936** lulus, termasuk 23 tes baru untuk tangga level dan 210 tes responsif (8 viewport, teks 130% di 320 px, HP miring 844×390 dan 568×320, ukuran target tap) |
 | Tooling riset | `cd tools/research && npm test` dengan `VOCABLY_PLACEMENT_SOURCE` | **93 lulus, 2 dilewati, 0 gagal** (rebuild bank placement ikut berjalan). 2 yang dilewati (`sourcePdf.test.js`) butuh PDF peneliti dan tidak diulang pada putaran ini; tooling tidak berubah sejak terakhir lulus |
-| Emulator riset + placement | Isi `npm run test:rules` (`node --test --test-concurrency=1 test/rules/*.test.js`) pada port alternatif 8091/9091 | **129/129** lulus. `npm run test:rules` polos gagal start karena port 9099 masih dipakai emulator sisa uji browser, jadi dipakai konfigurasi sementara di luar repo yang menunjuk `firestore.rules` dan index yang sama |
+| Emulator riset + placement | `cd tools/research && npm run test:rules` | **129/129** lulus |
 | Build rilis | `flutter build web --release --dart-define=WORKER_BASE_URL=…` | Berhasil; URL Worker produksi ada di bundle. Peringatan "Wasm dry run failed" sudah dikenal (§7) |
 | Kunci/secret di `build/web` | Pindai nama file, pola secret, dan sidik jari kunci asli (hanya hitungan) | **0 temuan:** 0/50 pasangan kunci placement, 0/80 pasangan kunci pretest, 0 nama field kunci, 0 pola secret, 0 host/proyek emulator |
-| Browser | Build `--profile` + Chrome headless + emulator + Worker tiruan, host produksi diblokir di browser | Masuk, alur 3 fase sampai Selesai, Riwayat, Pelajari Kembali, Keranjang, Pre-Test 20 soal, Placement, target guru, tambah/edit kata: semua tuntas; 0 overflow horizontal pada 8 viewport + 2 lanskap; 1 error konsol, yaitu 400 yang disengaja |
-| Integritas | `git diff` | `firestore.rules`, indeks, `firebase.json`, kedua bank soal, `lib/services`, `lib/providers`, `lib/models` tidak berubah; 0 file ter-stage |
+| Browser, tangga level | Build `--profile` + Chrome + emulator + server dengan SPA fallback, host produksi diblokir | Keenam level terbuka benar di dashboard sungguhan dan hanya mengambil bundle-nya sendiri; C2 menampilkan pesan kosong; 0 error konsol, 0 request ke host produksi. Build sebelum perbaikan C2: filter B1 → C1 + POS tidak terbawa ke pembukaan berikutnya, halaman 2 bertahan setelah Keranjang, membuka B2 saat animasi tutup menghasilkan B2 bersih, C1 benar di 1280 px |
+| Browser, redesain | Build `--profile` + Chrome headless + emulator + Worker tiruan, sebelum perbaikan tangga level | Masuk, alur 3 fase sampai Selesai, Riwayat, Pelajari Kembali, Keranjang, Pre-Test 20 soal, Placement, target guru, tambah/edit kata: semua tuntas; 0 overflow horizontal pada 8 viewport + 2 lanskap; 1 error konsol, yaitu 400 yang disengaja |
+| Integritas | `git diff` | `firestore.rules`, indeks, `firebase.json`, kedua bank soal, `lib/models` tidak berubah; 0 file ter-stage |
 
 - **Tidak diuji:** token Firebase asli + Firestore produksi/staging, runtime
   produksi, Worker dan LLM asli (uji browser memakai Worker tiruan), Chrome
@@ -105,16 +105,20 @@ Dijalankan agen pada 2026-11-02 terhadap working tree di atas `ef55afd`
   tersimpan, dan band target. Skoring K2 tidak berubah. Di emulator kunci
   placement **sintetis**, jadi jawaban yang benar secara makna tetap
   menghasilkan A1* (`tools/research/README.md`).
-- **Redesain UI & responsif (§5zd):** selesai dan diverifikasi lokal, belum
-  di-commit dan belum di-hosting. Semua layar yang ada memakai arah "buku
+- **Redesain UI & responsif (§5zd):** selesai di `main`, belum di-hosting.
+  Semua layar yang ada memakai arah "buku
   latihan" (`DESIGN_REFERENCE.md` §0), font lokal, dan kerangka responsif
   `widgets/app_layout.dart`. Logika, rules, data, kontrak Worker, skoring,
   dan bank soal tidak berubah. Tidak ada layar profil/pengaturan atau
   manajemen siswa di aplikasi, jadi keduanya tidak termasuk.
+- **Tangga level dashboard (§5ze):** selesai dan diverifikasi lokal, belum
+  di-commit. Keenam level membuka level yang ditekan, tiap pembukaan layar
+  mulai bersih, dan level tanpa bundle (C2) menampilkan pesan kosong, termasuk
+  di host dengan SPA rewrite seperti Firebase Hosting.
 
 ## 5. Blocker sebelum produksi / responden sungguhan
 
-1. **Commit** redesain UI (pemilik proyek).
+1. **Commit** perbaikan tangga level (pemilik proyek).
 2. **Jendela tahap riset:** rules yang kini ter-deploy **mewajibkan**
    `researchStudy/current` dengan jendela tahap terbuka; tanpa dokumen itu
    semua tes riset tertolak (fail closed). Ini perilaku yang benar, bukan
@@ -158,7 +162,6 @@ Dijalankan agen pada 2026-11-02 terhadap working tree di atas `ef55afd`
 
 | Item | Status |
 |---|---|
-| **Tangga level di dashboard selalu membuka A1.** Menekan level mana pun menyetel `vocabBrowserFilterProvider` lalu mendorong layar kosakata, tetapi provider itu auto-dispose, jadi nilainya sudah hilang saat layar terbuka (terkonfirmasi di browser: tekan B1 menghasilkan A1). Kode ini tidak berubah sejak sebelum redesain; tes lama hanya memeriksa layar terbuka | **Bug lama, belum diperbaiki.** Perbaikan mengubah masa hidup state (`keepAlive` atau parameter level), jadi menunggu keputusan pemilik |
 | **Mode emulator dengan sesi tersimpan menghubungi Auth sungguhan** sebelum `useAuthEmulator` berlaku. Saat uji redesain, beberapa percobaan login akun dummy sempat mengenai `identitytoolkit.googleapis.com` dan ditolak 400; tidak ada data produksi berubah | Peringatan dan cara menghindarinya ada di `tools/research/README.md`. Perilaku app tidak diubah |
 | Komentar `firestore.rules` (dua tempat) masih tertulis "NOT deployed", padahal rules sudah ter-deploy | Komentar basi; dibiarkan karena pekerjaan redesain dilarang menyentuh rules. Perbarui saat rules berikutnya diubah |
 | **Oracle kunci placement lewat attempt belajar:** level yang dikembalikan bisa dipakai, pelan-pelan, untuk menebak kunci (dibatasi 1 attempt belajar/hari/akun; akun ganda bisa melewatinya) | Mitigasi operasional: `learning-placement --close` selama sesi placement resmi |
@@ -180,18 +183,15 @@ Dijalankan agen pada 2026-11-02 terhadap working tree di atas `ef55afd`
 
 ## 8. Langkah berikutnya
 
-1. Review tampilan redesain lalu commit (pemilik proyek): satu commit untuk
-   kode + tes, satu untuk dokumen. Kode tidak bisa dipecah lebih kecil karena
-   token tema yang dihapus membuat tiap bagian tidak terkompilasi sendirian.
-2. Putuskan perbaikan bug tangga level dashboard (§7).
-3. Coba redesain di HP Android sungguhan, termasuk keyboard layar dan
+1. Review lalu commit perbaikan tangga level (pemilik proyek).
+2. Coba redesain di HP Android sungguhan, termasuk keyboard layar dan
    posisi miring; ulangi M1 dan `AppLifecycleListener` (pindah tab) di sana
    (`tools/research/README.md` "Placement Test checklist").
-4. Keputusan peneliti di §6, terutama validasi K2, kriteria band manual, dan
+3. Keputusan peneliti di §6, terutama validasi K2, kriteria band manual, dan
    kebijakan akun/email.
-5. Milestone berikutnya: CLI enrolmen peserta **tanpa band** (lookup email →
+4. Milestone berikutnya: CLI enrolmen peserta **tanpa band** (lookup email →
    UID, dry-run, konfirmasi) — belum disetujui.
-6. Generate kunci placement privat dan simpan cadangannya di luar repo &
+5. Generate kunci placement privat dan simpan cadangannya di luar repo &
    OneDrive.
-7. Saat siap produksi (izin eksplisit): urutan di §5.
-8. E2E Co-Write langsung terhadap Worker produksi (lihat §7).
+6. Saat siap produksi (izin eksplisit): urutan di §5.
+7. E2E Co-Write langsung terhadap Worker produksi (lihat §7).

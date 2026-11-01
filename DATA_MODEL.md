@@ -1437,7 +1437,10 @@ yang perlu disinkronkan dua arah.
 
 - Skrip dev meng-export `vocabWords` menjadi file JSON **per level CEFR**:
   `assets/vocab/vocab_a1.json`, `vocab_a2.json`, … `vocab_c1.json`
-  (`vocab_c2.json` boleh kosong/absent sampai ada kata C2).
+  (`vocab_c2.json` boleh kosong/absent sampai ada kata C2). Di web, file
+  yang tidak ada bisa datang sebagai `index.html` berstatus 200 karena SPA
+  rewrite Hosting; loader memperlakukan teks non-JSON sebagai bundle kosong,
+  dan delta Firestore tetap digabung.
 - Tiap file berisi array objek dengan field yang dibutuhkan browse &
   kamus detail: `word`, `meanings`, `posList`, `cefrLevel`, `topics`.
   Field audit (`source`, `addedByTeacherId`, `createdAt`) tidak perlu ikut.
