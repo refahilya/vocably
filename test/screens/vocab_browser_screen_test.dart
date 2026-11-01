@@ -100,7 +100,10 @@ void main() {
     // resets to page 1 rather than carrying over A1's current page.
     final a2Words = [for (var i = 0; i < 75; i++) _word('a2word$i', cefrLevel: 'A2')];
 
-    Future<void> pumpBrowser(WidgetTester tester) async {
+    Future<void> pumpBrowser(
+      WidgetTester tester, {
+      String? initialLevel,
+    }) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -113,11 +116,43 @@ void main() {
               ),
             ),
           ],
-          child: const MaterialApp(home: VocabBrowserScreen()),
+          child: MaterialApp(
+            home: initialLevel == null
+                ? const VocabBrowserScreen()
+                : VocabBrowserScreen(initialLevel: initialLevel),
+          ),
         ),
       );
       await tester.pumpAndSettle();
     }
+
+    testWidgets('initialLevel opens that level, and everything still works', (
+      tester,
+    ) async {
+      await pumpBrowser(tester, initialLevel: 'A2');
+      expect(find.text('a2word0'), findsOneWidget);
+      expect(find.text('Halaman 1 dari 2'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
+      await tester.pumpAndSettle();
+      expect(find.text('Halaman 2 dari 2'), findsOneWidget);
+
+      await tester.tap(find.text('Tema'));
+      await tester.pumpAndSettle();
+      expect(find.text('Halaman 1 dari 2'), findsOneWidget);
+
+      await tester.tap(find.text('A1'));
+      await tester.pumpAndSettle();
+      expect(find.text('Halaman 1 dari 3'), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    });
+
+    testWidgets('without initialLevel the browser still opens at A1', (
+      tester,
+    ) async {
+      await pumpBrowser(tester);
+      expect(find.text('word000'), findsOneWidget);
+    });
 
     testWidgets('shows "Halaman 1 dari 3" and the first page\'s words for 120 results', (
       tester,

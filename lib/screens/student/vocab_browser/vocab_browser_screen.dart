@@ -15,10 +15,10 @@ import 'learning_cart_screen.dart';
 import 'word_detail_screen.dart';
 
 /// Milestone 4 Stage 5 — student vocabulary browse/explore screen
-/// (`SPEC.md` §3.3, `DESIGN_REFERENCE.md` §5.7). Reached today only via
-/// the temporary entry point on [DashboardPlaceholder] — see the TODO
-/// there. This screen owns its own `Scaffold`/`AppBar` since it's a
-/// pushed route, not an `AppNavShell` destination body.
+/// (`SPEC.md` §3.3, `DESIGN_REFERENCE.md` §5.7). Reached from the level
+/// ladder on the dashboard, which passes the tapped level as [initialLevel].
+/// This screen owns its own `Scaffold`/`AppBar` since it's a pushed route,
+/// not an `AppNavShell` destination body.
 ///
 /// Deliberately simplified relative to `DESIGN_REFERENCE.md` §5.7's full
 /// vision for this stage: no per-letter sticky headers in Abjad mode (a
@@ -36,12 +36,26 @@ import 'word_detail_screen.dart';
 /// On phones the filters stack above the list; from
 /// [AppBreakpoints.medium] they move to a side panel and the words flow into
 /// columns, so a desktop isn't reading a phone-width list.
-class VocabBrowserScreen extends ConsumerWidget {
-  const VocabBrowserScreen({super.key});
+class VocabBrowserScreen extends ConsumerStatefulWidget {
+  const VocabBrowserScreen({
+    super.key,
+    this.initialLevel = VocabBrowserFilterState.defaultLevel,
+  });
+
+  final String initialLevel;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(vocabBrowserFilterProvider);
+  ConsumerState<VocabBrowserScreen> createState() => _VocabBrowserScreenState();
+}
+
+class _VocabBrowserScreenState extends ConsumerState<VocabBrowserScreen> {
+  // Held here because a route can rebuild: this opening keeps one filter.
+  late final _visit = VocabBrowserVisit(widget.initialLevel);
+
+  @override
+  Widget build(BuildContext context) {
+    final filterProvider = vocabBrowserFilterProvider(_visit);
+    final filter = ref.watch(filterProvider);
     final levelAsync = ref.watch(vocabLevelProvider(filter.cefrLevel));
     final width = MediaQuery.sizeOf(context).width;
     // Side panel on wide windows, and on phones held sideways, where stacked
@@ -53,9 +67,12 @@ class VocabBrowserScreen extends ConsumerWidget {
     final filters = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _LevelSelector(selected: filter.cefrLevel),
+        _LevelSelector(
+          filterProvider: filterProvider,
+          selected: filter.cefrLevel,
+        ),
         const SizedBox(height: AppSpacing.md),
-        _ModeSelector(selected: filter.mode),
+        _ModeSelector(filterProvider: filterProvider, selected: filter.mode),
       ],
     );
     final results = levelAsync.when(
@@ -63,7 +80,11 @@ class VocabBrowserScreen extends ConsumerWidget {
       error: (error, stackTrace) => _ErrorState(
         onRetry: () => ref.invalidate(vocabLevelProvider(filter.cefrLevel)),
       ),
-      data: (entries) => _LevelContent(allEntries: entries, filter: filter),
+      data: (entries) => _LevelContent(
+        filterProvider: filterProvider,
+        allEntries: entries,
+        filter: filter,
+      ),
     );
 
     return Scaffold(
@@ -136,22 +157,24 @@ class _CartBar extends ConsumerWidget {
 }
 
 class _LevelSelector extends ConsumerWidget {
-  const _LevelSelector({required this.selected});
+  const _LevelSelector({required this.filterProvider, required this.selected});
 
+  final VocabBrowserFilterProvider filterProvider;
   final String selected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return CefrLevelSelector(
       selected: selected,
-      onSelected: ref.read(vocabBrowserFilterProvider.notifier).selectLevel,
+      onSelected: ref.read(filterProvider.notifier).selectLevel,
     );
   }
 }
 
 class _ModeSelector extends ConsumerWidget {
-  const _ModeSelector({required this.selected});
+  const _ModeSelector({required this.filterProvider, required this.selected});
 
+  final VocabBrowserFilterProvider filterProvider;
   final VocabBrowseMode selected;
 
   @override
@@ -167,9 +190,7 @@ class _ModeSelector extends ConsumerWidget {
       ],
       selected: {selected},
       onSelectionChanged: (newSelection) {
-        ref
-            .read(vocabBrowserFilterProvider.notifier)
-            .selectMode(newSelection.first);
+        ref.read(filterProvider.notifier).selectMode(newSelection.first);
       },
     );
   }
@@ -186,8 +207,13 @@ class _ModeSelector extends ConsumerWidget {
 /// that actually affect it (not `page`), invalidated with simple field
 /// comparison — no new package, no app-wide state-management change.
 class _LevelContent extends ConsumerStatefulWidget {
-  const _LevelContent({required this.allEntries, required this.filter});
+  const _LevelContent({
+    required this.filterProvider,
+    required this.allEntries,
+    required this.filter,
+  });
 
+  final VocabBrowserFilterProvider filterProvider;
   final List<VocabBundleEntry> allEntries;
   final VocabBrowserFilterState filter;
 
@@ -250,6 +276,7 @@ class _LevelContentState extends ConsumerState<_LevelContent> {
   Widget build(BuildContext context) {
     final allEntries = widget.allEntries;
     final filter = widget.filter;
+    final filterNotifier = ref.read(widget.filterProvider.notifier);
 
     // DESIGN_REFERENCE.md §5.8: "Level C2 (atau level mana pun) tidak
     // punya kata" — a level with genuinely zero words, not a filter
@@ -272,17 +299,14 @@ class _LevelContentState extends ConsumerState<_LevelContent> {
             label: 'Pilih Topik',
             value: filter.selectedTopic,
             options: _distinctTopics(),
-            onChanged: (value) => ref
-                .read(vocabBrowserFilterProvider.notifier)
-                .selectTopic(value),
+            onChanged: filterNotifier.selectTopic,
           ),
         if (filter.mode == VocabBrowseMode.pos)
           _ValueDropdown(
             label: 'Pilih POS',
             value: filter.selectedPos,
             options: _distinctPosValues(),
-            onChanged: (value) =>
-                ref.read(vocabBrowserFilterProvider.notifier).selectPos(value),
+            onChanged: filterNotifier.selectPos,
           ),
         if (filter.mode != VocabBrowseMode.alphabetical)
           const SizedBox(height: AppSpacing.sm),
@@ -310,14 +334,10 @@ class _LevelContentState extends ConsumerState<_LevelContent> {
             pageIndex: paged.pageIndex,
             totalPages: paged.totalPages,
             onPrevious: paged.pageIndex > 0
-                ? () => ref
-                      .read(vocabBrowserFilterProvider.notifier)
-                      .goToPage(paged.pageIndex - 1)
+                ? () => filterNotifier.goToPage(paged.pageIndex - 1)
                 : null,
             onNext: paged.pageIndex < paged.totalPages - 1
-                ? () => ref
-                      .read(vocabBrowserFilterProvider.notifier)
-                      .goToPage(paged.pageIndex + 1)
+                ? () => filterNotifier.goToPage(paged.pageIndex + 1)
                 : null,
           ),
       ],

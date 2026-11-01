@@ -12,12 +12,14 @@ part 'vocab_browser_providers.g.dart';
 /// §4's "one Riverpod ecosystem" rule (no raw `setState` for this).
 class VocabBrowserFilterState {
   const VocabBrowserFilterState({
-    this.cefrLevel = 'A1',
+    this.cefrLevel = defaultLevel,
     this.mode = VocabBrowseMode.alphabetical,
     this.selectedTopic,
     this.selectedPos,
     this.page = 0,
   });
+
+  static const defaultLevel = 'A1';
 
   final String cefrLevel;
   final VocabBrowseMode mode;
@@ -55,10 +57,24 @@ class VocabBrowserFilterState {
   }
 }
 
+/// One opening of the browse screen, and the key of its filter. Compared by
+/// identity on purpose, so every opening has its own [VocabBrowserFilter]:
+/// the level arrives as the provider's argument rather than through a write
+/// that would have to outlive the navigation (the provider is auto-dispose,
+/// so a write with no listener is gone before the route's first frame), and
+/// a new opening cannot inherit the mode, topic or page of one still
+/// animating away. Not `const`, which would make equal visits identical.
+class VocabBrowserVisit {
+  VocabBrowserVisit(this.initialLevel);
+
+  final String initialLevel;
+}
+
 @riverpod
 class VocabBrowserFilter extends _$VocabBrowserFilter {
   @override
-  VocabBrowserFilterState build() => const VocabBrowserFilterState();
+  VocabBrowserFilterState build(VocabBrowserVisit visit) =>
+      VocabBrowserFilterState(cefrLevel: visit.initialLevel);
 
   /// Switching level resets any topic/POS selection — a value chosen for
   /// one level's data has no guaranteed meaning for another's — and, per

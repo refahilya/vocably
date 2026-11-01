@@ -17,8 +17,13 @@ import 'package:vocably/screens/student/research_assessment/research_assessment_
 import 'package:vocably/services/research_assessment_service.dart';
 import 'package:vocably/screens/student/vocab_browser/vocab_browser_screen.dart';
 import 'package:vocably/services/target_word_set_service.dart';
+import 'package:vocably/screens/student/vocab_browser/learning_cart_screen.dart';
+import 'package:vocably/screens/student/vocab_browser/word_detail_screen.dart';
 import 'package:vocably/services/vocab_bundle_service.dart';
+import 'package:vocably/utils/cefr_levels.dart';
 import 'package:vocably/utils/role.dart';
+import 'package:vocably/utils/vocab_browse_filter.dart';
+import 'package:vocably/widgets/cefr_level_selector.dart';
 
 import '../support/fake_placement_service.dart';
 import '../support/fake_research_assessment_service.dart';
@@ -36,12 +41,14 @@ class _FakeTargetWordSetService extends TargetWordSetService {
 /// explicitly stocked keeps that screen from ever touching real assets.
 class _FakeVocabBundleService extends VocabBundleService {
   Map<String, List<VocabBundleEntry>> byLevel = {};
+  final loadedLevels = <String>[];
 
   @override
   Future<List<VocabBundleEntry>> loadLevelWithDelta({
     required String cefrLevel,
     required DateTime bundleGeneratedAt,
   }) async {
+    loadedLevels.add(cefrLevel);
     return byLevel[cefrLevel] ?? const [];
   }
 }
@@ -267,6 +274,184 @@ void main() {
         expect(find.text('Tes Penempatan Kosakata'), findsOneWidget);
       },
     );
+  });
+
+  group('DashboardScreen — the level ladder opens that level', () {
+    /// One word per level (C2 stays empty, as in the real bundle), plus
+    /// enough A2 words for a second page.
+    _FakeVocabBundleService stockedBundle() {
+      VocabBundleEntry entry(String word, String level) => VocabBundleEntry(
+        word: word,
+        meanings: const [VocabMeaning(pos: 'noun', translation: 'arti')],
+        cefrLevel: level,
+        topics: const ['Topik'],
+      );
+      return _FakeVocabBundleService()
+        ..byLevel = {
+          for (final level in kCefrLevels.where((l) => l != 'C2'))
+            level: [entry('kata$level', level)],
+          'A2': [for (var i = 0; i < 75; i++) entry('kataA2n$i', 'A2')],
+        };
+    }
+
+    Finder ladder(String level) => find.descendant(
+      of: find.byType(DashboardScreen),
+      matching: find.text(level),
+    );
+
+    String browserLevel(WidgetTester tester) =>
+        tester.widget<CefrLevelSelector>(find.byType(CefrLevelSelector)).selected;
+
+    Set<VocabBrowseMode> browserMode(WidgetTester tester) => tester
+        .widget<SegmentedButton<VocabBrowseMode>>(
+          find.byType(SegmentedButton<VocabBrowseMode>),
+        )
+        .selected;
+
+    for (final level in kCefrLevels) {
+      testWidgets('tapping $level opens the browser at $level', (tester) async {
+        final bundle = stockedBundle();
+        await _pumpDashboard(
+          tester,
+          profile: _studentProfile,
+          vocabBundleService: bundle,
+        );
+        bundle.loadedLevels.clear();
+
+        await tester.tap(ladder(level));
+        await tester.pumpAndSettle();
+
+        expect(browserLevel(tester), level);
+        expect(
+          bundle.loadedLevels,
+          [level],
+          reason: 'no other level is fetched on the way there',
+        );
+        if (level == 'C2') {
+          expect(find.text('Belum ada kata di level ini.'), findsOneWidget);
+        } else if (level == 'A2') {
+          expect(find.text('kataA2n0'), findsOneWidget);
+        } else {
+          expect(find.text('kata$level'), findsOneWidget);
+        }
+      });
+    }
+
+    testWidgets('a level opened after leaving another starts clean', (
+      tester,
+    ) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        vocabBundleService: stockedBundle(),
+      );
+
+      await tester.tap(ladder('B1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('POS'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('C1'));
+      await tester.pumpAndSettle();
+      expect(browserLevel(tester), 'C1');
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(ladder('A2'));
+      await tester.pumpAndSettle();
+
+      expect(browserLevel(tester), 'A2');
+      expect(browserMode(tester), {VocabBrowseMode.alphabetical});
+      expect(find.text('Halaman 1 dari 2'), findsOneWidget);
+    });
+
+    testWidgets('the same level reopened starts clean', (tester) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        vocabBundleService: stockedBundle(),
+      );
+
+      await tester.tap(ladder('A2'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tema'));
+      await tester.pumpAndSettle();
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(ladder('A2'));
+      await tester.pumpAndSettle();
+
+      expect(browserLevel(tester), 'A2');
+      expect(browserMode(tester), {VocabBrowseMode.alphabetical});
+      expect(find.text('Halaman 1 dari 2'), findsOneWidget);
+    });
+
+    testWidgets('reopening during the closing animation inherits nothing', (
+      tester,
+    ) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        vocabBundleService: stockedBundle(),
+      );
+
+      await tester.tap(ladder('B1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('POS'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('C1'));
+      await tester.pumpAndSettle();
+
+      await tester.pageBack();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        find.byType(VocabBrowserScreen),
+        findsOneWidget,
+        reason: 'the old route must still be on its way out',
+      );
+      await tester.tap(ladder('B1'));
+      await tester.pumpAndSettle();
+
+      expect(browserLevel(tester), 'B1');
+      expect(browserMode(tester), {VocabBrowseMode.alphabetical});
+    });
+
+    testWidgets('trips to the cart and a word keep the level and page', (
+      tester,
+    ) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        vocabBundleService: stockedBundle(),
+      );
+
+      await tester.tap(ladder('A2'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('vocabBrowserNextPage')));
+      await tester.pumpAndSettle();
+      expect(find.text('Halaman 2 dari 2'), findsOneWidget);
+
+      await tester.tap(find.text('Keranjang Pelajari kosong'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LearningCartScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(browserLevel(tester), 'A2');
+      expect(find.text('Halaman 2 dari 2'), findsOneWidget);
+
+      await tester.tap(find.textContaining('kataA2n').first);
+      await tester.pumpAndSettle();
+      expect(find.byType(WordDetailScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(browserLevel(tester), 'A2');
+      expect(find.text('Halaman 2 dari 2'), findsOneWidget);
+    });
   });
 
   group('DashboardScreen — Pre-Test/Post-Test section', () {

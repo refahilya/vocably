@@ -10,23 +10,30 @@ part of 'vocab_browser_providers.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(VocabBrowserFilter)
-final vocabBrowserFilterProvider = VocabBrowserFilterProvider._();
+final vocabBrowserFilterProvider = VocabBrowserFilterFamily._();
 
 final class VocabBrowserFilterProvider
     extends $NotifierProvider<VocabBrowserFilter, VocabBrowserFilterState> {
-  VocabBrowserFilterProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'vocabBrowserFilterProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  VocabBrowserFilterProvider._({
+    required VocabBrowserFilterFamily super.from,
+    required VocabBrowserVisit super.argument,
+  }) : super(
+         retry: null,
+         name: r'vocabBrowserFilterProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$vocabBrowserFilterHash();
+
+  @override
+  String toString() {
+    return r'vocabBrowserFilterProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -39,13 +46,51 @@ final class VocabBrowserFilterProvider
       providerOverride: $SyncValueProvider<VocabBrowserFilterState>(value),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is VocabBrowserFilterProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
 String _$vocabBrowserFilterHash() =>
-    r'b0ba17eb04a189a4c2a00fad456e1fa060dc40e8';
+    r'c0c4807b37fd21efbe3484e120af7c02c9302da5';
+
+final class VocabBrowserFilterFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          VocabBrowserFilter,
+          VocabBrowserFilterState,
+          VocabBrowserFilterState,
+          VocabBrowserFilterState,
+          VocabBrowserVisit
+        > {
+  VocabBrowserFilterFamily._()
+    : super(
+        retry: null,
+        name: r'vocabBrowserFilterProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  VocabBrowserFilterProvider call(VocabBrowserVisit visit) =>
+      VocabBrowserFilterProvider._(argument: visit, from: this);
+
+  @override
+  String toString() => r'vocabBrowserFilterProvider';
+}
 
 abstract class _$VocabBrowserFilter extends $Notifier<VocabBrowserFilterState> {
-  VocabBrowserFilterState build();
+  late final _$args = ref.$arg as VocabBrowserVisit;
+  VocabBrowserVisit get visit => _$args;
+
+  VocabBrowserFilterState build(VocabBrowserVisit visit);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
@@ -59,6 +104,6 @@ abstract class _$VocabBrowserFilter extends $Notifier<VocabBrowserFilterState> {
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, build);
+    return element.handleCreate(ref, () => build(_$args));
   }
 }

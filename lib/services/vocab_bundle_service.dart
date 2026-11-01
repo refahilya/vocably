@@ -38,17 +38,18 @@ class VocabBundleService {
   /// that must render as an empty state later, not a crash here. The
   /// catch is deliberately broad: any failure to read the asset (missing
   /// key, or whatever the underlying binding throws for that) is treated
-  /// the same way.
+  /// the same way. On the web that includes text that isn't JSON: a host
+  /// with an SPA rewrite, as Firebase Hosting has here, answers a missing
+  /// file with `index.html` and a 200.
   Future<List<VocabBundleEntry>> loadLevel(String cefrLevel) async {
     final assetKey = 'assets/vocab/vocab_${cefrLevel.toLowerCase()}.json';
-    String raw;
+    Object? decoded;
     try {
-      raw = await _assetBundle.loadString(assetKey);
+      decoded = jsonDecode(await _assetBundle.loadString(assetKey));
     } catch (_) {
       return const [];
     }
 
-    final decoded = jsonDecode(raw);
     if (decoded is! List) return const [];
 
     return VocabBundleEntry.listFromJson(decoded);

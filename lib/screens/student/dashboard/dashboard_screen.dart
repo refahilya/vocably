@@ -5,7 +5,6 @@ import '../../../models/app_user.dart';
 import '../../../models/research_attempt.dart';
 import '../../../providers/dashboard_providers.dart';
 import '../../../providers/research_assessment_providers.dart';
-import '../../../providers/vocab_browser_providers.dart';
 import '../../../services/research_assessment_service.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/cefr_levels.dart';
@@ -149,13 +148,13 @@ class _TargetWordCard extends ConsumerWidget {
 /// point. The active level is `users.resultLevel` from the latest scored
 /// Placement Test attempt — never a score, and never the research band
 /// (`DATA_MODEL.md` §1). Also holds the permanent Placement Test entry point.
-class _LevelCard extends ConsumerWidget {
+class _LevelCard extends StatelessWidget {
   const _LevelCard({required this.profile});
 
   final AppUser profile;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final level = profile.resultLevel;
     final activeIndex = level == null ? -1 : kCefrLevels.indexOf(level);
 
@@ -195,16 +194,12 @@ class _LevelCard extends ConsumerWidget {
                     rung: i,
                     isActive: i == activeIndex,
                     isReached: i < activeIndex,
-                    onTap: () {
-                      ref
-                          .read(vocabBrowserFilterProvider.notifier)
-                          .selectLevel(kCefrLevels[i]);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const VocabBrowserScreen(),
-                        ),
-                      );
-                    },
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            VocabBrowserScreen(initialLevel: kCefrLevels[i]),
+                      ),
+                    ),
                   ),
                 ),
               ],

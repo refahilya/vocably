@@ -127,6 +127,37 @@ void main() {
       expect(entries, isEmpty);
     });
 
+    group('a host that answers a missing file with its index.html page', () {
+      const hostedPage = '<!DOCTYPE html><html><body>Vocably</body></html>';
+
+      test('counts as no bundle, so the level is empty rather than failed', () async {
+        final bundle = _FakeAssetBundle({'assets/vocab/vocab_c2.json': hostedPage});
+        final service = VocabBundleService(assetBundle: bundle);
+
+        expect(await service.loadLevel('C2'), isEmpty);
+      });
+
+      test('still shows words a teacher added to that level', () async {
+        final added = VocabBundleEntry(
+          word: 'zeppelin',
+          meanings: const [VocabMeaning(pos: 'noun', translation: 'zeppelin')],
+          cefrLevel: 'C2',
+          topics: const [],
+        );
+        final service = _StubDeltaVocabBundleService(
+          assetBundle: _FakeAssetBundle({'assets/vocab/vocab_c2.json': hostedPage}),
+          stubDelta: [added],
+        );
+
+        final entries = await service.loadLevelWithDelta(
+          cefrLevel: 'C2',
+          bundleGeneratedAt: DateTime(2026),
+        );
+
+        expect(entries.map((e) => e.word), ['zeppelin']);
+      });
+    });
+
     test('malformed entries inside an otherwise-valid file are skipped, not fatal', () async {
       final bundle = _FakeAssetBundle({
         'assets/vocab/vocab_a1.json': jsonEncode([
