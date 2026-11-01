@@ -9,7 +9,8 @@ import 'package:vocably/providers/dashboard_providers.dart';
 import 'package:vocably/providers/vocab_bundle_providers.dart';
 import 'package:vocably/screens/student/dashboard/dashboard_screen.dart';
 import 'package:vocably/screens/student/dashboard/target_word_list_screen.dart';
-import 'package:vocably/screens/student/placement_test/placement_test_placeholder_screen.dart';
+import 'package:vocably/providers/placement_test_providers.dart';
+import 'package:vocably/screens/student/placement_test/placement_test_screen.dart';
 import 'package:vocably/models/research_attempt.dart';
 import 'package:vocably/providers/research_assessment_providers.dart';
 import 'package:vocably/screens/student/research_assessment/research_assessment_screen.dart';
@@ -19,6 +20,7 @@ import 'package:vocably/services/target_word_set_service.dart';
 import 'package:vocably/services/vocab_bundle_service.dart';
 import 'package:vocably/utils/role.dart';
 
+import '../support/fake_placement_service.dart';
 import '../support/fake_research_assessment_service.dart';
 
 class _FakeTargetWordSetService extends TargetWordSetService {
@@ -70,6 +72,7 @@ Future<void> _pumpDashboard(
         researchAssessmentServiceProvider.overrideWithValue(
           researchService ?? FakeResearchAssessmentService(),
         ),
+        placementServiceProvider.overrideWithValue(FakePlacementService()),
         targetWordSetServiceProvider.overrideWithValue(
           targetWordSetService ?? _FakeTargetWordSetService(),
         ),
@@ -203,7 +206,7 @@ void main() {
 
   group('DashboardScreen — Level card', () {
     testWidgets(
-      'cefrLevel == null shows no active-level ring and the placement-test prompt',
+      'no resultLevel shows no active-level ring and the placement-test prompt',
       (tester) async {
         await _pumpDashboard(tester, profile: _studentProfile);
 
@@ -211,7 +214,7 @@ void main() {
           find.text('Kamu belum mengambil tes penempatan.'),
           findsOneWidget,
         );
-        expect(find.text('Ambil Placement Test'), findsOneWidget);
+        expect(find.text('Ambil Tes Penempatan'), findsOneWidget);
         for (final level in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']) {
           expect(find.text(level), findsOneWidget);
         }
@@ -219,7 +222,7 @@ void main() {
     );
 
     testWidgets(
-      'cefrLevel set shows the current level and the retake wording',
+      'resultLevel shows the active level; the legacy cefrLevel is ignored',
       (tester) async {
         final profile = AppUser(
           uid: 'student-1',
@@ -227,7 +230,8 @@ void main() {
           name: 'Siswa Uji',
           role: Role.siswa,
           createdAt: DateTime(2026, 1, 1),
-          cefrLevel: 'B1',
+          cefrLevel: 'C1',
+          resultLevel: 'B1',
           placementTestCompleted: true,
           placementTestPrompted: true,
         );
@@ -235,7 +239,7 @@ void main() {
         await _pumpDashboard(tester, profile: profile);
 
         expect(find.text('Level kamu saat ini: B1'), findsOneWidget);
-        expect(find.text('Ambil Ulang Placement Test'), findsOneWidget);
+        expect(find.text('Lihat Tes Penempatan'), findsOneWidget);
       },
     );
 
@@ -252,14 +256,15 @@ void main() {
     );
 
     testWidgets(
-      'tapping the placement-test link opens the placeholder screen',
+      'tapping the placement-test link opens the Placement Test',
       (tester) async {
         await _pumpDashboard(tester, profile: _studentProfile);
 
-        await tester.tap(find.text('Ambil Placement Test'));
+        await tester.tap(find.text('Ambil Tes Penempatan'));
         await tester.pumpAndSettle();
 
-        expect(find.byType(PlacementTestPlaceholderScreen), findsOneWidget);
+        expect(find.byType(PlacementTestScreen), findsOneWidget);
+        expect(find.text('Tes Penempatan Kosakata'), findsOneWidget);
       },
     );
   });

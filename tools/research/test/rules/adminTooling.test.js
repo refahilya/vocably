@@ -46,6 +46,11 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
 
   beforeEach(async () => {
     await env.clearFirestore();
+    // Active study with open pretest/posttest windows (the rules require them).
+    const pops = require('../../lib/admin/placementOperations');
+    await pops.setStudyStatus(admin.db, { status: 'active', apply: true });
+    await pops.setStageWindow(admin.db, { stage: 'preTest', open: true, apply: true });
+    await pops.setStageWindow(admin.db, { stage: 'postTest', open: true, apply: true });
   });
 
   const db = () => admin.db;

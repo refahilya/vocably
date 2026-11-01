@@ -26,6 +26,7 @@
 const { BANDS, ITEMS_PER_BAND, INSTRUMENT_VERSION } = require('../constants');
 const { buildInstrumentDocs } = require('../instrumentDocs');
 const { findForbiddenFields } = require('../instrumentBuild');
+const { PLACEMENT_BANDS, PLACEMENT_ITEMS_PER_BAND } = require('../placement/constants');
 
 const PARTICIPANTS = 'researchParticipants';
 const ATTEMPTS = 'researchAssessmentResults';
@@ -167,7 +168,7 @@ async function pretestCompleted(db, uid, participant) {
  * are listed in `skipped` with the reason; with explicit UIDs, any
  * ineligible UID refuses the whole request.
  */
-async function authorizeStage(db, { uids, cohort, stage, confirmSession4 = false, apply = false }) {
+async function authorizeStage(db, { uids, cohort, stage, confirmSession4 = false, acknowledgePlacementPolicy = false, apply = false }) {
   checkStage(stage);
   if (Boolean(uids && uids.length) === Boolean(cohort)) {
     throw new AdminError(['select participants with --uid (repeatable) or --cohort, not both']);
@@ -200,6 +201,27 @@ async function authorizeStage(db, { uids, cohort, stage, confirmSession4 = false
       reject(`${stage} already authorized (attempt ${p.authorizedAttempts[stage]}); use retake for another attempt`);
       continue;
     }
+    // Pending-band and ineligible participants (DATA_MODEL.md §6b). Records
+    // from the original enrolment (no `status`) count as enrolled.
+    const status = p.status || 'enrolled';
+    if (status !== 'enrolled' || !BANDS.includes(p.band)) {
+      reject(
+        status === 'conditional'
+          ? 'participant is conditional (manual band): the conditional-inclusion criteria are not decided yet'
+          : `participant is ${status} and has no usable research band`
+      );
+      continue;
+    }
+    if (p.reviewStatus === 'pending') {
+      reject('a human review is pending');
+      continue;
+    }
+    if (p.bandSource === 'placement_test' && !acknowledgePlacementPolicy) {
+      problems.push(
+        `${snap.id}: the band comes from the Placement Test (K2, researcher-selected, not expert-validated); add --acknowledge-placement-policy to authorize`
+      );
+      continue;
+    }
     const bankDoc = await db.collection(INSTRUMENT).doc(`${p.instrumentVersion}_${p.band}`).get();
     if (!bankDoc.exists) {
       problems.push(`${INSTRUMENT}/${p.instrumentVersion}_${p.band} is not seeded (run seed-instrument first)`);
@@ -220,6 +242,9 @@ async function authorizeStage(db, { uids, cohort, stage, confirmSession4 = false
     stage,
     attemptNumber: 1,
     ...(stage === 'postTest' ? { attestation: 'researcher confirmed treatment session 4 completed' } : {}),
+    ...(snap.get('bandSource') === 'placement_test'
+      ? { placementPolicy: 'researcher acknowledged the K2 placement band (not expert-validated)' }
+      : {}),
   }));
   if (apply && eligible.length) {
     await db.runTransaction(async (t) => {
@@ -311,7 +336,30 @@ async function stageStatus(db, { uid } = {}) {
   const rows = [];
   for (const snap of docs) {
     const p = snap.data();
-    const row = { uid: snap.id, researchId: p.researchId, band: p.band, cohort: p.cohort, stages: {} };
+    const row = {
+      uid: snap.id,
+      researchId: p.researchId,
+      band: p.band ?? null,
+      bandSource: p.bandSource ?? null,
+      status: p.status || 'enrolled',
+      reviewStatus: p.reviewStatus || null,
+      cohort: p.cohort,
+      stages: {},
+    };
+    const placementN = (p.authorizedAttempts && p.authorizedAttempts.placement) || 0;
+    if (placementN >= 1) {
+      const a = await db.collection('placementAttempts').doc(`${snap.id}_research_${placementN}`).get();
+      row.placement = a.exists
+        ? {
+            n: placementN,
+            status: a.get('status'),
+            answered: Object.keys(a.get('answers') || {}).length,
+            resultLevel: a.get('resultLevel'),
+            belowA1Threshold: a.get('belowA1Threshold'),
+            targetBand: a.get('pretestTargetBand'),
+          }
+        : { n: placementN, status: 'not_started', answered: 0 };
+    }
     for (const stage of STAGES) {
       const authorized = p.authorizedAttempts[stage];
       const attempts = [];
@@ -330,6 +378,20 @@ async function stageStatus(db, { uid } = {}) {
   return rows.sort((a, b) => String(a.researchId).localeCompare(String(b.researchId)));
 }
 
+/**
+ * The research placement field of `status`, e.g.
+ * `placement=#1 scored answered=50/50 level=A1* targetBand=A2`. `answered`
+ * counts saved answers (E included), never correct ones. `level` and
+ * `targetBand` are the values stored on the attempt, never derived from each
+ * other: `-` = none stored yet, `targetBand=none` = stored null (C1).
+ */
+function formatPlacementStatus({ n, status, answered, resultLevel, belowA1Threshold, targetBand }) {
+  const level = resultLevel == null ? '-' : `${resultLevel}${belowA1Threshold === true ? '*' : ''}`;
+  const target = targetBand === undefined ? '-' : (targetBand ?? 'none');
+  const items = PLACEMENT_BANDS.length * PLACEMENT_ITEMS_PER_BAND;
+  return `placement=#${n} ${status} answered=${answered}/${items} level=${level} targetBand=${target}`;
+}
+
 module.exports = {
   AdminError,
   seedInstrument,
@@ -338,6 +400,7 @@ module.exports = {
   voidAttempt,
   authorizeRetake,
   stageStatus,
+  formatPlacementStatus,
   canonical,
   PARTICIPANTS,
   ATTEMPTS,

@@ -71,11 +71,11 @@ membaca cerita yang di-generate AI, cloze test, lalu co-write cerita bersama
 AI — untuk sekumpulan kata target.
 
 Vocably juga berfungsi ganda sebagai **instrumen penelitian skripsi** —
-selain fitur belajar utama, ada modul Placement Test (personalisasi level,
-**ditunda**) dan modul riset Pre-Test/Post-Test (pengukuran data
-penelitian). Instrumen Pre/Post Test sudah dirancang (PDF peneliti) dan bank
-soalnya tersedia sebagai aset; aturan modul riset ada di bagian 10, status
-implementasinya di `HANDOFF.md`.
+selain fitur belajar utama, ada modul Placement Test (level belajar siswa
+dan, untuk peserta riset, band riset — PT-V1.1) dan modul riset
+Pre-Test/Post-Test (pengukuran data penelitian). Kedua instrumen berasal
+dari dokumen peneliti dan bank soalnya tersedia sebagai aset tanpa kunci;
+aturannya ada di bagian 10, status implementasinya di `HANDOFF.md`.
 
 Ini adalah **pengembangan kedua** dari nol. Versi pertama (Flutter for Android,
 ~80% jadi) di-deprecate karena requirement berubah signifikan. Versi pertama
@@ -120,7 +120,7 @@ lib/
       vocab_browser/   # 3 mode: abjad, tema, POS — semua difilter di memori
       learning_flow/   # 3 fase: read, cloze, co-write
       history/         # 2 tab: per kata, per sesi
-      placement_test/  # scaffold saja (placement test ditunda) — lihat bagian 10
+      placement_test/  # tawaran sekali + layar tes PT-V1.1 (riset & belajar) — lihat bagian 10
       research_assessment/  # layar pre-test & post-test, lihat bagian 10
     teacher/
       dashboard/
@@ -133,10 +133,11 @@ lib/
 assets/
   vocab/            # vocab_a1.json … vocab_c1.json — bundle bank kosakata (§11 DATA_MODEL)
   research/         # instrument_v1.json — bank soal Pre/Post Test, TANPA kunci jawaban (bagian 10)
+  placement/        # placement_bank_pt_v1_1.json — bank Placement Test, TANPA kunci (bagian 10)
 
 tools/              # skrip sisi dev, tidak ikut ter-bundle ke app
   vocab_import/     # pipeline CSV Oxford → Firestore + bundle aset (§7 Milestone 4)
-  research/         # PDF instrumen → bank + kunci privat; uji emulator; admin peneliti; ekspor & skoring (bagian 10)
+  research/         # instrumen → bank + kunci privat (pretest & placement); uji emulator; admin peneliti; ekspor & skoring (bagian 10)
 
 # REPO TERPISAH (bukan bagian dari project Flutter di atas):
 vocably-ai-worker/   # Cloudflare Worker (TypeScript) — proxy AI, lihat DATA_MODEL.md §10
@@ -211,9 +212,11 @@ dulu kalau perlu penyesuaian.
   sudah berjalan tanpa diskusi eksplisit — ini beberapa kali menyebabkan
   inkonsistensi di iterasi sebelumnya.
 - Kalau requirement dari `SPEC.md` ambigu, tanyakan dulu sebelum berasumsi.
-- **Jangan pernah mengasumsikan atau mengarang sistem skoring/algoritma
-  penentuan level untuk Placement Test** — masih TBD dan ditunda (lihat
-  bagian 10). **Instrumen Pre-Test/Post-Test tidak boleh dikarang, diubah,
+- **Aturan skoring Placement Test adalah K2 pilihan peneliti** (bagian 10)
+  — jangan diubah, diganti, atau disebut tervalidasi tanpa keputusan
+  eksplisit peneliti. Butir placement hanya di-generate ulang dari file
+  peneliti lewat `tools/research/bin/build_placement.js`; jangan dikarang
+  atau diparafrasekan. **Instrumen Pre-Test/Post-Test tidak boleh dikarang, diubah,
   atau diparafrasekan:** satu-satunya sumber adalah PDF peneliti
   (`Rancangan_Instrumen_Pretest_Vocably.pdf`), dan bank soalnya hanya
   di-generate ulang lewat `tools/research/bin/build_instrument.js`.
@@ -451,10 +454,12 @@ di `DATA_MODEL.md` §5.
   boleh diubah lagi** lewat `update` apa pun dari client — tegakkan eksplisit
   di security rules.
 - Field yang **boleh** di-update pemilik akun atas dirinya sendiri, per
-  role: **siswa** — `name`, `cefrLevel`, `placementTestCompleted`,
-  `placementTestPrompted`; **guru** — `name` saja. Field lain (`uid`,
-  `email`, `role`, `createdAt`, `teacherCodeInput`) immutable untuk kedua
-  role. Detail matriks lengkap di `DATA_MODEL.md` §1 poin 5.
+  role: **siswa** — `name`, `cefrLevel` (legacy, tidak dipakai app),
+  `placementTestPrompted`; **guru** — `name` saja. `resultLevel`/
+  `resultAttemptId`/`placementTestCompleted` hanya berubah bersama attempt
+  placement yang dinilai di batch yang sama. Field lain (`uid`, `email`,
+  `role`, `createdAt`, `teacherCodeInput`) immutable untuk kedua role.
+  Detail matriks lengkap di `DATA_MODEL.md` §1 poin 5.
 - **Satu akun = satu role, permanen** — terjaga otomatis oleh struktur ini +
   aturan immutability di atas.
 
@@ -500,16 +505,32 @@ maupun "sudah ditawari tapi menunda".
 Dua fitur ini **berbeda tujuan** dan **berbeda posisi arsitektur**, jangan
 disatukan atau ditukar-tukar pemahamannya:
 
-- **Placement Test — Status: TBD, ditunda.** Mekanisme aplikasi untuk
-  personalisasi belajar (menentukan `users.cefrLevel`). Sudah punya
-  alur/entry-point di `SPEC.md` §3.1 dan §3.2, tapi **detail teknis
-  penilaian & algoritma penentuan level CEFR-nya masih TBD** — jangan
-  diasumsikan atau dibuatkan sistem skoring sendiri. Implementasinya
-  **ditunda** dan **bukan prasyarat** untuk mengembangkan & menguji Pre/Post
-  Test. Begitu metodenya diputuskan, skoring placement **dihitung di
-  client** (tidak ada logic rahasia yang perlu disembunyikan), dengan
-  jawaban mentah tetap disimpan ke Firestore supaya bisa diverifikasi ulang
-  saat analisis skripsi.
+- **Placement Test PT-V1.1 — dibangun dan diverifikasi lokal (status
+  terkini: `HANDOFF.md`).** Sumber: spesifikasi peneliti
+  `Vocably_Spesifikasi_Placement_Test_v1.0.pdf` + `placement_items_v1.0.json`
+  (di luar repo, memuat kunci). 50 butir, 5 band × 10, opsi A–D tetap + E.
+  Perilaku: `SPEC.md` §3.1; skema & rules: `DATA_MODEL.md` §6/§6b.
+  - **Skoring K2** (pilihan peneliti, **belum divalidasi ahli/pembimbing**
+    — jangan sebut tervalidasi): band lolos bila ≥ 7, semua band di bawahnya
+    ≥ 6, paling banyak satu tepat 6; level = band lolos tertinggi, atau A1*.
+  - **Penilaian di Firestore Security Rules**, bukan di client dan bukan di
+    Worker: kunci hanya di `placementKey/{version}` (tidak bisa dibaca
+    client); rules menghitung ulang K2 dari jawaban beku dan hanya menerima
+    hasil yang tepat, sekali. **Kunci placement tidak boleh masuk repo, aset,
+    kode app, log, atau pesan test** — hanya file privat peneliti dan dokumen
+    `placementKey` yang ditulis tooling. Tidak ada MAC, tidak ada tulisan
+    Worker.
+  - Hasil untuk siswa hanya **level** (`users.resultLevel`); skor band,
+    total, dan penanda mutu tidak pernah disimpan atau ditampilkan —
+    diturunkan offline (`bin/export_placement.js`).
+  - Attempt **riset** (peserta tanpa band) mengisi band peserta otomatis;
+    attempt **belajar** tidak pernah menyentuh data riset. Sinyal (penanda,
+    `tabSwitchCount`) tidak pernah memicu tindakan; pembatalan integritas
+    hanya setelah tinjauan manusia terkonfirmasi, tanpa attempt pengganti.
+  - **Kebijakan riset yang belum final** (kriteria inklusi bersyarat untuk
+    band manual, bukti yang sah, peninjau banding, dll.) tercatat di
+    `HANDOFF.md` — jangan diputuskan sendiri; tooling menolak (fail
+    closed) aksi yang bergantung padanya.
 - **Pre-Test / Post-Test — instrumen sudah dirancang; fitur app dan
   tooling peneliti sudah dibangun (status terkini: `HANDOFF.md`).** Instrumen pengambilan data penelitian skripsi (mengukur
   kemampuan kosakata siswa sebelum & sesudah pakai Vocably), awalnya
@@ -535,8 +556,10 @@ disatukan atau ditukar-tukar pemahamannya:
     enrol, otorisasi, void, retake) dan ekspor/skoring di `tools/research/`
     (lihat README-nya).
   - **Band & otorisasi tes hanya dari `researchParticipants`** (ditulis
-    tooling peneliti) — **`users.cefrLevel` tidak pernah dipakai** untuk
-    band/kelayakan.
+    tooling peneliti, atau band otomatis dari attempt placement riset yang
+    dinilai rules) — **`users.cefrLevel`/`users.resultLevel` tidak pernah
+    dipakai** untuk band/kelayakan. Pretest/posttest juga butuh jendela
+    tahap terbuka (`researchStudy/current`).
   - **Tooling peneliti menulis ke produksi hanya dengan izin eksplisit
     pemilik proyek dan kredensialnya sendiri**; default-nya dry-run terhadap
     emulator. Jangan pernah mencetak kunci jawaban, kredensial, atau data
@@ -552,10 +575,9 @@ disatukan atau ditukar-tukar pemahamannya:
     Pre, N-gain = (Post − Pre)/(20 − Pre) dan tidak dihitung bila Pre = 20.
     Siswa tidak pernah melihat feedback benar/salah, skor, atau kunci.
 
-Placement Test: kerjakan **hanya scaffolding** (routing, entry point,
-placeholder `DATA_MODEL.md` §6). Pre/Post Test: dibangun bertahap per
-milestone yang disetujui — jangan melompat ke milestone berikutnya tanpa
-persetujuan eksplisit.
+Placement Test dan Pre/Post Test: dibangun bertahap per milestone yang
+disetujui — jangan melompat ke milestone berikutnya (mis. tooling enrolmen
+peserta tanpa band, deploy) tanpa persetujuan eksplisit.
 
 ### Satu hal lain yang berstatus ditunda
 

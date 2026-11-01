@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vocably/models/research_attempt.dart';
 import 'package:vocably/models/research_attempt_plan.dart';
 import 'package:vocably/models/research_instrument.dart';
+import 'package:vocably/models/research_participant.dart';
 import 'package:vocably/providers/research_assessment_providers.dart';
 import 'package:vocably/services/research_assessment_service.dart';
 import 'package:vocably/utils/research_attempt_planner.dart';
@@ -77,7 +78,7 @@ void main() {
   }) {
     final plan = planResearchAttempt(
       instrument: instrument,
-      assignment: server.participant!.assignment,
+      assignment: server.participant!.assignment!,
       random: Random(seed),
     );
     final indexes = answeredIndexes ?? List.generate(answered, (i) => i);
@@ -117,6 +118,52 @@ void main() {
         (s as ResearchAssessmentUnavailable).kind,
         ResearchStageKind.notEnrolled,
       );
+    });
+
+    test('a participant still awaiting placement (no band) or under review is not eligible, even if authorized', () async {
+      server.participant = ResearchParticipant(
+        status: ResearchParticipantStatus.awaitingPlacement,
+        assignment: null,
+        instrumentVersion: 'v1',
+        authorizedPlacement: 1,
+        authorizedPreTest: 1,
+        authorizedPostTest: 0,
+      );
+      expect(
+        ((await settle(pre)) as ResearchAssessmentUnavailable).kind,
+        ResearchStageKind.notEligible,
+      );
+      server.participant = ResearchParticipant(
+        status: ResearchParticipantStatus.enrolled,
+        assignment: const ResearchParticipantAssignment(band: 'A2', instrumentVersion: 'v1'),
+        instrumentVersion: 'v1',
+        authorizedPlacement: 1,
+        authorizedPreTest: 1,
+        authorizedPostTest: 0,
+        reviewPending: true,
+      );
+      await ctl(pre).reload();
+      expect(
+        (container.read(pre) as ResearchAssessmentUnavailable).kind,
+        ResearchStageKind.notEligible,
+      );
+    });
+
+    test('a closed pretest window: not started → stageClosed; an unfinished attempt is kept and paused', () async {
+      server.study = openStudy(open: const {'postTest'});
+      expect(
+        ((await settle(pre)) as ResearchAssessmentUnavailable).kind,
+        ResearchStageKind.stageClosed,
+      );
+      seedAttempt(answered: 4);
+      await ctl(pre).reload();
+      expect(
+        (container.read(pre) as ResearchAssessmentUnavailable).kind,
+        ResearchStageKind.stageClosed,
+      );
+      server.study = openStudy();
+      await ctl(pre).reload();
+      expect(container.read(pre), isA<ResearchAssessmentInProgress>());
     });
 
     test('enrolled but this stage is not authorized', () async {
@@ -222,7 +269,7 @@ void main() {
 
         final expected = planResearchAttempt(
           instrument: instrument,
-          assignment: server.participant!.assignment,
+          assignment: server.participant!.assignment!,
           random: Random(11),
         );
         final stored = server.attempts[preId()]!;

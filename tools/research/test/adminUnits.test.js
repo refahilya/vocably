@@ -11,10 +11,26 @@ const { resolveTarget, TargetError } = require('../lib/admin/target');
 const { parseArgs, openAuditLog } = require('../lib/admin/cli');
 const { toCsv } = require('../lib/export/files');
 const { assessPrivateOutputDir } = require('../lib/safeOutput');
+const { formatPlacementStatus } = require('../lib/admin/operations');
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..');
 const HEADER = 'uid,researchId,band,cohort';
 const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'vocably-admin-'));
+
+test('placement status: separates attempt status, answered count, stored level and target band', () => {
+  const base = { n: 1, status: 'scored', answered: 50 };
+  const line = (extra) => formatPlacementStatus({ ...base, ...extra });
+  assert.equal(line({ resultLevel: 'A1', belowA1Threshold: true, targetBand: 'A2' }), 'placement=#1 scored answered=50/50 level=A1* targetBand=A2');
+  assert.equal(line({ resultLevel: 'A1', belowA1Threshold: false, targetBand: 'A2' }), 'placement=#1 scored answered=50/50 level=A1 targetBand=A2');
+  assert.equal(line({ resultLevel: 'B2', belowA1Threshold: false, targetBand: 'C1' }), 'placement=#1 scored answered=50/50 level=B2 targetBand=C1');
+  assert.equal(line({ resultLevel: 'C1', belowA1Threshold: false, targetBand: null }), 'placement=#1 scored answered=50/50 level=C1 targetBand=none');
+});
+
+test('placement status: never infers a value that is not stored', () => {
+  assert.equal(formatPlacementStatus({ n: 2, status: 'not_started', answered: 0 }), 'placement=#2 not_started answered=0/50 level=- targetBand=-');
+  assert.equal(formatPlacementStatus({ n: 1, status: 'in_progress', answered: 12 }), 'placement=#1 in_progress answered=12/50 level=- targetBand=-');
+  assert.equal(formatPlacementStatus({ n: 1, status: 'scored', answered: 50, targetBand: 'B1' }), 'placement=#1 scored answered=50/50 level=- targetBand=B1');
+});
 
 test('participants CSV: accepts a valid file (BOM, CRLF, trailing newline)', () => {
   const { rows, problems } = parseParticipantsCsv(`\uFEFF${HEADER}\r\nabcdef123,R-01,A2,study\r\nghijkl456,R-02,C1,pilot\r\n`);

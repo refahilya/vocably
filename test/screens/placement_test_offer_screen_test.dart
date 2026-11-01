@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vocably/models/app_user.dart';
 import 'package:vocably/providers/auth_providers.dart';
 import 'package:vocably/screens/student/placement_test/placement_test_offer_screen.dart';
-import 'package:vocably/screens/student/placement_test/placement_test_placeholder_screen.dart';
+import 'package:vocably/providers/placement_test_providers.dart';
+import 'package:vocably/screens/student/placement_test/placement_test_screen.dart';
 import 'package:vocably/services/user_service.dart';
 import 'package:vocably/utils/role.dart';
+
+import '../support/fake_placement_service.dart';
 
 class _FakeUserService extends UserService {
   final List<String> promptedUids = [];
@@ -28,7 +31,10 @@ final _studentProfile = AppUser(
 Future<void> _pumpOfferScreen(WidgetTester tester, _FakeUserService userService) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [userServiceProvider.overrideWithValue(userService)],
+      overrides: [
+        userServiceProvider.overrideWithValue(userService),
+        placementServiceProvider.overrideWithValue(FakePlacementService()),
+      ],
       child: MaterialApp(home: PlacementTestOfferScreen(profile: _studentProfile)),
     ),
   );
@@ -53,10 +59,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(userService.promptedUids, ['student-1']);
-    expect(find.byType(PlacementTestPlaceholderScreen), findsNothing);
+    expect(find.byType(PlacementTestScreen), findsNothing);
   });
 
-  testWidgets('"Mulai Tes" marks the student as prompted and opens the placeholder test screen', (
+  testWidgets('"Mulai Tes" marks the student as prompted and opens the Placement Test', (
     tester,
   ) async {
     final userService = _FakeUserService();
@@ -66,6 +72,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(userService.promptedUids, ['student-1']);
-    expect(find.byType(PlacementTestPlaceholderScreen), findsOneWidget);
+    expect(find.byType(PlacementTestScreen), findsOneWidget);
   });
 }

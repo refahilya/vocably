@@ -123,6 +123,21 @@ abstract final class AppTextStyles {
     color: AppColors.primary,
   );
 
+  /// Kalimat soal tes — ukuran dan warna sama dengan [wordTitle], tetapi
+  /// regular, supaya kata target ([assessmentTarget]) bisa menonjol.
+  static const TextStyle assessmentSentence = TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.normal,
+    color: AppColors.primary,
+  );
+
+  /// Kata target di dalam [assessmentSentence] — tebal dan bergaris bawah.
+  /// Hanya menimpa yang berbeda; ukuran dan warna diwarisi dari kalimat.
+  static const TextStyle assessmentTarget = TextStyle(
+    fontWeight: FontWeight.bold,
+    decoration: TextDecoration.underline,
+  );
+
   /// Body text — regular weight, warna gelap netral.
   static const TextStyle body = TextStyle(
     fontSize: 14,

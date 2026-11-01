@@ -6,6 +6,7 @@ import '../models/research_attempt.dart';
 import '../models/research_attempt_plan.dart';
 import '../models/research_instrument.dart';
 import '../models/research_participant.dart';
+import '../models/research_study.dart';
 import 'firebase_service.dart';
 
 /// Why a research read or write failed, reduced to what the app acts on.
@@ -43,6 +44,15 @@ class ResearchServiceException implements Exception {
 enum ResearchStageKind {
   /// No `researchParticipants/{uid}` record: not a study participant.
   notEnrolled,
+
+  /// Enrolled, but without a usable research band yet (awaiting the
+  /// Placement Test or a manual band), excluded, conditional, or under a
+  /// pending review (`DATA_MODEL.md` §6b).
+  notEligible,
+
+  /// Authorized, but the researcher's window for this stage is closed (or
+  /// the study is not active). An unfinished attempt keeps its answers.
+  stageClosed,
 
   /// Enrolled, but this stage's attempt is not authorized (`0`).
   notAuthorized,
@@ -171,9 +181,24 @@ class ResearchAssessmentService {
     ),
   );
 
+  /// The study lifecycle document (`researchStudy/current`); a missing
+  /// document reads as a closed study.
+  Future<ResearchStudy> fetchStudy() => _guard(() async {
+    final snapshot = await _db
+        .collection('researchStudy')
+        .doc('current')
+        .get(_fromServer);
+    return ResearchStudy.fromFirestore(snapshot.data());
+  });
+
+  /// Device-clock view of the stage window, for explaining a closed stage.
+  /// The rules decide with the server clock; a refused write is re-read.
+  Future<bool> _stageOpen(ResearchStage stage) async =>
+      (await fetchStudy()).stageOpen(stage.name, DateTime.now());
+
   /// Resolves what the student may do for [stage]. Built only on
-  /// [fetchParticipant] and [fetchAttempt], so test doubles that override
-  /// those get the same decision logic.
+  /// [fetchParticipant], [fetchAttempt] and [fetchStudy], so test doubles
+  /// that override those get the same decision logic.
   Future<ResearchStageSnapshot> loadStage(
     String uid,
     ResearchStage stage,
@@ -181,6 +206,12 @@ class ResearchAssessmentService {
     final participant = await fetchParticipant(uid);
     if (participant == null) {
       return const ResearchStageSnapshot(kind: ResearchStageKind.notEnrolled);
+    }
+    if (!participant.canTakeResearchStages) {
+      return ResearchStageSnapshot(
+        kind: ResearchStageKind.notEligible,
+        participant: participant,
+      );
     }
     final number = participant.authorizedAttempt(stage);
     if (number < 1) {
@@ -212,7 +243,9 @@ class ResearchAssessmentService {
     final attempt = await fetchAttempt(attemptId);
     if (attempt == null) {
       return ResearchStageSnapshot(
-        kind: ResearchStageKind.notStarted,
+        kind: await _stageOpen(stage)
+            ? ResearchStageKind.notStarted
+            : ResearchStageKind.stageClosed,
         participant: participant,
         attemptId: attemptId,
       );
@@ -221,16 +254,19 @@ class ResearchAssessmentService {
         attempt.studentId == uid &&
         attempt.stage == stage &&
         attempt.attemptNumber == number &&
-        attempt.band == participant.assignment.band &&
-        attempt.instrumentVersion == participant.assignment.instrumentVersion;
+        attempt.band == participant.assignment!.band &&
+        attempt.instrumentVersion == participant.assignment!.instrumentVersion;
+    final kind = !consistent
+        ? ResearchStageKind.invalid
+        : switch (attempt.status) {
+            ResearchAttemptStatus.inProgress => ResearchStageKind.inProgress,
+            ResearchAttemptStatus.completed => ResearchStageKind.completed,
+            ResearchAttemptStatus.voided => ResearchStageKind.voided,
+          };
     return ResearchStageSnapshot(
-      kind: !consistent
-          ? ResearchStageKind.invalid
-          : switch (attempt.status) {
-              ResearchAttemptStatus.inProgress => ResearchStageKind.inProgress,
-              ResearchAttemptStatus.completed => ResearchStageKind.completed,
-              ResearchAttemptStatus.voided => ResearchStageKind.voided,
-            },
+      kind: kind == ResearchStageKind.inProgress && !await _stageOpen(stage)
+          ? ResearchStageKind.stageClosed
+          : kind,
       participant: participant,
       attemptId: attemptId,
       attempt: attempt,

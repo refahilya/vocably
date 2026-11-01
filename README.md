@@ -121,4 +121,4 @@ npx wrangler deploy --var "ALLOWED_ORIGINS:https://vocably-idn-en.web.app,https:
 Secrets (`OPENAI_API_KEY`) are managed with `wrangler secret`; never print or commit `.dev.vars`.
 
 ### 4. Research data collection
-Production setup for the pretest/posttest (seeding the bank documents, enrolling participants, opening stages, export) uses the researcher tooling with the researcher's own service account and is never automatic. See `tools/research/README.md`, and the blockers and open decisions in `HANDOFF.md`.
+Production setup for the pretest/posttest and the Placement Test (seeding the bank and placement-key documents, the study and stage windows, enrolling participants, opening stages, export) uses the researcher tooling with the researcher's own service account and is never automatic. See `tools/research/README.md`, and the blockers and open decisions in `HANDOFF.md`.

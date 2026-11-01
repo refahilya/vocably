@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/research_attempt.dart';
-import '../../../models/research_instrument.dart';
 import '../../../providers/research_assessment_providers.dart';
 import '../../../services/research_assessment_service.dart';
 import '../../../theme/theme.dart';
+import '../../../widgets/assessment_widgets.dart';
 import 'research_instructions.dart';
 
 /// The pretest/posttest itself (`SPEC.md` §3.7, `DESIGN_REFERENCE.md` §5.5):
@@ -56,10 +56,10 @@ class ResearchAssessmentScreen extends ConsumerWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 600),
               child: switch (state) {
-                ResearchAssessmentLoading() => const _Busy(
+                ResearchAssessmentLoading() => const AssessmentBusy(
                   label: 'Memuat tes…',
                 ),
-                ResearchAssessmentLoadFailed() => _Message(
+                ResearchAssessmentLoadFailed() => AssessmentMessage(
                   icon: Icons.wifi_off,
                   title: 'Gagal memuat tes',
                   body: 'Periksa koneksi internet, lalu coba lagi.',
@@ -69,7 +69,7 @@ class ResearchAssessmentScreen extends ConsumerWidget {
                 ResearchAssessmentUnavailable(:final kind) => _unavailable(
                   kind,
                 ),
-                ResearchAssessmentInvalid() => const _Message(
+                ResearchAssessmentInvalid() => const AssessmentMessage(
                   icon: Icons.error_outline,
                   title: 'Tes tidak dapat dilanjutkan',
                   body: 'Data tes tidak sesuai. Hubungi peneliti.',
@@ -96,10 +96,10 @@ class ResearchAssessmentScreen extends ConsumerWidget {
                   onSelect: controller.select,
                   onSubmit: controller.submit,
                 ),
-                ResearchAssessmentCompleting(error: null) => const _Busy(
+                ResearchAssessmentCompleting(error: null) => const AssessmentBusy(
                   label: 'Menyimpan…',
                 ),
-                ResearchAssessmentCompleting(:final error) => _Message(
+                ResearchAssessmentCompleting(:final error) => AssessmentMessage(
                   icon: Icons.cloud_off,
                   title: 'Penyelesaian tes belum tersimpan',
                   body: error == ResearchActionError.refused
@@ -108,7 +108,7 @@ class ResearchAssessmentScreen extends ConsumerWidget {
                   actionLabel: 'Coba lagi',
                   onAction: controller.retryCompletion,
                 ),
-                ResearchAssessmentCompleted() => _Message(
+                ResearchAssessmentCompleted() => AssessmentMessage(
                   icon: Icons.check_circle_outline,
                   title: '$_title selesai',
                   body: 'Terima kasih. Semua jawabanmu sudah tersimpan.',
@@ -124,94 +124,47 @@ class ResearchAssessmentScreen extends ConsumerWidget {
   }
 
   Widget _unavailable(ResearchStageKind kind) => switch (kind) {
-    ResearchStageKind.notEnrolled => const _Message(
+    ResearchStageKind.notEnrolled => const AssessmentMessage(
       icon: Icons.person_off_outlined,
       title: 'Belum terdaftar',
       body:
           'Akun ini belum terdaftar sebagai peserta penelitian. Tes ini hanya '
           'untuk siswa yang didaftarkan oleh peneliti.',
     ),
-    ResearchStageKind.locked => const _Message(
+    ResearchStageKind.notEligible => const AssessmentMessage(
+      icon: Icons.hourglass_empty,
+      title: 'Belum tersedia',
+      body:
+          'Tes ini belum tersedia untuk akunmu. Peneliti akan menjelaskan '
+          'langkah berikutnya.',
+    ),
+    ResearchStageKind.stageClosed => AssessmentMessage(
+      icon: Icons.lock_clock,
+      title: 'Tes sedang ditutup',
+      body:
+          '$_title sedang ditutup. Jawaban yang sudah kamu simpan tetap aman. '
+          'Tunggu arahan pengawas.',
+    ),
+    ResearchStageKind.locked => const AssessmentMessage(
       icon: Icons.lock_outline,
       title: 'Belum dibuka',
       body:
           'Post-Test dapat dikerjakan setelah Pre-Test selesai dan dibuka oleh '
           'peneliti.',
     ),
-    ResearchStageKind.voided => const _Message(
+    ResearchStageKind.voided => const AssessmentMessage(
       icon: Icons.block,
       title: 'Tes dibatalkan',
       body:
           'Percobaan tes ini dibatalkan oleh peneliti. Tunggu arahan dari '
           'peneliti.',
     ),
-    _ => _Message(
+    _ => AssessmentMessage(
       icon: Icons.lock_outline,
       title: 'Belum dibuka',
       body: '$_title belum dibuka. Tunggu arahan dari peneliti.',
     ),
   };
-}
-
-class _Busy extends StatelessWidget {
-  const _Busy({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: AppSpacing.md),
-          Text(label, style: AppTextStyles.body),
-        ],
-      ),
-    );
-  }
-}
-
-class _Message extends StatelessWidget {
-  const _Message({
-    required this.icon,
-    required this.title,
-    required this.body,
-    this.actionLabel,
-    this.onAction,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        children: [
-          Icon(icon, size: 48, color: AppColors.primary),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(body, textAlign: TextAlign.center, style: AppTextStyles.body),
-          if (actionLabel != null) ...[
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-          ],
-        ],
-      ),
-    );
-  }
 }
 
 /// Instructions + example item, verbatim from the instrument (§5).
@@ -281,12 +234,12 @@ class _Intro extends StatelessWidget {
           const Text(kResearchExampleExplanation, style: AppTextStyles.body),
           const SizedBox(height: AppSpacing.lg),
           if (errorText != null) ...[
-            _ErrorBanner(text: errorText!),
+            AssessmentErrorBanner(text: errorText!),
             const SizedBox(height: AppSpacing.md),
           ],
           FilledButton(
             onPressed: busy ? null : onPressed,
-            child: busy ? const _ButtonSpinner() : Text(buttonLabel),
+            child: busy ? const AssessmentButtonSpinner() : Text(buttonLabel),
           ),
         ],
       ),
@@ -348,10 +301,9 @@ class _ItemView extends StatelessWidget {
             child: Column(
               children: [
                 for (var i = 0; i < options.length; i++)
-                  _OptionTile(
+                  AssessmentOptionTile(
                     key: ValueKey('research-option-${options[i].id}'),
-                    letter: kResearchOptionLetters[i],
-                    option: options[i],
+                    label: '${kResearchOptionLetters[i]}) ${options[i].text}',
                     selected: state.selectedOptionId == options[i].id,
                     enabled: !state.saving && !state.selectionLocked,
                     onTap: () => onSelect(options[i].id),
@@ -361,7 +313,7 @@ class _ItemView extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           if (state.error != null) ...[
-            const _ErrorBanner(
+            const AssessmentErrorBanner(
               text:
                   'Jawaban belum tersimpan. Periksa koneksi internet, lalu '
                   'tekan tombol lagi.',
@@ -371,7 +323,7 @@ class _ItemView extends StatelessWidget {
           FilledButton(
             onPressed: canSubmit ? onSubmit : null,
             child: state.saving
-                ? const _ButtonSpinner()
+                ? const AssessmentButtonSpinner()
                 : Text(state.isLastItem ? 'Kirim' : 'Lanjut'),
           ),
         ],
@@ -380,99 +332,3 @@ class _ItemView extends StatelessWidget {
   }
 }
 
-class _OptionTile extends StatelessWidget {
-  const _OptionTile({
-    super.key,
-    required this.letter,
-    required this.option,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final String letter;
-  final ResearchOption option;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Semantics(
-        inMutuallyExclusiveGroup: true,
-        checked: selected,
-        enabled: enabled,
-        child: Material(
-          color: selected ? AppColors.infoBackground : AppColors.background,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
-            side: BorderSide(
-              color: selected ? AppColors.primary : AppColors.disabled,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
-            onTap: enabled ? onTap : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.md,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    selected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: selected ? AppColors.primary : AppColors.disabled,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      '$letter) ${option.text}',
-                      style: AppTextStyles.body,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.errorBackground,
-        borderRadius: BorderRadius.circular(AppRadius.small),
-      ),
-      child: Text(text, style: const TextStyle(color: AppColors.error)),
-    );
-  }
-}
-
-class _ButtonSpinner extends StatelessWidget {
-  const _ButtonSpinner();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 20,
-      width: 20,
-      child: CircularProgressIndicator(strokeWidth: 2),
-    );
-  }
-}

@@ -55,6 +55,19 @@ service cloud.firestore {
            ]);
     }
 
+    // The official level follows only a placement attempt of this user
+    // scored in the same batch (learning or research — `DATA_MODEL.md` §1).
+    function validPlacementResultOnUser(uid) {
+      let after = request.resource.data;
+      let a = getAfter(/databases/$(database)/documents/placementAttempts/$(after.resultAttemptId)).data;
+      return after.diff(resource.data).affectedKeys()
+               .hasOnly(['resultLevel', 'resultAttemptId', 'placementTestCompleted'])
+        && after.resultAttemptId is string
+        && a.studentId == uid && a.status == 'scored' && a.scoredAt == request.time
+        && after.resultLevel == a.resultLevel
+        && after.placementTestCompleted == true;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
 
@@ -65,17 +78,23 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && (isValidStudentCreate() || isValidTeacherCreate());
 
-      // Role-specific self-update whitelists — siswa may update its four
-      // documented fields; guru may only update `name`. uid/email/role/
-      // createdAt/teacherCodeInput are immutable for both roles: they
+      // Role-specific self-update whitelists — siswa may update `name`,
+      // `cefrLevel` (legacy display field, never used for research) and
+      // `placementTestPrompted`; guru may only update `name`. uid/email/
+      // role/createdAt/teacherCodeInput are immutable for both roles: they
       // simply never appear in either whitelist below, so any attempt to
       // touch them fails hasOnly() and the whole update is denied.
+      // Placement PT-V1.1: `resultLevel`/`resultAttemptId`/
+      // `placementTestCompleted` change only together with a placement
+      // attempt scored in this same batch (`validPlacementResultOnUser`).
       allow update: if isOwner(uid)
         && request.resource.data.role == resource.data.role
         && (
           (resource.data.role == 'siswa'
             && request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['name', 'cefrLevel', 'placementTestCompleted', 'placementTestPrompted']))
+                 .hasOnly(['name', 'cefrLevel', 'placementTestPrompted']))
+          ||
+          (resource.data.role == 'siswa' && validPlacementResultOnUser(uid))
           ||
           (resource.data.role == 'guru'
             && request.resource.data.diff(resource.data).affectedKeys()
@@ -368,14 +387,256 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Milestone 6 scaffolds this read path for forward-compatibility even
-    // though nothing reads or writes it yet. Write is denied because the
-    // placement-test scoring method is still undecided and the placement
-    // test is deferred (`CLAUDE.md` §10) — no field shape exists yet to
-    // validate against.
-    match /placementTestResults/{docId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.studentId;
-      allow write: if false;
+    // ---------------------------------------------------------------------
+    // Placement Test PT-V1.1 (`DATA_MODEL.md` §6). Tested only against the
+    // local Firestore Emulator (`tools/research`, `npm run test:rules`);
+    // NOT deployed.
+    //
+    // Trust model (Spark plan, no Cloud Functions, no Worker involvement):
+    // - The answer key lives ONLY in `placementKey/{version}`, which no
+    //   client can read or write; rules read it through get(), which is not
+    //   subject to read rules. The app bundles items and options only.
+    // - `placementAttempts/{uid}_{context}_{n}` (context `research` or
+    //   `learning`): the student creates it with a per-band shuffled order,
+    //   saves/changes one answer per write while `in_progress`, then submits
+    //   once all 50 items are answered (`submitted`, frozen).
+    // - Scoring is done HERE: the client proposes a result (level, A1*
+    //   flag, target band) and the rules recompute the K2 decision from the
+    //   frozen answers and the key; only the exact result is accepted
+    //   (`scored`), once, in the same batch as `users.resultLevel` and — for
+    //   a research attempt — the participant's band (or C1 exclusion).
+    //   Band scores and quality flags are never stored; the researcher
+    //   derives them offline from the frozen answers.
+    // - Research writes need the participant to be awaiting placement, the
+    //   attempt number the researcher authorized, no pending review, an
+    //   active study and an open `placement` stage window (server time).
+    //   A submission accepted before closure may be scored after it.
+    // ---------------------------------------------------------------------
+
+    function placementConfig() {
+      return get(/databases/$(database)/documents/placementConfig/current).data;
+    }
+
+    function researchStudy() {
+      return get(/databases/$(database)/documents/researchStudy/current).data;
+    }
+
+    // Stage window: active study and openAt <= request.time < closeAt.
+    // A missing window (never opened) fails closed.
+    function researchStageOpen(stage) {
+      let s = researchStudy();
+      let w = s.stages.get(stage, null);
+      return s.status == 'active' && w != null
+        && w.openAt is timestamp && w.closeAt is timestamp
+        && w.openAt <= request.time && request.time < w.closeAt;
+    }
+
+    function participantPath(uid) {
+      return /databases/$(database)/documents/researchParticipants/$(uid);
+    }
+
+    function placementAttemptPath(id) {
+      return /databases/$(database)/documents/placementAttempts/$(id);
+    }
+
+    function placementBands() {
+      return ['A1', 'A2', 'B1', 'B2', 'C1'];
+    }
+
+    // Exactly the bank's 50 items, band order fixed, shuffled within band.
+    function validPlacementItemOrder(io, b) {
+      return io is list && io.size() == 50 && io.toSet().size() == 50
+        && io[0:10].toSet() == b.A1.toSet() && io[10:20].toSet() == b.A2.toSet()
+        && io[20:30].toSet() == b.B1.toSet() && io[30:40].toSet() == b.B2.toSet()
+        && io[40:50].toSet() == b.C1.toSet();
+    }
+
+    // Correct answers in one band: answers equal to the band's key entries.
+    function placementBandScore(answers, bandKey) {
+      return answers.diff(bandKey).unchangedKeys().size();
+    }
+
+    function atSix(s) {
+      return s == 6 ? 1 : 0;
+    }
+
+    // K2 (researcher-selected, not expert-validated — `DATA_MODEL.md` §6):
+    // band k when s[k] >= 7, every lower band >= 6 and at most one lower
+    // band exactly 6; the highest such band; -1 = none (A1*). Mirrors
+    // `tools/research/lib/placement/scoring.js` (tested against it).
+    function placementK2(s0, s1, s2, s3, s4) {
+      return (s4 >= 7 && s0 >= 6 && s1 >= 6 && s2 >= 6 && s3 >= 6
+               && atSix(s0) + atSix(s1) + atSix(s2) + atSix(s3) <= 1) ? 4
+        : (s3 >= 7 && s0 >= 6 && s1 >= 6 && s2 >= 6 && atSix(s0) + atSix(s1) + atSix(s2) <= 1) ? 3
+        : (s2 >= 7 && s0 >= 6 && s1 >= 6 && atSix(s0) + atSix(s1) <= 1) ? 2
+        : (s1 >= 7 && s0 >= 6) ? 1
+        : (s0 >= 7) ? 0
+        : -1;
+    }
+
+    function placementLevelIndex(answers, key) {
+      return placementK2(placementBandScore(answers, key.A1), placementBandScore(answers, key.A2),
+                         placementBandScore(answers, key.B1), placementBandScore(answers, key.B2),
+                         placementBandScore(answers, key.C1));
+    }
+
+    // The proposed result equals the decision for level index [idx].
+    function placementResultMatches(r, idx) {
+      return (idx == -1 && r.resultLevel == 'A1' && r.belowA1Threshold == true && r.pretestTargetBand == 'A2')
+        || (idx >= 0 && r.belowA1Threshold == false && r.resultLevel == placementBands()[idx]
+            && r.pretestTargetBand == (idx == 4 ? null : placementBands()[idx + 1]));
+    }
+
+    function placementReviewPending(p) {
+      return p.get('reviewStatus', null) == 'pending';
+    }
+
+    // Research writes on attempt [a]: participant awaiting placement, this
+    // attempt number authorized, no pending review, window open.
+    function researchPlacementWritable(a) {
+      let p = researchParticipant();
+      return p.status == 'awaiting_placement'
+        && p.authorizedAttempts.placement == a.attemptNumber
+        && !placementReviewPending(p)
+        && researchStageOpen('placement');
+    }
+
+    // Ordinary (learning-only) placement: open to non-participants, to
+    // participants excluded from the study, and to everyone once the study
+    // is closed. Never touches research records.
+    function learningPlacementAllowed() {
+      return placementConfig().learningOpen == true
+        && (!exists(participantPath(request.auth.uid))
+          || researchParticipant().status == 'excluded'
+          || researchStudy().status == 'closed');
+    }
+
+    function placementAttemptWritable(a) {
+      return a.context == 'research' ? researchPlacementWritable(a) : learningPlacementAllowed();
+    }
+
+    // Learning attempt n > 1 only after attempt n − 1 was scored more than a
+    // day ago (or voided): limits using the level as an answer oracle.
+    function previousLearningAttemptDone(n) {
+      let prev = get(placementAttemptPath(request.auth.uid + '_learning_' + string(n - 1))).data;
+      return prev.status == 'voided'
+        || (prev.status == 'scored' && request.time > prev.scoredAt + duration.value(1, 'd'));
+    }
+
+    function validPlacementAttemptCreate(attemptId) {
+      let d = request.resource.data;
+      let uid = request.auth.uid;
+      let fields = ['studentId', 'context', 'attemptNumber', 'instrumentVersion', 'itemOrder',
+                    'answers', 'lastAnsweredItemId', 'tabSwitchCount', 'status', 'startedAt', 'updatedAt'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.studentId == uid
+        && d.attemptNumber is int && d.attemptNumber >= 1
+        && d.status == 'in_progress'
+        && d.answers == {}
+        && d.lastAnsweredItemId == null
+        && d.tabSwitchCount == 0
+        && d.startedAt == request.time
+        && d.updatedAt == request.time
+        && d.instrumentVersion == placementConfig().instrumentVersion
+        && validPlacementItemOrder(d.itemOrder,
+             get(/databases/$(database)/documents/placementInstrument/$(d.instrumentVersion)).data.bandItems)
+        && ((d.context == 'research'
+              && attemptId == uid + '_research_' + string(d.attemptNumber)
+              && researchPlacementWritable(d))
+          || (d.context == 'learning'
+              && attemptId == uid + '_learning_' + string(d.attemptNumber)
+              && learningPlacementAllowed()
+              && (d.attemptNumber == 1 || previousLearningAttemptDone(d.attemptNumber))));
+    }
+
+    // Save or change one answer (A–E) while in progress.
+    function validPlacementAnswer() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let item = after.lastAnsweredItemId;
+      return after.diff(before).affectedKeys().hasOnly(['answers', 'lastAnsweredItemId', 'updatedAt'])
+        && after.updatedAt == request.time
+        && item is string && item in before.itemOrder
+        && after.answers.diff(before.answers).affectedKeys().hasOnly([item])
+        && after.answers[item] in ['A', 'B', 'C', 'D', 'E'];
+    }
+
+    // Lifecycle signal (hidden/inactive) — recorded only, never acted on.
+    function validPlacementTabSwitch() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return after.diff(before).affectedKeys().hasOnly(['tabSwitchCount', 'updatedAt'])
+        && after.updatedAt == request.time
+        && after.tabSwitchCount == before.tabSwitchCount + 1;
+    }
+
+    // Submit: only with all 50 items answered; freezes the answers.
+    function validPlacementSubmit() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return after.diff(before).affectedKeys().hasOnly(['status', 'submittedAt', 'updatedAt'])
+        && after.status == 'submitted'
+        && after.submittedAt == request.time
+        && after.updatedAt == request.time
+        && before.answers.size() == 50
+        && before.answers.keys().hasOnly(before.itemOrder);
+    }
+
+    // Score: once, on a submitted attempt, with exactly the K2 result,
+    // together with users.resultLevel (and the participant band for a
+    // research attempt) in the same batch. No window check: a submission
+    // accepted before closure may be scored after it.
+    function validPlacementScore(attemptId) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let key = get(/databases/$(database)/documents/placementKey/$(before.instrumentVersion)).data.key;
+      return after.diff(before).affectedKeys().hasOnly(
+               ['status', 'resultLevel', 'belowA1Threshold', 'pretestTargetBand', 'scoringPolicy', 'scoredAt', 'updatedAt'])
+        && after.status == 'scored'
+        && after.scoredAt == request.time
+        && after.updatedAt == request.time
+        && after.scoringPolicy == 'K2'
+        && placementResultMatches(after, placementLevelIndex(before.answers, key))
+        && getAfter(/databases/$(database)/documents/users/$(before.studentId)).data.resultAttemptId == attemptId
+        && (before.context == 'learning'
+          || getAfter(participantPath(before.studentId)).data.placementAttemptId == attemptId);
+    }
+
+    match /placementConfig/{docId} {
+      allow get: if request.auth != null;
+      allow list, write: if false;
+    }
+
+    match /researchStudy/{docId} {
+      allow get: if request.auth != null;
+      allow list, write: if false;
+    }
+
+    // Trusted-tooling only. The key document is never readable by clients.
+    match /placementInstrument/{docId} {
+      allow read, write: if false;
+    }
+    match /placementKey/{docId} {
+      allow read, write: if false;
+    }
+    match /researchReviews/{docId} {
+      allow read, write: if false;
+    }
+
+    match /placementAttempts/{attemptId} {
+      // Own attempts only (get, and list queries constrained to studentId).
+      allow read: if request.auth != null && resource.data.studentId == request.auth.uid;
+
+      allow create: if request.auth != null && validPlacementAttemptCreate(attemptId);
+
+      allow update: if request.auth != null
+        && resource.data.studentId == request.auth.uid
+        && ((resource.data.status == 'in_progress'
+              && placementAttemptWritable(resource.data)
+              && (validPlacementAnswer() || validPlacementTabSwitch() || validPlacementSubmit()))
+          || (resource.data.status == 'submitted' && validPlacementScore(attemptId)));
+
+      allow delete: if false;
     }
 
     // ---------------------------------------------------------------------
@@ -389,8 +650,13 @@ service cloud.firestore {
     //   research band and the explicit per-stage authorization
     //   `authorizedAttempts: {preTest: int, postTest: int}` (0 = not
     //   authorized; n = attempt n may be created). Clients can read their
-    //   own record and never write it, so nobody can pick their band or
-    //   authorize themselves. `users.cefrLevel` is never consulted.
+    //   own record; their only write is the automatic placement band
+    //   (`validPlacementBandWrite`, recomputed by these rules), so nobody
+    //   can pick their band or authorize themselves. A participant may be
+    //   enrolled without a band (`status: awaiting_placement`); pretest and
+    //   posttest additionally need a band, `status: enrolled`, no pending
+    //   review and an open stage window (`researchStudy/current`).
+    //   `users.cefrLevel` / `users.resultLevel` are never consulted.
     // - `researchAssessmentResults/{uid}_{stage}_{n}` is one attempt. The
     //   student creates it (fixed question/option order), then adds one
     //   answer per write (never changing a saved answer), then completes it
@@ -433,8 +699,12 @@ service cloud.firestore {
     // The 4 displayed options of item k: a permutation of the bank's 4
     // option IDs for that item ("Saya tidak tahu kata ini" is never listed:
     // it is always shown last and stored as 'dont_know').
+    // No separate `is list` check: a non-list has no toSet() and fails
+    // closed, and the saved expressions keep the create under the
+    // 1000-expression limit now that it also checks the stage window and
+    // eligibility.
     function validResearchOptions(oo, k, ids) {
-      return oo[k] is list && oo[k].size() == 4 && oo[k].toSet() == ids[k].toSet();
+      return oo[k].size() == 4 && oo[k].toSet() == ids[k].toSet();
     }
 
     // Written out per position because the rules language has no loops.
@@ -459,6 +729,15 @@ service cloud.firestore {
       let a = researchParticipant().authorizedAttempts;
       return (a.preTest is int && a.preTest >= 1 && attemptId == researchAttemptId('preTest', a.preTest))
         || (a.postTest is int && a.postTest >= 1 && attemptId == researchAttemptId('postTest', a.postTest));
+    }
+
+    // Pretest/posttest need a research band and an enrolled participant
+    // without a pending review. Records from the original enrolment tooling
+    // (band assigned by the researcher, no `status`) count as enrolled.
+    function researchParticipantActive(p) {
+      return p.get('band', null) in ['A2', 'B1', 'B2', 'C1']
+        && p.get('status', 'enrolled') == 'enrolled'
+        && !placementReviewPending(p);
     }
 
     function researchPreTestCompleted(p) {
@@ -489,6 +768,8 @@ service cloud.firestore {
         && d.updatedAt == request.time
         && validResearchItemOrder(d.itemOrder, ids)
         && validResearchOptionOrder(d.optionOrder, d.itemOrder, ids)
+        && researchParticipantActive(p)
+        && researchStageOpen(d.stage)
         && (d.stage == 'preTest' || researchPreTestCompleted(p));
     }
 
@@ -539,9 +820,34 @@ service cloud.firestore {
         && before.responses.keys().hasOnly(before.itemOrder);
     }
 
+    // The ONLY client write to a participant record: the automatic band (or
+    // C1 exclusion) from the participant's currently authorized research
+    // placement attempt, scored in this same batch, while still awaiting
+    // placement with no band and no pending review.
+    function validPlacementBandWrite(uid) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let id = uid + '_research_' + string(before.authorizedAttempts.placement);
+      let a = getAfter(placementAttemptPath(id)).data;
+      return before.status == 'awaiting_placement' && before.band == null
+        && !placementReviewPending(before)
+        && after.diff(before).affectedKeys().hasOnly(
+             ['band', 'bandSource', 'status', 'exclusionReason', 'placementAttemptId', 'updatedAt'])
+        && after.placementAttemptId == id
+        && after.updatedAt == request.time
+        && a.studentId == uid && a.status == 'scored' && a.scoredAt == request.time
+        && ((a.pretestTargetBand != null
+              && after.band == a.pretestTargetBand && after.bandSource == 'placement_test'
+              && after.status == 'enrolled' && after.exclusionReason == null)
+          || (a.pretestTargetBand == null && a.resultLevel == 'C1'
+              && after.band == null && after.bandSource == null
+              && after.status == 'excluded' && after.exclusionReason == 'placement_c1'));
+    }
+
     match /researchParticipants/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
-      allow list, create, update, delete: if false;
+      allow update: if request.auth != null && request.auth.uid == uid && validPlacementBandWrite(uid);
+      allow list, create, delete: if false;
     }
 
     // Trusted, read-only bank data used by the rules above. Clients never
@@ -567,12 +873,14 @@ service cloud.firestore {
 
       allow create: if request.auth != null && validResearchAttemptCreate(attemptId);
 
-      // Only while in progress, and only on the attempt that is currently
-      // authorized for this stage (a superseded attempt is frozen).
+      // Only while in progress, only on the attempt that is currently
+      // authorized for this stage (a superseded attempt is frozen), and only
+      // while the stage window is open (a closed window or study freezes it).
       allow update: if request.auth != null
         && resource.data.studentId == request.auth.uid
         && resource.data.status == 'in_progress'
         && researchParticipant().authorizedAttempts[resource.data.stage] == resource.data.attemptNumber
+        && researchStageOpen(resource.data.stage)
         && (validResearchAnswerWrite() || validResearchCompletion());
 
       allow delete: if false;

@@ -48,8 +48,10 @@ lewat field `role`), `docId` = Firebase Auth `uid`.
 | `name` | string | |
 | `role` | string enum | `"siswa"` \| `"guru"` — **lihat alur assignment di bawah, ditegakkan lewat security rules, bukan server function** |
 | `createdAt` | Timestamp | |
-| `cefrLevel` | string enum \| null | **hanya untuk siswa** — hasil placement test (`A1`–`C2`, lihat catatan cakupan di §2), `null` kalau belum tes. **Hanya untuk tampilan/personalisasi**: siswa boleh mengubahnya sendiri (§1 poin 5), jadi **tidak pernah** menentukan band riset maupun kelayakan tes (band riset ada di `researchParticipants`, §6b) |
-| `placementTestCompleted` | boolean | **hanya untuk siswa** — default `false` |
+| `cefrLevel` | string enum \| null | **hanya untuk siswa** — field **lama (legacy)**, `null` saat dibuat. Sejak Placement Test PT-V1.1 **tidak ditulis maupun dibaca app** (level aktif ada di `resultLevel`). Masih boleh diubah pemiliknya (§1 poin 5), dan **tidak pernah** menentukan band riset maupun kelayakan tes |
+| `resultLevel` | string enum \| absent | **hanya untuk siswa** — level aktif dari attempt Placement Test terakhir yang **sudah dinilai** (`A1`–`C1`; A1* disimpan sebagai `A1`), ditampilkan di kartu Level. Hanya bisa ditulis **bersama** attempt yang dinilai dalam batch yang sama (§6), baik attempt riset maupun belajar. **Bukan** band riset (band ada di `researchParticipants`, §6b) |
+| `resultAttemptId` | string \| absent | **hanya untuk siswa** — ID `placementAttempts` asal `resultLevel` |
+| `placementTestCompleted` | boolean | **hanya untuk siswa** — default `false`; menjadi `true` hanya bersama `resultLevel` (sejak PT-V1.1 tidak bisa di-set sendiri) |
 | `placementTestPrompted` | boolean | **hanya untuk siswa** — default `false`; di-set `true` begitu tawaran placement test otomatis pernah ditampilkan sekali. **Ini mekanisme yang menegakkan aturan "kalau siswa menunda, tawaran tidak muncul lagi"** (SPEC §3.1) — tanpa field ini, aplikasi tidak punya cara membedakan "belum pernah ditawari" dari "sudah ditawari tapi ditunda", karena `placementTestCompleted` tetap `false` di kedua kasus |
 | `teacherCodeInput` | string \| absent | **hanya untuk guru** — kode akses yang diketik saat sign up, **disimpan permanen sebagai audit trail** (bukan field sementara). Lihat catatan di bawah |
 
@@ -123,15 +125,16 @@ lewat field `role`), `docId` = Firebase Auth `uid`.
 >    dicatat).
 > 5. **Field yang BOLEH di-update oleh pemilik akun, per role (final,
 >    diimplementasikan & diverifikasi di Milestone 2):**
->    - **Siswa:** `name`, `cefrLevel`, `placementTestCompleted`,
->      `placementTestPrompted`.
+>    - **Siswa:** `name`, `cefrLevel` (legacy), `placementTestPrompted`.
+>      `resultLevel`/`resultAttemptId`/`placementTestCompleted` hanya
+>      berubah bersama attempt placement yang dinilai dalam batch yang sama
+>      (§6; `validPlacementResultOnUser` di `firestore.rules`).
 >    - **Guru:** `name` saja — tidak ada field lain yang relevan untuk
 >      diedit guru atas profilnya sendiri di milestone ini.
 >    Field di luar daftar sesuai role masing-masing ditolak — termasuk
 >    `uid`, `email`, `role`, `createdAt` (immutable untuk kedua role) dan
 >    `teacherCodeInput` (immutable untuk guru, dan tidak pernah boleh ada
->    sama sekali di dokumen siswa). Field self-update siswa penting karena
->    skoring placement test dihitung di client (§6).
+>    sama sekali di dokumen siswa).
 > 6. Karena tiap akun (`uid`) cuma punya satu dokumen `users` dengan satu
 >    field `role`, dan email di Firebase Auth memang unik per akun, aturan
 >    **"satu email = satu role"** otomatis terjaga oleh struktur ini +
@@ -457,8 +460,8 @@ dan otomatis unik per pasangan).
 
 ### 3a. Integritas Data Sisi Klien — Trade-off yang Diterima
 
-Karena tidak ada Cloud Functions (§10), tulisan ke `learningProgress`,
-`placementTestResults`, dan `researchAssessmentResults` divalidasi Security
+Karena tidak ada Cloud Functions (§10), tulisan ke `learningProgress` dan
+`researchAssessmentResults` divalidasi Security
 Rules hanya untuk **bentuk dan transisi** data (tipe field, larangan
 transisi `mastered`→`difficult`, kepemilikan dokumen) — **bukan** untuk
 **keaslian** data itu. Security Rules bisa memastikan sebuah tulisan *valid
@@ -466,8 +469,8 @@ secara bentuk* (mis. `masteryStatus` bertipe enum yang benar, tidak turun
 dari `mastered`), tapi tidak bisa membuktikan bahwa nilai itu memang berasal
 dari sesi belajar/tes yang sungguh-sungguh dikerjakan siswa. Seorang siswa
 yang memanggil Firestore SDK/REST API secara langsung (di luar alur UI
-aplikasi) bisa menulis `masteryStatus: "mastered"`, atau `cefrLevel`/
-`placementTestCompleted` apa pun, tanpa benar-benar mengerjakan apa pun —
+aplikasi) bisa menulis `masteryStatus: "mastered"` (atau `cefrLevel` lama)
+tanpa benar-benar mengerjakan apa pun —
 rules yang ada tidak berpura-pura mencegah ini, dan tidak boleh dibaca
 sebagai jaminan bahwa data ini pasti sah.
 
@@ -480,6 +483,12 @@ saat ini di luar anggaran. Kalau validitas data ini kelak jadi masalah nyata
 saat analisis skripsi, mitigasi paling ringan adalah audit manual (mis. cari
 `masteryStatus: mastered` tanpa `learningSessions` yang cocok datanya) —
 bukan redesain arsitektur.
+
+> **Pengecualian: hasil Placement Test (§6).** Level placement **tidak**
+> termasuk trade-off ini: rules menghitung sendiri keputusan K2 dari
+> jawaban yang sudah dibekukan dan kunci di dokumen yang tidak bisa dibaca
+> client, lalu hanya menerima hasil yang persis sama. Yang tetap tidak bisa
+> dibuktikan rules: bahwa siswa itu sendiri yang menjawab (pengawasan kelas).
 
 ## 4. `learningSessions`
 
@@ -690,46 +699,105 @@ puluhan set target sepanjang penelitian, bukan ribuan).
 > `role == "guru"` (dicek lewat `get()` ke dokumen `users` milik
 > `request.auth.uid`). Siswa `read`-only.
 
-## 6. `placementTestResults` — Status: TBD (placeholder)
+## 6. Placement Test PT-V1.1 — `placementAttempts`, `placementConfig`, `placementInstrument`, `placementKey`
 
-> **Jangan implementasikan skema detail di bawah ini sampai metode
-> placement test diputuskan** (lihat `SPEC.md` §3.1 dan `CLAUDE.md` §10).
-> Yang boleh dibangun sekarang cuma kontrak minimal yang dibutuhkan bagian
-> lain aplikasi (`users.cefrLevel` perlu di-update dari suatu tempat) —
-> field di bawah `resultLevel` dkk masih dugaan struktur, **bukan keputusan
-> final**.
+> Menggantikan placeholder `placementTestResults` (dihapus; tidak pernah
+> berisi data). Ditegakkan oleh `firestore.rules` dan diuji terhadap
+> **Firestore + Auth Emulator lokal** (`cd tools/research && npm run
+> test:rules`), termasuk replay payload persis dari app. **Status deploy:
+> `HANDOFF.md`** (belum di-deploy).
 
-Collection ini nantinya menyimpan histori percobaan placement test siswa
-(simpan semua percobaan, bukan cuma hasil terakhir), dan dipakai untuk
-update `users.cefrLevel` + `users.placementTestCompleted`.
+**Instrumen.** Spesifikasi peneliti PT-V1.0 (`Vocably_Spesifikasi_Placement_Test_v1.0.pdf`
++ `placement_items_v1.0.json`, di luar repo) dinaikkan ke **PT-V1.1** oleh
+keputusan peneliti: aturan skoring **K2**, kunci tidak dibundel ke client,
+dan kontrol buka/tutup per tahap. Isi butir **tidak diubah**. Bank aman-app
+`assets/placement/placement_bank_pt_v1_1.json` (50 butir, 5 band × 10, opsi
+A–D tetap + E "Saya tidak tahu") dibangun oleh
+`tools/research/bin/build_placement.js`, yang juga memeriksa nol irisan kata
+dengan bank pretest/posttest. Bank aman-app **tanpa kunci**.
+
+**Skoring K2 (dipilih peneliti; belum divalidasi ahli/pembimbing).** Band
+*k* lolos bila s[k] ≥ 7, semua band di bawahnya ≥ 6, dan paling banyak satu
+band di bawahnya bernilai tepat 6. Level = band tertinggi yang lolos; bila
+tidak ada → A1 dengan `belowA1Threshold` (A1*). Band target pretest =
+level + 1 (A1/A1* → A2); C1 → tanpa band (dikeluarkan dari kohort). E
+bernilai 0.
+
+**Model kepercayaan (Spark, tanpa Cloud Functions, tanpa Worker).** Kunci
+hanya ada di `placementKey/{version}`, yang tidak bisa dibaca maupun
+ditulis client; rules membacanya lewat `get()`. Setelah attempt dikirim,
+client **mengusulkan** hasil (enam kemungkinan, berurutan) dalam satu
+batch. **Rules menghitung ulang K2** dari jawaban beku
+(`answers.diff(kunciBand).unchangedKeys().size()` per band) dan hanya
+menerima hasil yang persis sama, sekali saja. Skor band, total, dan
+penanda mutu (`near_threshold`, `inconsistent_profile`,
+`suspicious_pattern`) **tidak pernah disimpan**; peneliti menurunkannya
+offline dari jawaban beku (`bin/export_placement.js`).
+
+### `placementAttempts/{uid}_{context}_{n}`
+
+`context` = `research` (attempt resmi) atau `learning` (latihan, tidak
+pernah menyentuh data riset).
 
 | Field | Tipe | Keterangan |
 |---|---|---|
-| `studentId` | string | stabil, tidak bergantung metode tes |
-| `resultLevel` | string enum \| TBD | `A1`–`C1` — **sengaja tidak sampai C2** karena sumber bank kosakata baru mencakup A1–C1, jadi menempatkan siswa di C2 tidak ada gunanya (C2 tetap bisa dipilih manual di UI, lihat §2). Ini yang dipakai untuk update `users.cefrLevel` |
-| `startedAt` | Timestamp | |
-| `completedAt` | Timestamp | |
-| *(TBD)* | *(TBD)* | Struktur soal/jawaban/skoring **menunggu keputusan metode** — jangan diasumsikan bentuknya sekarang |
+| `studentId` | string | = `request.auth.uid` |
+| `context` | `"research"` \| `"learning"` | tidak bisa diubah |
+| `attemptNumber` | int ≥ 1 | riset: = `researchParticipants.authorizedAttempts.placement` |
+| `instrumentVersion` | string | = `placementConfig/current.instrumentVersion` (`PT-V1.1`) |
+| `itemOrder` | string[50] | urutan band tetap A1→C1, butir diacak di dalam band; divalidasi rules terhadap `placementInstrument` |
+| `answers` | map itemId → `"A"`…`"E"` | satu butir per tulisan, boleh **diubah** sampai dikirim |
+| `lastAnsweredItemId` | string \| null | butir pada tulisan terakhir (dipakai rules) |
+| `tabSwitchCount` | int | sinyal "aplikasi tersembunyi" (`AppLifecycleListener.onHide`); hanya naik +1; **hanya dicatat, tidak pernah memicu tindakan** |
+| `status` | `in_progress` → `submitted` → `scored`; `voided` (tooling) | |
+| `startedAt`, `updatedAt` | Timestamp | `== request.time` |
+| `submittedAt` | Timestamp | `== request.time` saat dikirim; **waktu otoritatif** kontrak penutupan |
+| `resultLevel`, `belowA1Threshold`, `pretestTargetBand`, `scoringPolicy` (`"K2"`), `scoredAt` | | ditulis sekali saat dinilai; harus persis hasil K2 rules |
+| `voidCategory` (`technical` \| `integrity`), `voidedFromStatus`, `voidedAt` | | hanya tooling; **alasan tidak disimpan di sini** (lihat `researchReviews`) |
 
-> **Alur (tanpa Cloud Function):** skoring **dihitung di client** begitu
-> metodenya diputuskan (tidak ada logic rahasia yang perlu disembunyikan —
-> beda dengan panggilan ChatGPT API yang butuh proxy). Client yang menulis
-> `resultLevel` ke collection ini **dan** meng-update `users.cefrLevel` +
-> `users.placementTestCompleted`. Jawaban mentah tetap disimpan supaya skor
-> bisa diverifikasi ulang saat analisis skripsi.
->
+Aturan rules (ringkas):
+- **Buat** — riset: peserta `awaiting_placement`, nomor attempt yang
+  diotorisasi, tidak ada tinjauan `pending`, studi `active`, dan jendela
+  `placement` terbuka (`openAt ≤ request.time < closeAt`). Belajar:
+  `placementConfig.learningOpen == true` dan (bukan peserta, atau peserta
+  `excluded`, atau studi `closed`); attempt *n* > 1 hanya setelah attempt
+  *n* − 1 `voided` atau dinilai > 1 hari sebelumnya (membatasi pemakaian
+  level sebagai oracle kunci).
+- **Jawab / sinyal / kirim** — hanya selama `in_progress` dan selama syarat
+  "buat" di atas masih berlaku. Kirim hanya bila 50 jawaban; jawaban lalu
+  beku. Kiriman yang tiba setelah penutupan **ditolak**. Attempt yang belum
+  selesai saat jendela/studi ditutup tetap `in_progress` (jawaban tersimpan,
+  tercatat tidak lengkap).
+- **Nilai** — hanya dari `submitted`, sekali, **tanpa** syarat jendela
+  (kiriman yang diterima sebelum penutupan tetap bisa dinilai sesudahnya),
+  dalam batch yang sama dengan `users.resultLevel`/`resultAttemptId`/
+  `placementTestCompleted` dan — untuk riset — band peserta (§6b).
+- Baca: pemilik saja (`get`, dan query `where studentId == uid`). `get` pada
+  dokumen yang **belum ada** ditolak (`resource.data` tidak punya nilai), jadi
+  client memakai query milik sendiri untuk mengetahui attempt belum ada.
+  Perilaku ini dikunci di `placementClientFlow.test.js`.
+
+### Dokumen tepercaya (hanya tooling peneliti)
+
+| Dokumen | Isi | Akses client |
+|---|---|---|
+| `placementConfig/current` | `instrumentVersion`, `bankSha256`, `scoringPolicy`, `learningOpen` | baca (`get`) |
+| `placementInstrument/{version}` | `bandItems: {A1: [10 id], …}`, `bankSha256` — publik, tanpa kunci | tidak ada (dibaca rules) |
+| `placementKey/{version}` | `key: {A1: {itemId: huruf}, …}` — **kunci** | **tidak ada** (dibaca rules) |
+| `researchReviews/{auto}` | jejak audit tinjauan/void/retake/restore/band manual beserta alasan | tidak ada |
+
 > **Soal `placementTestPrompted` (§1):** tawaran otomatis sebelum dashboard
 > pertama hanya ditampilkan **sekali seumur akun**. Begitu ditampilkan,
 > set `placementTestPrompted = true` — apa pun pilihan siswa (mengerjakan
 > atau menunda). Kalau siswa menunda, tawaran itu **tidak muncul lagi**;
-> satu-satunya jalan masuk berikutnya adalah entry point di dashboard, yang
-> selalu tersedia baik untuk mengambil pertama kali maupun mengambil ulang.
+> jalan masuk berikutnya adalah entry point di kartu Level dashboard.
 
 ## 6b. Riset Pre/Post Test — `researchParticipants`, `researchAssessmentResults`, `researchInstrument`
 
 Collection untuk modul riset **Pre-Test & Post-Test** (SPEC §3.7) —
-**terpisah total dari `placementTestResults`** (tujuan, alur, dan
-kepemilikan data beda — lihat tabel perbandingan di `SPEC.md` §3.7).
+**terpisah dari Placement Test (§6)** (tujuan, alur, dan kepemilikan data
+beda — lihat tabel perbandingan di `SPEC.md` §3.7). Satu-satunya sambungan:
+attempt placement **riset** yang dinilai mengisi band peserta.
 
 > Skema di bawah **ditegakkan oleh `firestore.rules`** dan diuji terhadap
 > **Firestore + Auth Emulator lokal** (`cd tools/research && npm run
@@ -739,13 +807,15 @@ kepemilikan data beda — lihat tabel perbandingan di `SPEC.md` §3.7).
 > `services/research_assessment_service.dart`; tooling peneliti
 > `tools/research/bin/research_admin.js` menulis `researchInstrument` dan
 > `researchParticipants`, mengotorisasi tahap, membatalkan (void) percobaan,
-> dan mengotorisasi retake. Placement test tetap ditunda. **Status deploy
-> rules dan data riset di produksi: `HANDOFF.md`.**
+> dan mengotorisasi retake, serta mengelola studi dan jendela tahap.
+> **Status deploy rules dan data riset di produksi: `HANDOFF.md`.**
 
 **Model kepercayaan (Spark, tanpa Cloud Functions):** dokumen
-`researchParticipants` dan `researchInstrument` **hanya** ditulis oleh
-tooling peneliti lokal (Admin SDK, melewati rules); client tidak pernah bisa
-menulisnya. Siswa sendiri yang membuat dan mengisi `researchAssessmentResults`
+`researchParticipants`, `researchInstrument` dan `researchStudy` ditulis
+oleh tooling peneliti lokal (Admin SDK, melewati rules). Satu-satunya
+tulisan client ke `researchParticipants` adalah band otomatis dari attempt
+placement riset miliknya yang dinilai dalam batch yang sama (dihitung ulang
+rules, §6). Siswa sendiri yang membuat dan mengisi `researchAssessmentResults`
 miliknya, dengan setiap tulisan divalidasi rules. **Tidak pernah disimpan di
 dokumen yang bisa dibaca client:** kunci jawaban, penanda benar/salah, kode
 B/S/T/K, skor.
@@ -756,15 +826,38 @@ B/S/T/K, skor.
 |---|---|---|
 | (docId) | uid Firebase | **Identitas yang bisa ditautkan ke orang** — tidak pernah diekspor |
 | `researchId` | string | ID pseudonim acak; satu-satunya ID di ekspor |
-| `band` | `"A2" \| "B1" \| "B2" \| "C1"` | Ditetapkan peneliti selama placement ditunda. **Bukan dari `users.cefrLevel`**, dan mapping level→band di PDF **tidak** diimplementasikan |
-| `bandSource` | string | mis. `"researcher_assigned"` |
-| `instrumentVersion` | string | `"v1"` |
-| `authorizedAttempts` | map `{preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. Posttest dibuka peneliti setelah sesi treatment ke-4; retake = peneliti menaikkan angka ini |
+| `band` | `"A2" \| "B1" \| "B2" \| "C1"` \| null | **Boleh kosong** selama menunggu Placement. Diisi otomatis dari attempt placement riset (level + 1), atau oleh peneliti (enrolmen lama `researcher_assigned`; band manual `manual_review`). **Bukan dari `users.cefrLevel`/`resultLevel`** |
+| `bandSource` | string \| null | `"placement_test"` \| `"researcher_assigned"` \| `"manual_review"` |
+| `status` | string \| absent | `awaiting_placement` \| `enrolled` \| `excluded` \| `awaiting_manual_band` \| `conditional`. **Absent = `enrolled`** (dokumen dari enrolmen lama dengan band) |
+| `exclusionReason` | string \| null | mis. `"placement_c1"` |
+| `placementAttemptId` | string \| null | attempt placement riset asal band |
+| `reviewStatus` | null \| `pending` \| `confirmed` \| `not_confirmed` | tinjauan manusia; `pending` memblokir aksi riset. Alasan **hanya** di `researchReviews` |
+| `bandHistory` | array | hanya tooling: entri `revoked` / `restored` / `manual` (band, sumber, attempt, waktu) |
+| `instrumentVersion` | string | `"v1"` (pretest/posttest) |
+| `authorizedAttempts` | map `{placement?: int, preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. Enrolmen sendiri **tidak** membuka pretest/posttest. Posttest dibuka peneliti setelah sesi treatment ke-4; retake = peneliti menaikkan angka ini |
 | `cohort` | string | `study` / `pilot` / `test` |
 | `createdAt`, `updatedAt` | Timestamp | |
 
 Rules: pemilik boleh `get` dokumennya sendiri; tidak ada `list`; create /
-update / delete dari client **selalu ditolak**.
+delete dari client **selalu ditolak**; update dari client **hanya**
+`validPlacementBandWrite` (status `awaiting_placement` + band kosong + tidak
+ada tinjauan `pending` → band = `pretestTargetBand` attempt riset yang
+dinilai di batch yang sama, atau `excluded/placement_c1` untuk C1).
+
+**Kelayakan pretest/posttest** (rules + `research_admin.js authorize`):
+band A2–C1, `status` `enrolled` (atau absent), tidak ada tinjauan `pending`,
+studi `active`, dan jendela tahap terbuka. `conditional` (band manual)
+**ditolak** sampai kriteria inklusi bersyarat diputuskan. Band dari
+placement butuh atestasi `--acknowledge-placement-policy` saat `authorize`
+(K2 belum divalidasi ahli).
+
+### `researchStudy/current` — siklus studi dan jendela tahap (tooling saja; client boleh `get`)
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `status` | `setup` \| `active` \| `closed` | `closed` final; semua tulisan riset (attempt belum selesai) beku |
+| `closedAt` | Timestamp \| null | |
+| `stages.placement` / `stages.preTest` / `stages.postTest` | `{openAt, closeAt}` | Timestamp server. Terbuka bila `openAt ≤ request.time < closeAt`; "buka" = `openAt` sekarang, `closeAt` jauh di depan atau yang ditentukan; "tutup" = `closeAt` = waktu server sekarang. Jendela yang tidak ada = tertutup |
 
 ### `researchInstrument/{version}_{band}` — data bank publik untuk rules
 
@@ -876,9 +969,10 @@ jangan diedit manual. Skema lengkap & prosedurnya di
 ```
 users (siswa) ──1:N── learningProgress ──N:1── vocabWords
 users (siswa) ──1:N── learningSessions
-users (siswa) ──1:N── placementTestResults        (TBD)
+users (siswa) ──1:N── placementAttempts (research | learning) ──→ users.resultLevel
+placementAttempts (research, dinilai) ──→ researchParticipants.band
 users (siswa) ──1:1── researchParticipants ──1:N── researchAssessmentResults
-researchInstrument (data bank publik, per versi+band) ← dibaca rules lewat get()
+researchInstrument, placementInstrument, placementKey, researchStudy ← dibaca rules lewat get()
 users (guru)  ──1:N── targetWordSets ──N:N── vocabWords (via wordIds)
 users (guru)  ──1:N── vocabWords (via addedByTeacherId, kalau source="guru")
 vocabWords    ──N:N── topics (via vocabWords.topics, merujuk ke topics.name)
@@ -921,8 +1015,8 @@ kompatibel untuk ditambah nanti:
 - Target per-siswa individual → isi `targetWordSets.targetStudentIds`
   dengan daftar `uid` alih-alih `[kAllStudents]`; query di §5 sudah
   menanganinya tanpa perubahan.
-- Placement Test → skema §6 sengaja generik (masih ditunda). Pre/Post Test
-  → skema §6b sudah ditetapkan di rules (M2a).
+- Placement Test → skema §6 (PT-V1.1) dan Pre/Post Test → skema §6b sudah
+  ditegakkan rules dan diuji di emulator; status deploy di `HANDOFF.md`.
 - Kode akses guru per-individu / single-use → tinggal tambah
   `maxUses`/`usedCount` di §2c, atau satu dokumen kode per guru.
 - Kalau suatu saat billing tersedia dan mau pindah ke Cloud Functions,
@@ -1275,8 +1369,9 @@ Dipanggil dari dua tempat:
 - **Cloze test** (SPEC §5.2) — tidak butuh AI; blank diturunkan dari
   penanda di `storyContent` dan pencocokan jawaban cuma perbandingan string
   di client.
-- **Skoring Placement Test** — dihitung di client (§6), begitu metodenya
-  diputuskan (masih ditunda).
+- **Skoring Placement Test** — dihitung ulang oleh **Firestore Security
+  Rules** dari jawaban beku dan kunci di dokumen yang tidak bisa dibaca
+  client (§6); Worker tidak terlibat dan tidak menulis apa pun.
 - **Skoring Pre-Test / Post-Test** — **tidak** di app sama sekali:
   dilakukan offline oleh peneliti dengan kunci jawaban privat yang tidak
   pernah masuk app/Firestore/Worker (§6b, `tools/research/README.md`).
@@ -1406,7 +1501,7 @@ Bundle hanya untuk bank kosakata. Yang berikut tetap query Firestore
 normal, karena volumenya kecil dan/atau harus selalu segar:
 
 - `users`, `learningProgress`, `learningSessions`, `targetWordSets`,
-  `topics`, `placementTestResults`, `researchAssessmentResults`.
+  `topics`, `placementAttempts`, `researchAssessmentResults`.
 - **Catatan efisiensi `learningProgress`:** ambil **sekali per sesi login**
   dengan satu query `where('studentId', isEqualTo: uid)` lalu simpan di
   provider — jangan query per kata saat merender chip, karena itu

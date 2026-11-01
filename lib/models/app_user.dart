@@ -5,8 +5,8 @@ import '../utils/role.dart';
 /// Typed shape of a `users/{uid}` Firestore document.
 ///
 /// Field presence mirrors DATA_MODEL.md §1 and `firestore.rules` exactly:
-/// `cefrLevel` / `placementTestCompleted` / `placementTestPrompted` only
-/// exist on `siswa` documents; `teacherCodeInput` only exists on `guru`
+/// `cefrLevel` / `resultLevel` / `placementTestCompleted` /
+/// `placementTestPrompted` only exist on `siswa` documents; `teacherCodeInput` only exists on `guru`
 /// documents. Do not assume any of these are present for the other role.
 class AppUser {
   const AppUser({
@@ -16,6 +16,8 @@ class AppUser {
     required this.role,
     required this.createdAt,
     this.cefrLevel,
+    this.resultLevel,
+    this.resultAttemptId,
     this.placementTestCompleted,
     this.placementTestPrompted,
     this.teacherCodeInput,
@@ -29,8 +31,17 @@ class AppUser {
   final String role;
   final DateTime createdAt;
 
-  /// Siswa-only. Always absent on guru documents.
+  /// Siswa-only legacy display field; never written by the app and never
+  /// used for research (`DATA_MODEL.md` §1).
   final String? cefrLevel;
+
+  /// Siswa-only. The active level from the latest scored Placement Test
+  /// attempt (research or learning) — written only together with that
+  /// scored attempt (`firestore.rules`). Absent until a test is scored.
+  final String? resultLevel;
+
+  /// The `placementAttempts` document [resultLevel] came from.
+  final String? resultAttemptId;
 
   /// Siswa-only. Always absent on guru documents.
   final bool? placementTestCompleted;
@@ -56,6 +67,8 @@ class AppUser {
           ? createdAtRaw.toDate()
           : DateTime.now(),
       cefrLevel: data['cefrLevel'] as String?,
+      resultLevel: data['resultLevel'] as String?,
+      resultAttemptId: data['resultAttemptId'] as String?,
       placementTestCompleted: data['placementTestCompleted'] as bool?,
       placementTestPrompted: data['placementTestPrompted'] as bool?,
       teacherCodeInput: data['teacherCodeInput'] as String?,

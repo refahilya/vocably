@@ -272,8 +272,10 @@ void main() {
 
     test('reads the assignment and authorized attempt numbers', () {
       final p = ResearchParticipant.fromFirestore(record());
-      expect(p.assignment.band, 'B1');
-      expect(p.assignment.instrumentVersion, 'v1');
+      expect(p.status, ResearchParticipantStatus.enrolled);
+      expect(p.canTakeResearchStages, isTrue);
+      expect(p.assignment!.band, 'B1');
+      expect(p.assignment!.instrumentVersion, 'v1');
       expect(p.authorizedAttempt(ResearchStage.preTest), 1);
       expect(p.authorizedAttempt(ResearchStage.postTest), 0);
     });

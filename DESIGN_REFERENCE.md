@@ -255,14 +255,15 @@ Pre-Test/Post-Test di bawahnya:
   - Empty state kalau guru belum men-set target: pesan singkat, bukan card
     kosong (§5.8).
 - **Card "Level"** — menampilkan 6 pill CEFR (A1–C2) dalam satu baris/wrap di
-  dalam card, level yang sedang aktif (hasil placement test) ditandai ring
+  dalam card, level yang sedang aktif (`users.resultLevel`, hasil placement
+  test yang sudah dinilai) ditandai ring
   navy + badge kecil "Level kamu" di atasnya. Pill **C2** ditampilkan dengan
   style pudar/disabled ringan (tetap bisa di-tap, tapi mengarah ke empty
   state). Tap salah satu level → masuk ke browse kosakata (§5.7), di-scope
   ke level itu.
   - Di dalam card ini juga ada **entry point Placement Test**: teks link
-    kecil "Ambil Placement Test" (kalau belum pernah) atau "Ambil Ulang
-    Placement Test" (kalau sudah pernah) — style link/teks kecil, bukan
+    kecil "Ambil Tes Penempatan" (kalau belum pernah) atau "Lihat Tes
+    Penempatan" (kalau sudah) — style link/teks kecil, bukan
     tombol besar. Ini **satu-satunya** jalan masuk setelah tawaran otomatis
     pertama lewat (`SPEC.md` §3.1), jadi pastikan tetap mudah ditemukan
     meski kecil.
@@ -272,29 +273,41 @@ Pre-Test/Post-Test di bawahnya:
 **Riwayat Pembelajaran bukan card di layar ini** — dia destinasi navigasi
 tersendiri (§6), dengan desain di §3.3.
 
-### 5.2 Placement Test — Placeholder (bukan desain final)
+### 5.2 Placement Test (PT-V1.1)
 
-> **Status: TBD.** Isi soal, jumlah soal, tipe soal, dan algoritma penentuan
-> level **belum ditentukan** (lihat `SPEC.md` §3.1 dan `CLAUDE.md` §10).
-> Desain di bawah **sengaja generik** — hanya mencakup bagian yang tidak
-> bergantung pada metode tes (entry/exit point), bukan detail soal.
+> Layar: `lib/screens/student/placement_test/placement_test_screen.dart`;
+> perilaku: `SPEC.md` §3.1; status: `HANDOFF.md`. Komponen pesan, banner
+> error, spinner dan kartu opsi dipakai bersama layar Pre/Post-Test
+> (`lib/widgets/assessment_widgets.dart`).
 
-- App bar navy standar, judul "Tes Penempatan", tombol back / tombol "Lewati"
-  (skip) di kanan atas app bar.
-- **Tawaran otomatis (sebelum dashboard pertama)** berupa dialog/layar
-  sambutan dengan dua aksi setara: "Mulai Tes" (solid navy) dan "Nanti Saja"
-  (outline/teks). Jangan buat "Nanti Saja" terlihat seperti pilihan yang
-  salah — tes ini memang opsional. Ingat: tawaran ini **hanya muncul sekali
-  seumur akun**, jadi teksnya sebaiknya menyebutkan bahwa tes bisa diambil
-  kapan saja lewat menu Level.
-- Body layar tes: **placeholder** — pesan sederhana + ilustrasi ringan (mis.
-  "Tes penempatan akan segera hadir") sampai metode tesnya diputuskan.
-  **Jangan bangun UI soal spesifik** (pilihan jawaban, progress bar per soal,
-  dsb) sebelum instrumennya jelas.
-- Layar hasil: placeholder serupa, cukup pastikan ada tempat untuk
-  menampilkan `resultLevel` setelah datanya ada, dan tombol CTA "Mulai
-  Belajar" navy solid menuju dashboard (ini tidak bergantung metode tes, jadi
-  boleh dibangun sekarang).
+- **Tawaran otomatis** (sekali seumur akun): layar sambutan dengan dua aksi
+  setara "Mulai Tes" (solid navy) dan "Nanti Saja" (outline). "Mulai Tes"
+  membuka layar tes.
+- **Petunjuk:** kotak biru muda berisi judul "Tes Penempatan Kosakata",
+  paragraf pembuka, dan 8 butir "Petunjuk" — verbatim dari spesifikasi §3.3.
+  Tombol "Mulai" (baru) atau "Lanjutkan" (melanjutkan attempt).
+- **Butir:** satu per layar, lebar maks 600 px di tengah; caption "Soal x
+  dari 50"; kalimat regular (`AppTextStyles.assessmentSentence`) dengan hanya
+  kata target **tebal + bergaris bawah** (`AppTextStyles.assessmentTarget`);
+  kartu opsi penuh-lebar "A. …" s.d. "D. …" lalu "E. Saya tidak tahu"; status
+  kecil "Menyimpan…"/"Tersimpan"; tombol "Sebelumnya" (outline) dan "Berikutnya"
+  (navy; butir terakhir: "Ringkasan"). Label band tidak pernah tampil.
+- **Ringkasan:** teks spesifikasi §3.4 untuk soal yang belum dijawab, kisi
+  tombol nomor 1–50 (yang terjawab berlatar biru muda, bisa diketuk untuk
+  kembali), dan "Kirim jawaban" yang aktif hanya bila 50 terjawab → dialog
+  konfirmasi "Periksa lagi" / "Kirim".
+- **Status lain:** "Tes belum dibuka. Tunggu arahan pengawas." · "Tes
+  sedang ditutup. Jawabanmu tersimpan. Tunggu arahan pengawas." · "Mohon
+  tunggu" (tinjauan, netral) · "Tes dihentikan" (gangguan teknis) ·
+  "Hubungi peneliti" · "Jawabanmu sudah terkirim" + "Coba lagi" bila hasil
+  belum bisa diproses. Mulai yang ditolak server menampilkan status yang
+  sebenarnya; bila status itu masih "siap" (mis. jam perangkat berbeda dari
+  server), layar petunjuk menampilkan banner "Tes belum dapat dimulai. Tunggu
+  arahan pengawas."
+- **Hasil:** ikon centang, "Terima kasih. Jawabanmu sudah tersimpan.", dan
+  "Level kamu: **B1**" — tanpa skor, persentase, benar/salah, atau penanda.
+  Tombol "Ulangi tes" hanya untuk tes ulang belajar yang sedang dibuka;
+  bila belum boleh, teks kecil kapan bisa diulang.
 
 ### 5.3 Badge Mastery (mastered / difficult) pada Chip & Card Kata
 
@@ -360,8 +373,10 @@ Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
 
 - **Dashboard** ("Belajar", §5.1): section terpisah di bawah dua card utama,
   dua banner "Pre-Test" dan "Post-Test" (abu netral, rounded) dengan badge
-  status dari data server: "Belum tersedia" (bukan peserta), "Belum dibuka"
-  (belum diotorisasi / posttest terkunci), "Siap dikerjakan" (navy),
+  status dari data server: "Belum tersedia" (bukan peserta, atau peserta
+  tanpa band / dikeluarkan / dalam tinjauan), "Belum dibuka" (belum
+  diotorisasi / posttest terkunci), "Ditutup" (jendela tahap ditutup
+  peneliti), "Siap dikerjakan" (navy),
   "Lanjutkan" (oranye), "Selesai" (hijau), "Dibatalkan" / "Hubungi peneliti"
   (merah), "Gagal memuat". Banner selalu bisa diketuk; layar tes menjelaskan
   setiap status. Badge "Segera" lama sudah dihapus.

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:vocably/models/research_attempt.dart';
 import 'package:vocably/models/research_attempt_plan.dart';
 import 'package:vocably/models/research_participant.dart';
+import 'package:vocably/models/research_study.dart';
 import 'package:vocably/services/research_assessment_service.dart';
 import 'package:vocably/utils/research_constants.dart';
 
@@ -89,6 +90,13 @@ class FakeResearchAssessmentService extends ResearchAssessmentService {
   static Never _deny(String why) =>
       throw ResearchServiceException(ResearchFailureKind.permissionDenied, why);
 
+  /// The study lifecycle; pretest and posttest windows open by default.
+  /// Not subject to [readFaults] (they target participant/attempt reads).
+  ResearchStudy study = openStudy();
+
+  @override
+  Future<ResearchStudy> fetchStudy() async => study;
+
   @override
   Future<ResearchParticipant?> fetchParticipant(String uid) async {
     _maybeFailRead();
@@ -116,8 +124,9 @@ class FakeResearchAssessmentService extends ResearchAssessmentService {
       if (p == null || p.authorizedAttempt(stage) != attemptNumber) {
         _deny('not authorized');
       }
-      if (plan.band != p.assignment.band ||
-          plan.instrumentVersion != p.assignment.instrumentVersion) {
+      if (!p.canTakeResearchStages ||
+          plan.band != p.assignment!.band ||
+          plan.instrumentVersion != p.assignment!.instrumentVersion) {
         _deny('assignment mismatch');
       }
       if (stage == ResearchStage.postTest) {
@@ -227,10 +236,28 @@ ResearchParticipant participantFor({
   int preTest = 1,
   int postTest = 0,
 }) => ResearchParticipant(
+  status: ResearchParticipantStatus.enrolled,
   assignment: ResearchParticipantAssignment(
     band: band,
     instrumentVersion: 'v1',
   ),
+  instrumentVersion: 'v1',
+  authorizedPlacement: 0,
   authorizedPreTest: preTest,
   authorizedPostTest: postTest,
 );
+
+/// An active study with the given stage windows open (others closed).
+ResearchStudy openStudy({Set<String> open = const {'preTest', 'postTest'}}) {
+  final now = DateTime.now();
+  return ResearchStudy(
+    status: ResearchStudyStatus.active,
+    windows: {
+      for (final stage in open)
+        stage: (
+          openAt: now.subtract(const Duration(days: 1)),
+          closeAt: now.add(const Duration(days: 1)),
+        ),
+    },
+  );
+}

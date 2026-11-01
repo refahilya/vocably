@@ -74,7 +74,7 @@ void main() {
   ResearchAttemptPlan seed({List<int> answered = const []}) {
     final plan = planResearchAttempt(
       instrument: instrument,
-      assignment: server.participant!.assignment,
+      assignment: server.participant!.assignment!,
       random: Random(77),
     );
     server.putAttempt(
@@ -171,7 +171,7 @@ void main() {
 
       final plan = ResearchAttemptPlan.fromOrder(
         instrument: instrument,
-        assignment: server.participant!.assignment,
+        assignment: server.participant!.assignment!,
         itemOrder: stored().itemOrder,
         optionOrder: stored().optionOrder,
       );

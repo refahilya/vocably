@@ -1,0 +1,1330 @@
+{
+  "schemaVersion": 1,
+  "instrumentId": "vocably-placement",
+  "instrumentVersion": "PT-V1.1",
+  "status": "Researcher instrument. K2 decision rule selected by the researcher; not empirically or expert validated.",
+  "source": {
+    "version": "PT-V1.0",
+    "sha256": "83eff1c5ab08f6eeda0b1221029ec3a2a0a097b13b675ee168c6a0e9bc611ec1"
+  },
+  "bands": [
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+    "C1"
+  ],
+  "itemsPerBand": 10,
+  "thresholds": {
+    "mastered": 7,
+    "lowerBandMin": 6,
+    "maxLowerBandsAtMin": 1
+  },
+  "scoringPolicy": "K2",
+  "dontKnowOption": {
+    "id": "E",
+    "text": "Saya tidak tahu"
+  },
+  "items": [
+    {
+      "id": "pt-a1-01",
+      "band": "A1",
+      "number": 1,
+      "word": "window",
+      "sentence": "Please open the window. It is very hot in this room.",
+      "sentenceMarkup": "Please open the [[window|window]]. It is very hot in this room.",
+      "options": [
+        {
+          "id": "A",
+          "text": "pintu"
+        },
+        {
+          "id": "B",
+          "text": "jendela"
+        },
+        {
+          "id": "C",
+          "text": "lantai"
+        },
+        {
+          "id": "D",
+          "text": "meja"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-02",
+      "band": "A1",
+      "number": 2,
+      "word": "breakfast",
+      "sentence": "I eat breakfast at seven o’clock every morning.",
+      "sentenceMarkup": "I eat [[breakfast|breakfast]] at seven o’clock every morning.",
+      "options": [
+        {
+          "id": "A",
+          "text": "makan malam"
+        },
+        {
+          "id": "B",
+          "text": "makan siang"
+        },
+        {
+          "id": "C",
+          "text": "sarapan"
+        },
+        {
+          "id": "D",
+          "text": "camilan"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-03",
+      "band": "A1",
+      "number": 3,
+      "word": "brother",
+      "sentence": "My brother is twenty years old. He is a student.",
+      "sentenceMarkup": "My [[brother|brother]] is twenty years old. He is a student.",
+      "options": [
+        {
+          "id": "A",
+          "text": "saudara laki-laki"
+        },
+        {
+          "id": "B",
+          "text": "saudara perempuan"
+        },
+        {
+          "id": "C",
+          "text": "sepupu"
+        },
+        {
+          "id": "D",
+          "text": "kakek"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-04",
+      "band": "A1",
+      "number": 4,
+      "word": "kitchen",
+      "sentence": "My mother is cooking dinner in the kitchen.",
+      "sentenceMarkup": "My mother is cooking dinner in the [[kitchen|kitchen]].",
+      "options": [
+        {
+          "id": "A",
+          "text": "kamar mandi"
+        },
+        {
+          "id": "B",
+          "text": "halaman"
+        },
+        {
+          "id": "C",
+          "text": "ruang tamu"
+        },
+        {
+          "id": "D",
+          "text": "dapur"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-05",
+      "band": "A1",
+      "number": 5,
+      "word": "clothes",
+      "sentence": "These clothes are too small for me.",
+      "sentenceMarkup": "These [[clothes|clothes]] are too small for me.",
+      "options": [
+        {
+          "id": "A",
+          "text": "sepatu"
+        },
+        {
+          "id": "B",
+          "text": "pakaian"
+        },
+        {
+          "id": "C",
+          "text": "buku"
+        },
+        {
+          "id": "D",
+          "text": "tas"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-06",
+      "band": "A1",
+      "number": 6,
+      "word": "hungry",
+      "sentence": "I am very hungry. Is there any food?",
+      "sentenceMarkup": "I am very [[hungry|hungry]]. Is there any food?",
+      "options": [
+        {
+          "id": "A",
+          "text": "lapar"
+        },
+        {
+          "id": "B",
+          "text": "lelah"
+        },
+        {
+          "id": "C",
+          "text": "sedih"
+        },
+        {
+          "id": "D",
+          "text": "marah"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-07",
+      "band": "A1",
+      "number": 7,
+      "word": "sleep",
+      "sentence": "The baby is going to sleep now. Please be quiet.",
+      "sentenceMarkup": "The baby is going to [[sleep|sleep]] now. Please be quiet.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menangis"
+        },
+        {
+          "id": "B",
+          "text": "bermain"
+        },
+        {
+          "id": "C",
+          "text": "makan"
+        },
+        {
+          "id": "D",
+          "text": "tidur"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-08",
+      "band": "A1",
+      "number": 8,
+      "word": "wash",
+      "sentence": "Please wash your hands before you eat.",
+      "sentenceMarkup": "Please [[wash|wash]] your hands before you eat.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menutup"
+        },
+        {
+          "id": "B",
+          "text": "menyentuh"
+        },
+        {
+          "id": "C",
+          "text": "mencuci"
+        },
+        {
+          "id": "D",
+          "text": "menggigit"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-09",
+      "band": "A1",
+      "number": 9,
+      "word": "rain",
+      "sentence": "Take an umbrella. I think it will rain today.",
+      "sentenceMarkup": "Take an umbrella. I think it will [[rain|rain]] today.",
+      "options": [
+        {
+          "id": "A",
+          "text": "turun hujan"
+        },
+        {
+          "id": "B",
+          "text": "berangin"
+        },
+        {
+          "id": "C",
+          "text": "panas"
+        },
+        {
+          "id": "D",
+          "text": "berkabut"
+        }
+      ]
+    },
+    {
+      "id": "pt-a1-10",
+      "band": "A1",
+      "number": 10,
+      "word": "bread",
+      "sentence": "We bought some bread and milk at the shop.",
+      "sentenceMarkup": "We bought some [[bread|bread]] and milk at the shop.",
+      "options": [
+        {
+          "id": "A",
+          "text": "nasi"
+        },
+        {
+          "id": "B",
+          "text": "roti"
+        },
+        {
+          "id": "C",
+          "text": "telur"
+        },
+        {
+          "id": "D",
+          "text": "gula"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-01",
+      "band": "A2",
+      "number": 1,
+      "word": "borrow",
+      "sentence": "Can I borrow your pen, please?",
+      "sentenceMarkup": "Can I [[borrow|borrow]] your pen, please?",
+      "options": [
+        {
+          "id": "A",
+          "text": "meminjamkan"
+        },
+        {
+          "id": "B",
+          "text": "membeli"
+        },
+        {
+          "id": "C",
+          "text": "meminjam"
+        },
+        {
+          "id": "D",
+          "text": "menghilangkan"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-02",
+      "band": "A2",
+      "number": 2,
+      "word": "invite",
+      "sentence": "We want to invite all our friends to the party.",
+      "sentenceMarkup": "We want to [[invite|invite]] all our friends to the party.",
+      "options": [
+        {
+          "id": "A",
+          "text": "mengundang"
+        },
+        {
+          "id": "B",
+          "text": "melupakan"
+        },
+        {
+          "id": "C",
+          "text": "menolak"
+        },
+        {
+          "id": "D",
+          "text": "menjemput"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-03",
+      "band": "A2",
+      "number": 3,
+      "word": "guest",
+      "sentence": "We have a guest tonight, so please clean the living room.",
+      "sentenceMarkup": "We have a [[guest|guest]] tonight, so please clean the living room.",
+      "options": [
+        {
+          "id": "A",
+          "text": "tetangga"
+        },
+        {
+          "id": "B",
+          "text": "pelayan"
+        },
+        {
+          "id": "C",
+          "text": "penjual"
+        },
+        {
+          "id": "D",
+          "text": "tamu"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-04",
+      "band": "A2",
+      "number": 4,
+      "word": "empty",
+      "sentence": "The bottle is empty. Can you buy some more water?",
+      "sentenceMarkup": "The bottle is [[empty|empty]]. Can you buy some more water?",
+      "options": [
+        {
+          "id": "A",
+          "text": "penuh"
+        },
+        {
+          "id": "B",
+          "text": "pecah"
+        },
+        {
+          "id": "C",
+          "text": "kosong"
+        },
+        {
+          "id": "D",
+          "text": "berat"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-05",
+      "band": "A2",
+      "number": 5,
+      "word": "reduce",
+      "sentence": "The company wants to reduce the cost of its products.",
+      "sentenceMarkup": "The company wants to [[reduce|reduce]] the cost of its products.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menaikkan"
+        },
+        {
+          "id": "B",
+          "text": "mengurangi"
+        },
+        {
+          "id": "C",
+          "text": "menghitung"
+        },
+        {
+          "id": "D",
+          "text": "membagi"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-06",
+      "band": "A2",
+      "number": 6,
+      "word": "complain",
+      "sentence": "Customers often complain when the food is late.",
+      "sentenceMarkup": "Customers often [[complain|complain]] when the food is late.",
+      "options": [
+        {
+          "id": "A",
+          "text": "memuji"
+        },
+        {
+          "id": "B",
+          "text": "meminta"
+        },
+        {
+          "id": "C",
+          "text": "mengabaikan"
+        },
+        {
+          "id": "D",
+          "text": "mengeluh"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-07",
+      "band": "A2",
+      "number": 7,
+      "word": "steal",
+      "sentence": "Someone tried to steal my phone on the bus.",
+      "sentenceMarkup": "Someone tried to [[steal|steal]] my phone on the bus.",
+      "options": [
+        {
+          "id": "A",
+          "text": "mencuri"
+        },
+        {
+          "id": "B",
+          "text": "menemukan"
+        },
+        {
+          "id": "C",
+          "text": "menjatuhkan"
+        },
+        {
+          "id": "D",
+          "text": "membeli"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-08",
+      "band": "A2",
+      "number": 8,
+      "word": "typical",
+      "sentence": "A typical school day starts at seven o’clock.",
+      "sentenceMarkup": "A [[typical|typical]] school day starts at seven o’clock.",
+      "options": [
+        {
+          "id": "A",
+          "text": "aneh"
+        },
+        {
+          "id": "B",
+          "text": "istimewa"
+        },
+        {
+          "id": "C",
+          "text": "biasa (khas)"
+        },
+        {
+          "id": "D",
+          "text": "baru"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-09",
+      "band": "A2",
+      "number": 9,
+      "word": "avoid",
+      "sentence": "You should avoid eating too much sugar.",
+      "sentenceMarkup": "You should [[avoid|avoid]] eating too much sugar.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menghindari"
+        },
+        {
+          "id": "B",
+          "text": "menyukai"
+        },
+        {
+          "id": "C",
+          "text": "membeli"
+        },
+        {
+          "id": "D",
+          "text": "mencoba"
+        }
+      ]
+    },
+    {
+      "id": "pt-a2-10",
+      "band": "A2",
+      "number": 10,
+      "word": "prevent",
+      "sentence": "Wearing a helmet can prevent serious injuries.",
+      "sentenceMarkup": "Wearing a helmet can [[prevent|prevent]] serious injuries.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menyebabkan"
+        },
+        {
+          "id": "B",
+          "text": "mencegah"
+        },
+        {
+          "id": "C",
+          "text": "menyembuhkan"
+        },
+        {
+          "id": "D",
+          "text": "menunjukkan"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-01",
+      "band": "B1",
+      "number": 1,
+      "word": "damage",
+      "sentence": "The storm caused a lot of damage to the village.",
+      "sentenceMarkup": "The storm caused a lot of [[damage|damage]] to the village.",
+      "options": [
+        {
+          "id": "A",
+          "text": "kerusakan"
+        },
+        {
+          "id": "B",
+          "text": "kemajuan"
+        },
+        {
+          "id": "C",
+          "text": "keuntungan"
+        },
+        {
+          "id": "D",
+          "text": "keributan"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-02",
+      "band": "B1",
+      "number": 2,
+      "word": "pleasant",
+      "sentence": "We had a pleasant evening at the beach.",
+      "sentenceMarkup": "We had a [[pleasant|pleasant]] evening at the beach.",
+      "options": [
+        {
+          "id": "A",
+          "text": "panjang"
+        },
+        {
+          "id": "B",
+          "text": "menyenangkan"
+        },
+        {
+          "id": "C",
+          "text": "berbahaya"
+        },
+        {
+          "id": "D",
+          "text": "dingin"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-03",
+      "band": "B1",
+      "number": 3,
+      "word": "encourage",
+      "sentence": "My teacher always encourages me to read more books.",
+      "sentenceMarkup": "My teacher always [[encourage|encourages]] me to read more books.",
+      "options": [
+        {
+          "id": "A",
+          "text": "melarang"
+        },
+        {
+          "id": "B",
+          "text": "menghukum"
+        },
+        {
+          "id": "C",
+          "text": "menguji"
+        },
+        {
+          "id": "D",
+          "text": "mendorong (memberi semangat)"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-04",
+      "band": "B1",
+      "number": 4,
+      "word": "ignore",
+      "sentence": "He saw me, but he decided to ignore me.",
+      "sentenceMarkup": "He saw me, but he decided to [[ignore|ignore]] me.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menyapa"
+        },
+        {
+          "id": "B",
+          "text": "mengikuti"
+        },
+        {
+          "id": "C",
+          "text": "mengabaikan"
+        },
+        {
+          "id": "D",
+          "text": "memanggil"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-05",
+      "band": "B1",
+      "number": 5,
+      "word": "reliable",
+      "sentence": "He is a reliable friend.",
+      "sentenceMarkup": "He is a [[reliable|reliable]] friend.",
+      "options": [
+        {
+          "id": "A",
+          "text": "lucu"
+        },
+        {
+          "id": "B",
+          "text": "kaya"
+        },
+        {
+          "id": "C",
+          "text": "pendiam"
+        },
+        {
+          "id": "D",
+          "text": "dapat diandalkan"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-06",
+      "band": "B1",
+      "number": 6,
+      "word": "obvious",
+      "sentence": "The answer was obvious to everyone in the class.",
+      "sentenceMarkup": "The answer was [[obvious|obvious]] to everyone in the class.",
+      "options": [
+        {
+          "id": "A",
+          "text": "rumit"
+        },
+        {
+          "id": "B",
+          "text": "jelas"
+        },
+        {
+          "id": "C",
+          "text": "salah"
+        },
+        {
+          "id": "D",
+          "text": "rahasia"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-07",
+      "band": "B1",
+      "number": 7,
+      "word": "consequence",
+      "sentence": "If you break the rules, there will be a serious consequence.",
+      "sentenceMarkup": "If you break the rules, there will be a serious [[consequence|consequence]].",
+      "options": [
+        {
+          "id": "A",
+          "text": "peringatan"
+        },
+        {
+          "id": "B",
+          "text": "imbalan"
+        },
+        {
+          "id": "C",
+          "text": "alasan"
+        },
+        {
+          "id": "D",
+          "text": "akibat"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-08",
+      "band": "B1",
+      "number": 8,
+      "word": "hurry",
+      "sentence": "We must hurry. The bus leaves in five minutes.",
+      "sentenceMarkup": "We must [[hurry|hurry]]. The bus leaves in five minutes.",
+      "options": [
+        {
+          "id": "A",
+          "text": "berhenti"
+        },
+        {
+          "id": "B",
+          "text": "bergegas"
+        },
+        {
+          "id": "C",
+          "text": "menunggu"
+        },
+        {
+          "id": "D",
+          "text": "berjalan santai"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-09",
+      "band": "B1",
+      "number": 9,
+      "word": "persuade",
+      "sentence": "I tried to persuade my father to let me go.",
+      "sentenceMarkup": "I tried to [[persuade|persuade]] my father to let me go.",
+      "options": [
+        {
+          "id": "A",
+          "text": "memaksa"
+        },
+        {
+          "id": "B",
+          "text": "bertanya"
+        },
+        {
+          "id": "C",
+          "text": "membujuk"
+        },
+        {
+          "id": "D",
+          "text": "mengancam"
+        }
+      ]
+    },
+    {
+      "id": "pt-b1-10",
+      "band": "B1",
+      "number": 10,
+      "word": "bury",
+      "sentence": "The dog likes to bury bones in the garden.",
+      "sentenceMarkup": "The dog likes to [[bury|bury]] bones in the garden.",
+      "options": [
+        {
+          "id": "A",
+          "text": "mengubur"
+        },
+        {
+          "id": "B",
+          "text": "menggali"
+        },
+        {
+          "id": "C",
+          "text": "mencuri"
+        },
+        {
+          "id": "D",
+          "text": "memakan"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-01",
+      "band": "B2",
+      "number": 1,
+      "word": "urgent",
+      "sentence": "I need to see the doctor. It is urgent.",
+      "sentenceMarkup": "I need to see the doctor. It is [[urgent|urgent]].",
+      "options": [
+        {
+          "id": "A",
+          "text": "mudah"
+        },
+        {
+          "id": "B",
+          "text": "rahasia"
+        },
+        {
+          "id": "C",
+          "text": "mendesak"
+        },
+        {
+          "id": "D",
+          "text": "biasa"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-02",
+      "band": "B2",
+      "number": 2,
+      "word": "temporary",
+      "sentence": "He found a temporary job in a shop.",
+      "sentenceMarkup": "He found a [[temporary|temporary]] job in a shop.",
+      "options": [
+        {
+          "id": "A",
+          "text": "sementara"
+        },
+        {
+          "id": "B",
+          "text": "bergaji tinggi"
+        },
+        {
+          "id": "C",
+          "text": "berbahaya"
+        },
+        {
+          "id": "D",
+          "text": "jauh dari rumah"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-03",
+      "band": "B2",
+      "number": 3,
+      "word": "overcome",
+      "sentence": "She had to overcome many problems to finish school.",
+      "sentenceMarkup": "She had to [[overcome|overcome]] many problems to finish school.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menciptakan"
+        },
+        {
+          "id": "B",
+          "text": "mengatasi"
+        },
+        {
+          "id": "C",
+          "text": "menyebabkan"
+        },
+        {
+          "id": "D",
+          "text": "menghindari"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-04",
+      "band": "B2",
+      "number": 4,
+      "word": "gradually",
+      "sentence": "The weather is gradually getting colder.",
+      "sentenceMarkup": "The weather is [[gradually|gradually]] getting colder.",
+      "options": [
+        {
+          "id": "A",
+          "text": "berangsur-angsur"
+        },
+        {
+          "id": "B",
+          "text": "tiba-tiba"
+        },
+        {
+          "id": "C",
+          "text": "sangat"
+        },
+        {
+          "id": "D",
+          "text": "kadang-kadang"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-05",
+      "band": "B2",
+      "number": 5,
+      "word": "diverse",
+      "sentence": "Our class is very diverse. Students come from many different places.",
+      "sentenceMarkup": "Our class is very [[diverse|diverse]]. Students come from many different places.",
+      "options": [
+        {
+          "id": "A",
+          "text": "seragam"
+        },
+        {
+          "id": "B",
+          "text": "kecil"
+        },
+        {
+          "id": "C",
+          "text": "ramai"
+        },
+        {
+          "id": "D",
+          "text": "beragam"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-06",
+      "band": "B2",
+      "number": 6,
+      "word": "assume",
+      "sentence": "Don’t assume that he knows the answer. Ask him first.",
+      "sentenceMarkup": "Don’t [[assume|assume]] that he knows the answer. Ask him first.",
+      "options": [
+        {
+          "id": "A",
+          "text": "mengira (tanpa bukti)"
+        },
+        {
+          "id": "B",
+          "text": "mengetahui"
+        },
+        {
+          "id": "C",
+          "text": "memastikan"
+        },
+        {
+          "id": "D",
+          "text": "menjelaskan"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-07",
+      "band": "B2",
+      "number": 7,
+      "word": "tough",
+      "sentence": "Losing the final match was tough for the whole team.",
+      "sentenceMarkup": "Losing the final match was [[tough|tough]] for the whole team.",
+      "options": [
+        {
+          "id": "A",
+          "text": "mudah"
+        },
+        {
+          "id": "B",
+          "text": "lucu"
+        },
+        {
+          "id": "C",
+          "text": "berat (sulit diterima)"
+        },
+        {
+          "id": "D",
+          "text": "cepat"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-08",
+      "band": "B2",
+      "number": 8,
+      "word": "enhance",
+      "sentence": "New software can enhance the quality of your photos.",
+      "sentenceMarkup": "New software can [[enhance|enhance]] the quality of your photos.",
+      "options": [
+        {
+          "id": "A",
+          "text": "merekam"
+        },
+        {
+          "id": "B",
+          "text": "menyimpan"
+        },
+        {
+          "id": "C",
+          "text": "menyalin"
+        },
+        {
+          "id": "D",
+          "text": "meningkatkan"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-09",
+      "band": "B2",
+      "number": 9,
+      "word": "inevitable",
+      "sentence": "Change is inevitable, so we should be ready for it.",
+      "sentenceMarkup": "Change is [[inevitable|inevitable]], so we should be ready for it.",
+      "options": [
+        {
+          "id": "A",
+          "text": "tak terelakkan"
+        },
+        {
+          "id": "B",
+          "text": "berbahaya"
+        },
+        {
+          "id": "C",
+          "text": "menakutkan"
+        },
+        {
+          "id": "D",
+          "text": "tidak mungkin"
+        }
+      ]
+    },
+    {
+      "id": "pt-b2-10",
+      "band": "B2",
+      "number": 10,
+      "word": "delay",
+      "sentence": "The flight was delayed because of the storm.",
+      "sentenceMarkup": "The flight was [[delay|delayed]] because of the storm.",
+      "options": [
+        {
+          "id": "A",
+          "text": "dibatalkan"
+        },
+        {
+          "id": "B",
+          "text": "ditunda"
+        },
+        {
+          "id": "C",
+          "text": "dipercepat"
+        },
+        {
+          "id": "D",
+          "text": "dipenuhi"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-01",
+      "band": "C1",
+      "number": 1,
+      "word": "mutual",
+      "sentence": "They ended the friendship by mutual agreement.",
+      "sentenceMarkup": "They ended the friendship by [[mutual|mutual]] agreement.",
+      "options": [
+        {
+          "id": "A",
+          "text": "rahasia"
+        },
+        {
+          "id": "B",
+          "text": "tertulis"
+        },
+        {
+          "id": "C",
+          "text": "bersama (dari kedua pihak)"
+        },
+        {
+          "id": "D",
+          "text": "terpaksa"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-02",
+      "band": "C1",
+      "number": 2,
+      "word": "reluctant",
+      "sentence": "She was reluctant to speak in front of the class.",
+      "sentenceMarkup": "She was [[reluctant|reluctant]] to speak in front of the class.",
+      "options": [
+        {
+          "id": "A",
+          "text": "bersemangat"
+        },
+        {
+          "id": "B",
+          "text": "enggan"
+        },
+        {
+          "id": "C",
+          "text": "mampu"
+        },
+        {
+          "id": "D",
+          "text": "siap"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-03",
+      "band": "C1",
+      "number": 3,
+      "word": "profound",
+      "sentence": "The book had a profound effect on her life.",
+      "sentenceMarkup": "The book had a [[profound|profound]] effect on her life.",
+      "options": [
+        {
+          "id": "A",
+          "text": "singkat"
+        },
+        {
+          "id": "B",
+          "text": "buruk"
+        },
+        {
+          "id": "C",
+          "text": "biasa"
+        },
+        {
+          "id": "D",
+          "text": "mendalam"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-04",
+      "band": "C1",
+      "number": 4,
+      "word": "subtle",
+      "sentence": "There is a subtle difference between the two words.",
+      "sentenceMarkup": "There is a [[subtle|subtle]] difference between the two words.",
+      "options": [
+        {
+          "id": "A",
+          "text": "besar"
+        },
+        {
+          "id": "B",
+          "text": "halus (tidak mencolok)"
+        },
+        {
+          "id": "C",
+          "text": "penting"
+        },
+        {
+          "id": "D",
+          "text": "jelas"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-05",
+      "band": "C1",
+      "number": 5,
+      "word": "persist",
+      "sentence": "Even when the work was hard, he persisted until he finished.",
+      "sentenceMarkup": "Even when the work was hard, he [[persist|persisted]] until he finished.",
+      "options": [
+        {
+          "id": "A",
+          "text": "terus berusaha"
+        },
+        {
+          "id": "B",
+          "text": "menyerah"
+        },
+        {
+          "id": "C",
+          "text": "mengeluh"
+        },
+        {
+          "id": "D",
+          "text": "beristirahat"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-06",
+      "band": "C1",
+      "number": 6,
+      "word": "thrive",
+      "sentence": "Small plants thrive in places with plenty of light and water.",
+      "sentenceMarkup": "Small plants [[thrive|thrive]] in places with plenty of light and water.",
+      "options": [
+        {
+          "id": "A",
+          "text": "mati"
+        },
+        {
+          "id": "B",
+          "text": "layu"
+        },
+        {
+          "id": "C",
+          "text": "tumbuh subur"
+        },
+        {
+          "id": "D",
+          "text": "berhenti tumbuh"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-07",
+      "band": "C1",
+      "number": 7,
+      "word": "vulnerable",
+      "sentence": "Young animals are vulnerable to attack.",
+      "sentenceMarkup": "Young animals are [[vulnerable|vulnerable]] to attack.",
+      "options": [
+        {
+          "id": "A",
+          "text": "kebal"
+        },
+        {
+          "id": "B",
+          "text": "rentan"
+        },
+        {
+          "id": "C",
+          "text": "tangguh"
+        },
+        {
+          "id": "D",
+          "text": "terkenal"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-08",
+      "band": "C1",
+      "number": 8,
+      "word": "exaggerate",
+      "sentence": "Don’t exaggerate. The fish was not that big.",
+      "sentenceMarkup": "Don’t [[exaggerate|exaggerate]]. The fish was not that big.",
+      "options": [
+        {
+          "id": "A",
+          "text": "menyembunyikan"
+        },
+        {
+          "id": "B",
+          "text": "mengecilkan"
+        },
+        {
+          "id": "C",
+          "text": "menjelaskan"
+        },
+        {
+          "id": "D",
+          "text": "melebih-lebihkan"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-09",
+      "band": "C1",
+      "number": 9,
+      "word": "undermine",
+      "sentence": "Constant criticism can undermine a child’s confidence.",
+      "sentenceMarkup": "Constant criticism can [[undermine|undermine]] a child’s confidence.",
+      "options": [
+        {
+          "id": "A",
+          "text": "melemahkan"
+        },
+        {
+          "id": "B",
+          "text": "membangun"
+        },
+        {
+          "id": "C",
+          "text": "mengukur"
+        },
+        {
+          "id": "D",
+          "text": "menunjukkan"
+        }
+      ]
+    },
+    {
+      "id": "pt-c1-10",
+      "band": "C1",
+      "number": 10,
+      "word": "overwhelm",
+      "sentence": "The huge amount of homework began to overwhelm him.",
+      "sentenceMarkup": "The huge amount of homework began to [[overwhelm|overwhelm]] him.",
+      "options": [
+        {
+          "id": "A",
+          "text": "membosankan"
+        },
+        {
+          "id": "B",
+          "text": "menyibukkan"
+        },
+        {
+          "id": "C",
+          "text": "membuat gembira"
+        },
+        {
+          "id": "D",
+          "text": "membuat kewalahan"
+        }
+      ]
+    }
+  ]
+}

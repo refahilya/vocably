@@ -9,7 +9,7 @@ import '../../../providers/vocab_browser_providers.dart';
 import '../../../services/research_assessment_service.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/cefr_levels.dart';
-import '../placement_test/placement_test_placeholder_screen.dart';
+import '../placement_test/placement_test_screen.dart';
 import '../research_assessment/research_assessment_screen.dart';
 import '../vocab_browser/vocab_browser_screen.dart';
 import 'target_word_list_screen.dart';
@@ -141,7 +141,9 @@ class _TargetWordCard extends ConsumerWidget {
 
 /// "Level" card (`DESIGN_REFERENCE.md` §5.1/§5.7) — 6 CEFR pills, the
 /// active level (if any) called out, C2 always visually muted, plus the
-/// permanent Placement Test entry point link.
+/// permanent Placement Test entry point link. The active level is
+/// `users.resultLevel` from the latest scored Placement Test attempt —
+/// never a score, and never the research band (`DATA_MODEL.md` §1).
 class _LevelCard extends ConsumerWidget {
   const _LevelCard({required this.profile});
 
@@ -149,7 +151,7 @@ class _LevelCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasLevel = profile.cefrLevel != null;
+    final level = profile.resultLevel;
 
     return _DashboardCard(
       icon: Icons.leaderboard,
@@ -158,8 +160,8 @@ class _LevelCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            hasLevel
-                ? 'Level kamu saat ini: ${profile.cefrLevel}'
+            level != null
+                ? 'Level kamu saat ini: $level'
                 : 'Kamu belum mengambil tes penempatan.',
             style: AppTextStyles.caption,
           ),
@@ -171,7 +173,7 @@ class _LevelCard extends ConsumerWidget {
               for (final level in kCefrLevels)
                 _LevelPill(
                   level: level,
-                  isActive: profile.cefrLevel == level,
+                  isActive: profile.resultLevel == level,
                   onTap: () {
                     ref
                         .read(vocabBrowserFilterProvider.notifier)
@@ -191,13 +193,13 @@ class _LevelCard extends ConsumerWidget {
             child: TextButton(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const PlacementTestPlaceholderScreen(),
+                  builder: (_) => PlacementTestScreen(uid: profile.uid),
                 ),
               ),
               child: Text(
                 profile.placementTestCompleted == true
-                    ? 'Ambil Ulang Placement Test'
-                    : 'Ambil Placement Test',
+                    ? 'Lihat Tes Penempatan'
+                    : 'Ambil Tes Penempatan',
               ),
             ),
           ),
@@ -314,9 +316,11 @@ class _AssessmentBanner extends ConsumerWidget {
     final status = ref.watch(researchStageStatusProvider(uid, stage));
     final (text, color) = switch (status) {
       AsyncData(:final value) => switch (value) {
-        ResearchStageKind.notEnrolled => ('Belum tersedia', AppColors.disabled),
+        ResearchStageKind.notEnrolled ||
+        ResearchStageKind.notEligible => ('Belum tersedia', AppColors.disabled),
         ResearchStageKind.notAuthorized ||
         ResearchStageKind.locked => ('Belum dibuka', AppColors.disabled),
+        ResearchStageKind.stageClosed => ('Ditutup', AppColors.disabled),
         ResearchStageKind.notStarted => ('Siap dikerjakan', AppColors.primary),
         ResearchStageKind.inProgress => ('Lanjutkan', AppColors.warning),
         ResearchStageKind.completed => ('Selesai', AppColors.success),

@@ -137,6 +137,22 @@ function buildExport({ bank, key, participants, attempts, cohort = null }) {
       problems.push({ category: 'duplicate_or_missing_research_id', reference: uid, detail: 'participant left out of every analysis file' });
       continue;
     }
+    // Placement PT-V1.1 lifecycle: awaiting placement, excluded (C1),
+    // awaiting a manual band or conditional are valid states, not data
+    // problems — they are simply not (yet) part of the paired analysis.
+    const status = data.status || 'enrolled';
+    if (status !== 'enrolled') {
+      exclusions.push({
+        research_id: data.researchId,
+        band: data.band ?? '',
+        cohort: data.cohort,
+        stage: 'pair',
+        reason: `participant_${status}`,
+        detail: status === 'conditional' ? 'manual band; conditional-inclusion criteria not decided' : 'no usable research band',
+      });
+      identifiers.push({ research_id: data.researchId, uid });
+      continue;
+    }
     if (!BANDS.includes(data.band)) {
       problems.push({ category: 'invalid_participant', reference: uid, detail: 'unknown band' });
       continue;

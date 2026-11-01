@@ -59,6 +59,10 @@ describe('app payloads and full flow (emulators, real Auth emulator sign-in)', {
     await admin.auth.createUser({ uid: fixture.uid, email: EMAIL, password: PASSWORD });
     await admin.db.collection('users').doc(fixture.uid).set({ uid: fixture.uid, email: EMAIL, name: 'E2E', role: 'siswa' });
     await ops.seedInstrument(admin.db, { bank: fixtures.bank, bankJson: fixtures.bankJson, apply: true });
+    const pops = require('../../lib/admin/placementOperations');
+    await pops.setStudyStatus(admin.db, { status: 'active', apply: true });
+    await pops.setStageWindow(admin.db, { stage: 'preTest', open: true, apply: true });
+    await pops.setStageWindow(admin.db, { stage: 'postTest', open: true, apply: true });
     await ops.enrolParticipants(admin.db, { rows: [{ line: 2, uid: fixture.uid, researchId: 'E2E-01', band: fixture.band, cohort: 'test' }], apply: true });
     await ops.authorizeStage(admin.db, { uids: [fixture.uid], stage: 'preTest', apply: true });
   });

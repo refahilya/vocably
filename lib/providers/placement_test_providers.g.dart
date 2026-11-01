@@ -8,25 +8,19 @@ part of 'placement_test_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Drives the one write Milestone 6's placement-test scaffold makes:
-/// flipping `users.placementTestPrompted` to `true` the moment the
-/// one-time automatic offer (`SPEC.md` §3.1) is shown. No scoring, no
-/// questions — see `UserService.markPlacementTestPrompted`'s doc comment.
+/// Flips `users.placementTestPrompted` to `true` the moment the one-time
+/// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
 
 @ProviderFor(PlacementTestPromptController)
 final placementTestPromptControllerProvider =
     PlacementTestPromptControllerProvider._();
 
-/// Drives the one write Milestone 6's placement-test scaffold makes:
-/// flipping `users.placementTestPrompted` to `true` the moment the
-/// one-time automatic offer (`SPEC.md` §3.1) is shown. No scoring, no
-/// questions — see `UserService.markPlacementTestPrompted`'s doc comment.
+/// Flips `users.placementTestPrompted` to `true` the moment the one-time
+/// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
 final class PlacementTestPromptControllerProvider
     extends $AsyncNotifierProvider<PlacementTestPromptController, void> {
-  /// Drives the one write Milestone 6's placement-test scaffold makes:
-  /// flipping `users.placementTestPrompted` to `true` the moment the
-  /// one-time automatic offer (`SPEC.md` §3.1) is shown. No scoring, no
-  /// questions — see `UserService.markPlacementTestPrompted`'s doc comment.
+  /// Flips `users.placementTestPrompted` to `true` the moment the one-time
+  /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
   PlacementTestPromptControllerProvider._()
     : super(
         from: null,
@@ -49,10 +43,8 @@ final class PlacementTestPromptControllerProvider
 String _$placementTestPromptControllerHash() =>
     r'261468c3fe85e74c50b402ccde0df17f4a20ea7e';
 
-/// Drives the one write Milestone 6's placement-test scaffold makes:
-/// flipping `users.placementTestPrompted` to `true` the moment the
-/// one-time automatic offer (`SPEC.md` §3.1) is shown. No scoring, no
-/// questions — see `UserService.markPlacementTestPrompted`'s doc comment.
+/// Flips `users.placementTestPrompted` to `true` the moment the one-time
+/// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
 
 abstract class _$PlacementTestPromptController extends $AsyncNotifier<void> {
   FutureOr<void> build();
@@ -69,5 +61,196 @@ abstract class _$PlacementTestPromptController extends $AsyncNotifier<void> {
               Object?
             >;
     return element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(placementService)
+final placementServiceProvider = PlacementServiceProvider._();
+
+final class PlacementServiceProvider
+    extends
+        $FunctionalProvider<
+          PlacementService,
+          PlacementService,
+          PlacementService
+        >
+    with $Provider<PlacementService> {
+  PlacementServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'placementServiceProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$placementServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<PlacementService> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  PlacementService create(Ref ref) {
+    return placementService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PlacementService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PlacementService>(value),
+    );
+  }
+}
+
+String _$placementServiceHash() => r'fafee7d670d5031537ae96af505ce958327830f8';
+
+/// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
+///
+/// The server is the only source of truth: after any failed or timed-out
+/// write the attempt is re-read and the state rebuilt from what is stored.
+/// "Terkirim" is shown only after the server holds `submitted`; the result
+/// only after the server holds `scored`. Lifecycle signals are recorded and
+/// never acted on.
+
+@ProviderFor(PlacementTestController)
+final placementTestControllerProvider = PlacementTestControllerFamily._();
+
+/// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
+///
+/// The server is the only source of truth: after any failed or timed-out
+/// write the attempt is re-read and the state rebuilt from what is stored.
+/// "Terkirim" is shown only after the server holds `submitted`; the result
+/// only after the server holds `scored`. Lifecycle signals are recorded and
+/// never acted on.
+final class PlacementTestControllerProvider
+    extends $NotifierProvider<PlacementTestController, PlacementTestState> {
+  /// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
+  ///
+  /// The server is the only source of truth: after any failed or timed-out
+  /// write the attempt is re-read and the state rebuilt from what is stored.
+  /// "Terkirim" is shown only after the server holds `submitted`; the result
+  /// only after the server holds `scored`. Lifecycle signals are recorded and
+  /// never acted on.
+  PlacementTestControllerProvider._({
+    required PlacementTestControllerFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'placementTestControllerProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$placementTestControllerHash();
+
+  @override
+  String toString() {
+    return r'placementTestControllerProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  PlacementTestController create() => PlacementTestController();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PlacementTestState value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PlacementTestState>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PlacementTestControllerProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$placementTestControllerHash() =>
+    r'3427554997d39ed9ef9dab727a32c33ba64d75f9';
+
+/// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
+///
+/// The server is the only source of truth: after any failed or timed-out
+/// write the attempt is re-read and the state rebuilt from what is stored.
+/// "Terkirim" is shown only after the server holds `submitted`; the result
+/// only after the server holds `scored`. Lifecycle signals are recorded and
+/// never acted on.
+
+final class PlacementTestControllerFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          PlacementTestController,
+          PlacementTestState,
+          PlacementTestState,
+          PlacementTestState,
+          String
+        > {
+  PlacementTestControllerFamily._()
+    : super(
+        retry: null,
+        name: r'placementTestControllerProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
+  ///
+  /// The server is the only source of truth: after any failed or timed-out
+  /// write the attempt is re-read and the state rebuilt from what is stored.
+  /// "Terkirim" is shown only after the server holds `submitted`; the result
+  /// only after the server holds `scored`. Lifecycle signals are recorded and
+  /// never acted on.
+
+  PlacementTestControllerProvider call(String uid) =>
+      PlacementTestControllerProvider._(argument: uid, from: this);
+
+  @override
+  String toString() => r'placementTestControllerProvider';
+}
+
+/// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
+///
+/// The server is the only source of truth: after any failed or timed-out
+/// write the attempt is re-read and the state rebuilt from what is stored.
+/// "Terkirim" is shown only after the server holds `submitted`; the result
+/// only after the server holds `scored`. Lifecycle signals are recorded and
+/// never acted on.
+
+abstract class _$PlacementTestController extends $Notifier<PlacementTestState> {
+  late final _$args = ref.$arg as String;
+  String get uid => _$args;
+
+  PlacementTestState build(String uid);
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<PlacementTestState, PlacementTestState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<PlacementTestState, PlacementTestState>,
+              PlacementTestState,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, () => build(_$args));
   }
 }

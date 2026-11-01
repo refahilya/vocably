@@ -173,9 +173,22 @@ describe('research Firestore rules (emulator)', { skip: !RUN && 'not inside the 
     });
   }
 
+  /** Trusted study lifecycle: active study, pretest/posttest windows open unless overridden. */
+  async function seedStudy({ status = 'active', preTest = true, postTest = true } = {}) {
+    const day = 24 * 60 * 60 * 1000;
+    const win = (open) =>
+      open
+        ? { openAt: fsdk.Timestamp.fromMillis(Date.now() - day), closeAt: fsdk.Timestamp.fromMillis(Date.now() + day) }
+        : { openAt: fsdk.Timestamp.fromMillis(Date.now() - 2 * day), closeAt: fsdk.Timestamp.fromMillis(Date.now() - day) };
+    await trusted((tdb) =>
+      fsdk.setDoc(fsdk.doc(tdb, 'researchStudy', 'current'), { status, closedAt: null, stages: { preTest: win(preTest), postTest: win(postTest) } })
+    );
+  }
+
   beforeEach(async () => {
     await env.clearFirestore();
     await seedInstrument();
+    await seedStudy();
   });
 
   // ---------------------------------------------------------------------
@@ -909,6 +922,69 @@ describe('research Firestore rules (emulator)', { skip: !RUN && 'not inside the 
       await rut.assertFails(
         fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2', 'postTest', 1)), newAttempt('stu-a2', { stage: 'postTest' }))
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  describe('stage windows and eligibility (Placement PT-V1.1)', () => {
+    async function setParticipant(uid, fields) {
+      await trusted((tdb) => fsdk.updateDoc(fsdk.doc(tdb, PARTICIPANTS, uid), fields));
+    }
+
+    it('a closed pretest window, a not-yet-active or closed study refuses a new attempt', async () => {
+      await seedParticipant('stu-a2');
+      await seedStudy({ preTest: false });
+      await rut.assertFails(fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2')), newAttempt('stu-a2')));
+      await seedStudy({ status: 'setup' });
+      await rut.assertFails(fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2')), newAttempt('stu-a2')));
+      await seedStudy({ status: 'closed' });
+      await rut.assertFails(fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2')), newAttempt('stu-a2')));
+      await trusted((tdb) => fsdk.deleteDoc(fsdk.doc(tdb, 'researchStudy', 'current')));
+      await rut.assertFails(fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2')), newAttempt('stu-a2')));
+      await seedStudy();
+      await rut.assertSucceeds(fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2')), newAttempt('stu-a2')));
+    });
+
+    it('closing the window freezes an in-progress attempt; answers stay saved and it is never completed', async () => {
+      await seedParticipant('stu-a2');
+      const { attempt, id } = await startedAttempt('stu-a2', 19);
+      await seedStudy({ preTest: false });
+      await rut.assertFails(saveAnswer(db('stu-a2'), id, attempt.itemOrder[19], answerFor(attempt, attempt.itemOrder[19], 1)));
+      await seedStudy({ status: 'closed' });
+      await rut.assertFails(saveAnswer(db('stu-a2'), id, attempt.itemOrder[19], answerFor(attempt, attempt.itemOrder[19], 1)));
+      const stored = await readTrusted(ATTEMPTS, id);
+      assert.equal(stored.status, 'in_progress');
+      assert.equal(Object.keys(stored.responses).length, 19);
+    });
+
+    it('pretest and posttest windows are independent', async () => {
+      await seedParticipant('stu-a2', { preTest: 1, postTest: 1 });
+      await seedStudy({ preTest: true, postTest: false });
+      const pre = await startedAttempt('stu-a2', 20);
+      await rut.assertSucceeds(complete(db('stu-a2'), pre.id));
+      await rut.assertFails(
+        fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2', 'postTest', 1)), newAttempt('stu-a2', { stage: 'postTest' }))
+      );
+      await seedStudy({ preTest: false, postTest: true });
+      await rut.assertSucceeds(
+        fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2', 'postTest', 1)), newAttempt('stu-a2', { stage: 'postTest' }))
+      );
+    });
+
+    it('a participant awaiting placement (no band), excluded, conditional or under review cannot start the pretest', async () => {
+      await seedParticipant('stu-a2');
+      for (const fields of [
+        { band: null, status: 'awaiting_placement' },
+        { band: null, status: 'excluded', exclusionReason: 'placement_c1' },
+        { band: 'A2', status: 'awaiting_manual_band' },
+        { band: 'A2', status: 'conditional', bandSource: 'manual_review' },
+        { band: 'A2', status: 'enrolled', reviewStatus: 'pending' },
+      ]) {
+        await setParticipant('stu-a2', { status: 'enrolled', reviewStatus: null, ...fields });
+        await rut.assertFails(fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2')), newAttempt('stu-a2')), JSON.stringify(fields));
+      }
+      await setParticipant('stu-a2', { band: 'A2', status: 'enrolled', bandSource: 'placement_test', reviewStatus: 'not_confirmed' });
+      await rut.assertSucceeds(fsdk.setDoc(fsdk.doc(db('stu-a2'), ATTEMPTS, attemptId('stu-a2')), newAttempt('stu-a2')));
     });
   });
 });

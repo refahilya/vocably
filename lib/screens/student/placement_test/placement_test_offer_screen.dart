@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/app_user.dart';
 import '../../../providers/placement_test_providers.dart';
 import '../../../theme/theme.dart';
-import 'placement_test_placeholder_screen.dart';
+import 'placement_test_screen.dart';
 
 /// The one-time automatic placement-test offer (`SPEC.md` §3.1,
 /// `DESIGN_REFERENCE.md` §5.2) — shown by `_RootRouter` in place of
@@ -31,7 +31,7 @@ class PlacementTestOfferScreen extends ConsumerWidget {
           .markPrompted(profile.uid);
       if (startNow && context.mounted) {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const PlacementTestPlaceholderScreen()),
+          MaterialPageRoute(builder: (_) => PlacementTestScreen(uid: profile.uid)),
         );
       }
     }

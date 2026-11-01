@@ -196,8 +196,10 @@ class ResearchAssessmentController extends _$ResearchAssessmentController {
       _attemptId = snapshot.attemptId;
       switch (snapshot.kind) {
         case ResearchStageKind.notEnrolled ||
+            ResearchStageKind.notEligible ||
             ResearchStageKind.notAuthorized ||
             ResearchStageKind.locked ||
+            ResearchStageKind.stageClosed ||
             ResearchStageKind.voided:
           _set(ResearchAssessmentUnavailable(snapshot.kind));
         case ResearchStageKind.invalid:
@@ -227,7 +229,7 @@ class ResearchAssessmentController extends _$ResearchAssessmentController {
   Future<void> _loadInstrument() async {
     _instrument = await ref.read(
       researchInstrumentProvider(
-        _participant!.assignment.instrumentVersion,
+        _participant!.assignment!.instrumentVersion,
       ).future,
     );
   }
@@ -250,7 +252,7 @@ class ResearchAssessmentController extends _$ResearchAssessmentController {
     }
     final plan = ResearchAttemptPlan.fromOrder(
       instrument: _instrument!,
-      assignment: _participant!.assignment,
+      assignment: _participant!.assignment!,
       itemOrder: attempt.itemOrder,
       optionOrder: attempt.optionOrder,
     );
@@ -286,7 +288,7 @@ class ResearchAssessmentController extends _$ResearchAssessmentController {
     try {
       final plan = planResearchAttempt(
         instrument: _instrument!,
-        assignment: _participant!.assignment,
+        assignment: _participant!.assignment!,
         random: ref.read(researchAssessmentRandomProvider),
       );
       ResearchServiceException? writeError;

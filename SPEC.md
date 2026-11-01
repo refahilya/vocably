@@ -81,40 +81,79 @@ baliknya. Detail teknis di `DATA_MODEL.md` §10.
 
 ### 3.1 Login pertama kali → Placement Test
 
-> **Status: sebagian TBD.** Alur/entry-point di bawah ini sudah final dan
-> boleh diimplementasikan. **Detail teknis penilaian & algoritma penentuan
-> level CEFR-nya belum ditentukan** — masih dicari metode yang punya dasar
-> teori jelas dan sesuai kebutuhan riset Vocably. **Jangan buat asumsi atau
-> sistem skoring sendiri.** Bagian ini akan direvisi begitu metodenya
-> diputuskan. Untuk sekarang, implementasikan hanya scaffolding (routing,
-> entry point, layar placeholder) — lihat `DATA_MODEL.md` §6 dan
-> `DESIGN_REFERENCE.md` §5.2.
+> **Status: diimplementasikan (PT-V1.1), diverifikasi lokal; belum
+> di-deploy — `HANDOFF.md`.** Sumber instrumen: spesifikasi peneliti
+> `Vocably_Spesifikasi_Placement_Test_v1.0.pdf` + `placement_items_v1.0.json`
+> (di luar repo, memuat kunci), dinaikkan ke PT-V1.1 lewat keputusan
+> peneliti (K2, kunci tidak dibundel, kontrol tahap terpisah). Skema &
+> rules: `DATA_MODEL.md` §6; tooling: `tools/research/README.md`.
+> **Aturan skoring K2 dipilih peneliti tetapi belum divalidasi ahli/
+> pembimbing** — jangan disebut tervalidasi.
 
-- Begitu siswa login pertama kali, ditawarkan placement test untuk
-  menentukan level CEFR awal.
-- Placement test **opsional saat itu juga** — bisa langsung dikerjakan atau
-  ditunda ("nanti").
-- **Tawaran otomatis hanya muncul SEKALI seumur akun.** Begitu tawaran itu
-  ditampilkan, aplikasi menandainya (`users.placementTestPrompted = true`)
-  apa pun pilihan siswa. Kalau siswa menunda, **tawaran itu tidak akan
-  muncul lagi di login-login berikutnya** — bukan diulang tiap masuk.
-  Penanda ini perlu karena `placementTestCompleted` tetap `false` baik
-  untuk siswa yang belum pernah ditawari maupun yang sudah ditawari tapi
-  menunda; tanpa penanda, aplikasi tidak bisa membedakan keduanya.
-- **Entry point tersedia di dua tempat:**
-  1. Ditawarkan otomatis **sebelum siswa pertama kali masuk dashboard**
-     (sekali saja, seperti di atas).
-  2. Tersedia **permanen di dalam dashboard** (lihat 3.2) — baik untuk
-     siswa yang menunda tadi (belum pernah ambil), maupun untuk
-     **mengambil ulang** placement test kapan saja siswa mau. Ini
-     satu-satunya jalan masuk setelah tawaran otomatis lewat.
-- Hasil placement test menentukan level CEFR siswa saat ini, ditandai secara
-  visual di pilihan level (lihat 3.3).
-- Begitu metode skoring sudah diputuskan: perhitungan level dilakukan
-  **langsung di client** (tidak lewat Worker — tidak ada rahasia yang perlu
-  disembunyikan di logic skoringnya), dan jawaban mentah siswa tetap
-  disimpan ke Firestore supaya bisa diverifikasi ulang saat analisis
-  skripsi.
+**Tawaran dan entry point**
+- Saat login pertama, siswa ditawari placement test. Tawaran otomatis
+  **hanya muncul sekali seumur akun**: begitu ditampilkan,
+  `users.placementTestPrompted = true` apa pun pilihan siswa. Sesudah itu,
+  satu-satunya jalan masuk adalah link di kartu Level dashboard (3.2).
+
+**Bentuk tes (spesifikasi §3)**
+- 50 butir, satu per layar, "Soal x dari 50"; label band tidak pernah
+  ditampilkan. Urutan band tetap A1→A2→B1→B2→C1, butir diacak di dalam band
+  (urutan disimpan sekali saat attempt dibuat). Opsi A–D **tidak diacak**,
+  ditambah E "Saya tidak tahu" (selalu terakhir, bernilai 0).
+- Tiap butir: satu kalimat bahasa Inggris dengan teks regular; hanya kata
+  target yang **tebal dan bergaris bawah** (penanda `[[kata|bentuk]]`, parser
+  yang sama dengan cerita, jadi bentuk infleksi seperti *encourages* ikut
+  tersorot tanpa pencarian string).
+- Teks petunjuk dipakai **persis** dari spesifikasi §3.3
+  (`placement_instructions.dart`).
+- Jawaban **disimpan setiap memilih** dan **boleh diubah** sampai dikirim;
+  ada tombol Sebelumnya/Berikutnya dan ringkasan di akhir yang menyebut
+  nomor yang belum dijawab. **Kirim jawaban** aktif hanya bila 50 butir
+  terjawab, dengan konfirmasi "Setelah dikirim, jawaban tidak dapat diubah".
+- "Terkirim" baru ditampilkan setelah server menyimpan status `submitted`;
+  level baru ditampilkan setelah server menyimpan hasil yang dinilai.
+- Tidak ada timer. Perpindahan tab/aplikasi tersembunyi
+  (`AppLifecycleListener.onHide`) **hanya dicatat** (`tabSwitchCount`),
+  tanpa peringatan dan tanpa tindakan. Blur jendela (`inactive`) tidak
+  dihitung karena juga terjadi saat address bar/devtools dibuka.
+
+**Hasil yang dilihat siswa**
+- Hanya **level** (A1–C1; A1* ditampilkan sebagai A1) — tidak pernah skor
+  band, total, benar/salah, kunci, atau penanda mutu (termasuk
+  `suspicious_pattern`). Level aktif = `users.resultLevel`, ditandai di
+  kartu Level.
+- Peserta riset juga membaca "Peneliti akan menjelaskan langkah
+  berikutnya." Band riset tidak ditampilkan.
+
+**Dua konteks attempt (`DATA_MODEL.md` §6)**
+- **Riset** — untuk peserta yang didaftarkan peneliti **tanpa band**
+  (`awaiting_placement`): satu attempt resmi, hanya saat jendela
+  `placement` dibuka peneliti. Hasil yang dinilai **otomatis** mengisi band
+  peserta (level + 1; C1 → dikeluarkan dari kohort). Tidak ada tes ulang
+  resmi, kecuali peneliti membatalkan attempt karena gangguan **teknis**
+  lalu membuka attempt baru. Penyelesaian placement **tidak** membuka
+  pretest — peneliti tetap mengotorisasi pretest dan membuka jendelanya.
+- **Belajar** — untuk pengguna biasa, peserta yang dikeluarkan, dan semua
+  akun setelah studi ditutup, bila peneliti membuka "learning placement".
+  Hanya memperbarui `users.resultLevel`; **tidak pernah** mengubah hasil
+  riset, band, atau kelayakan. Tes ulang paling cepat 1 hari setelah hasil
+  sebelumnya.
+
+**Penutupan, gangguan, dan pembatalan**
+- Waktu server (`request.time`) yang menentukan. Kiriman yang diterima
+  sebelum penutupan tetap dinilai sesudahnya; kiriman setelah penutupan
+  ditolak. Saat jendela ditutup di tengah tes: "Tes sedang ditutup.
+  Jawabanmu tersimpan. Tunggu arahan pengawas." — dilanjutkan dengan urutan
+  dan jawaban yang sama saat dibuka lagi. Bila jendela ditutup setelah
+  petunjuk tampil tetapi sebelum siswa menekan "Mulai", penolakan server
+  menghasilkan "Tes belum dibuka. Tunggu arahan pengawas.", bukan pesan
+  koneksi. Attempt yang belum selesai saat studi ditutup tetap tersimpan
+  sebagai tidak lengkap.
+- Penanda dan sinyal **tidak pernah** membatalkan attempt secara otomatis.
+  Pembatalan karena integritas (kecurangan) hanya setelah tinjauan manusia
+  terkonfirmasi, dan **tanpa** attempt pengganti; siswa hanya melihat pesan
+  netral "Hubungi peneliti".
 
 ### 3.2 Dashboard Siswa
 
@@ -135,11 +174,12 @@ Dua destinasi navigasi untuk siswa: **Belajar** dan **Riwayat**.
    lihat 3.5), dan langsung mulai fitur utama 3-fase dari kata-kata ini.
 2. **Level** — 6 pilihan CEFR (A1–C2) dalam satu kelompok pilihan. Semua
    level selalu terlihat/dipilih-bisa, tapi kalau placement test sudah
-   dikerjakan, level tempat siswa berada sekarang ditandai secara visual.
+   dinilai, level aktif (`users.resultLevel`) ditandai secara visual.
    Memilih satu level → masuk ke browse kosakata level itu (lihat 3.3).
-   - **Entry point Placement Test ada di dalam card ini** — "Ambil
-     Placement Test" (kalau belum pernah) atau "Ambil Ulang Placement Test"
-     (kalau sudah pernah), lihat 3.1.
+   - **Entry point Placement Test ada di dalam card ini** — "Ambil Tes
+     Penempatan" (kalau belum pernah) atau "Lihat Tes Penempatan" (kalau
+     sudah); layar tes sendiri yang menentukan apakah attempt baru boleh
+     (3.1).
    - **Catatan cakupan data:** sumber utama bank kosakata (Oxford
      3000/5000) hanya mencakup level **A1–C1**. Level **C2 tetap
      ditampilkan sebagai pilihan**, tapi kontennya kosong sampai ada kata
@@ -312,8 +352,16 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 > ekspor: `tools/research/README.md`. **Status implementasi, deploy, dan
 > validasi: `HANDOFF.md`.** Aplikasi tidak melacak sesi treatment, jadi
 > pembukaan posttest adalah pernyataan (atestasi) peneliti, bukan bukti
-> otomatis bahwa sesi ke-4 selesai. Placement Test (3.1) **ditunda** dan
-> bukan prasyarat modul ini.
+> otomatis bahwa sesi ke-4 selesai. Peserta bisa didaftarkan dengan band
+> dari peneliti (enrolmen lama) atau **tanpa band** lalu mendapat band dari
+> Placement Test riset (3.1).
+
+**Kontrol tahap (PT-V1.1):** pretest dan posttest punya jendela buka/tutup
+**terpisah** (`researchStudy/current`, waktu server), selain otorisasi per
+peserta. Jendela tertutup → banner "Ditutup" dan layar "Tes sedang ditutup"
+(jawaban tersimpan); studi ditutup → semua percobaan yang belum selesai beku
+dan tercatat tidak lengkap. Peserta tanpa band, dikeluarkan, berstatus
+`conditional` (band manual) atau dalam tinjauan → "Belum tersedia".
 
 **Ketentuan instrumen (dari PDF; jangan diubah atau diparafrasekan):**
 
@@ -371,17 +419,19 @@ siswa mengulang tes dan kejadiannya dicatat.
 
   | | Placement Test | Pre-Test / Post-Test |
   |---|---|---|
-  | Tujuan | Personalisasi konten belajar (tentukan `cefrLevel`) | Pengukuran data penelitian (kemampuan sebelum/sesudah) |
+  | Tujuan | Level belajar siswa (`users.resultLevel`) dan, untuk peserta, band riset | Pengukuran data penelitian (kemampuan sebelum/sesudah) |
   | Sifat | Bagian dari mekanisme aplikasi, dipakai siswa manapun | Instrumen riset skripsi, terikat desain penelitian pretest-posttest |
   | Kapan diambil | Ditawarkan sekali sebelum dashboard pertama, bisa diambil/diulang kapan saja lewat dashboard | Pre-Test di awal (sebelum sesi treatment pertama), Post-Test segera setelah sesi treatment ke-4 |
   | Hasil dipakai untuk | Menentukan level/kata yang ditampilkan ke siswa | Data analisis skripsi (dibandingkan pre vs post) |
-  | Collection | `placementTestResults` | `researchAssessmentResults` |
+  | Penilaian | Dihitung ulang Security Rules dari jawaban beku (K2) | Offline oleh peneliti dengan kunci privat |
+  | Collection | `placementAttempts` | `researchAssessmentResults` |
 
 - **Posisi di UI:** section tersendiri di layar "Belajar", **di bawah** dua
   card utama (3.2) — terpisah secara visual & struktural, bukan bagian dari
   card Level maupun destinasi Riwayat.
 - Banner Pre-Test/Post-Test menampilkan status asli dari server (belum
-  terdaftar, belum dibuka, siap, lanjutkan, selesai, dibatalkan) dan
+  terdaftar/belum tersedia, belum dibuka, ditutup, siap, lanjutkan, selesai,
+  dibatalkan) dan
   membuka layar tes (`DESIGN_REFERENCE.md` §5.5).
 
 ## 4. Alur Guru
@@ -772,7 +822,7 @@ sebagai dua field independen di data model (bukan satu enum gabungan), lihat
 
 ## 8. Daftar Fungsional Ringkas
 
-**Siswa:** placement test (entry point saja, penilaian TBD — ditunda), riwayat
+**Siswa:** placement test PT-V1.1 (riset & belajar; hanya level yang ditampilkan), riwayat
 pembelajaran (dua tab: per kata & per sesi), jelajah & cari kosakata (3 mode:
 abjad/tema/POS), memilih kosakata, tambah/kurang kata di keranjang pelajari,
 generate story dari judul/tema (berkali-kali, cerita saat "Selanjutnya"
