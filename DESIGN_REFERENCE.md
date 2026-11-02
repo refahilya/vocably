@@ -383,7 +383,9 @@ Mengikuti identitas warna & shape language yang sama dengan dashboard siswa
 
 - Wordmark "Vocably" + aksi keluar, seperti siswa (§6.1).
 - **Navigasi yang sama polanya dengan siswa** (§6) dengan dua destinasi:
-  **"Target Kata"** (ikon target) dan **"Kosakata"** (ikon buku/plus).
+  **"Target Kata"** (ikon target) dan **"Kosakata"** (ikon buku/plus). Akun
+  operator peneliti mendapat destinasi ketiga **"Riset"** (ikon daftar
+  centang) — Panel Riset, §5.9.
 - **Destinasi "Target Kata":** tombol "+ Set Target Baru" di atas, lalu
   daftar target yang sudah pernah di-set sebagai card (rentang waktu, jumlah
   kata, level) — style card sama dengan card sesi di §3.3. Tap "+ Set Target
@@ -538,6 +540,41 @@ layar kosong atau spinner yang menggantung:
 Prinsipnya: **siswa tidak boleh pernah melihat pesan error mentah** dari
 Firestore, Worker, atau DictionaryAPI.
 
+### 5.9 Panel Riset (destinasi "Riset", khusus operator peneliti)
+
+Perilaku: `SPEC.md` §4.3. Metafora: **daftar hadir di buku latihan** —
+pertama tahap tes, lalu satu baris per peserta. Implementasi:
+`lib/screens/teacher/research_panel/` (layar + dialog).
+
+- **Judul halaman** "Panel Riset" (`pageTitle`) dengan baris keterangan
+  "Studi aktif, *n* peserta". Notice hasil tindakan (`AppNotice`, sukses
+  atau error) muncul di bawah judul dan bisa ditutup.
+- **Tahap tes** — satu `AppSheet`, tiga baris dipisah garis tipis. Tiap baris:
+  nama tahap (`wordRow`), keterangan jendela (`caption`), ringkasan jumlah
+  (`bodyMuted`), dan kontrol di kanan (≥ 560 px) atau di bawah (HP).
+  **Stabilo hanya pada tahap yang sedang dibuka**: garis kiri kuning 4 px +
+  label kuning "Sedang dibuka". Tombol **Buka** = solid navy; **Tutup** dan
+  **Izinkan *n* peserta** = outline (keduanya berefek, jadi selalu lewat
+  dialog konfirmasi).
+- **Daftar peserta** — kolom cari + chip filter (Semua / Bisa ditindak /
+  Sedang mengerjakan). ≥ 900 px: tabel (kepala kolom `surfaceAlt`; kolom
+  Peserta, Placement Test, Pre-Test, Post-Test). < 900 px: satu blok per
+  peserta, label tahap 104 px di kiri, status di kanan. Status sel memakai
+  warna nada (`AppTone`): netral = abu redup, info (mengerjakan) = biru +
+  bilah progres tipis navy, sukses (band, selesai) = hijau, peringatan
+  (dibatalkan, perlu peneliti) = amber. Aksi sel = `TextButton` kecil di
+  bawah status.
+- **Dialog** (`AlertDialog`, maks 440 px): tindakan berisiko punya
+  pernyataan yang **wajib dicentang** sebelum tombol konfirmasi aktif (band
+  dari Placement/K2, sesi ke-4 selesai, ini gangguan teknis). Dialog buka
+  tahap memakai radio: "Sampai saya tutup" / tutup otomatis 60/90/120 menit.
+- **Riwayat tindakan** — `AppSheet` berisi baris waktu (`caption`, 84 px) +
+  kalimat tindakan; empty state berupa notice netral.
+- Tidak ada skor, jawaban, atau warna benar/salah di mana pun. Diuji di
+  `test/responsive/responsive_screens_test.dart` ("researcher panel") di
+  semua viewport, teks 130%, HP miring, dan target sentuh.
+
+
 ## 6. Navigasi & Responsif (baru di versi 6)
 
 ### 6.1 Navigasi tunggal, dua bentuk
@@ -557,8 +594,10 @@ Isi destinasi yang sedang terbuka tetap hidup saat bentuknya berganti, misalnya
 tablet diputar di tengah mengisi form.
 
 Bangun sebagai **satu widget shell reusable** yang dipakai baik oleh siswa
-(Belajar · Riwayat) maupun guru (Target Kata · Kosakata) — jangan dua
-implementasi terpisah.
+(Belajar · Riwayat) maupun guru (Target Kata · Kosakata, + Riset untuk
+operator peneliti) — jangan dua implementasi terpisah. Kalau jumlah destinasi
+berubah saat app terbuka (operator dicabut), tab terpilih dijepit ke tab yang
+masih ada.
 
 ### 6.2 Aturan responsif
 

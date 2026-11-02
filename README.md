@@ -5,7 +5,7 @@ A responsive, mobile-first Flutter web application for learning English vocabula
 2. **Cloze Test:** Fill in blanks for the target words within the generated story.
 3. **Co-Write:** Collaborative turn-based story writing with an AI partner.
 
-This project also serves as a research instrument for a bachelor's thesis, incorporating student mastery tracking, teacher target-word assignments, vocabulary editing, and an in-app research pretest/posttest with offline scoring tooling.
+This project also serves as a research instrument for a bachelor's thesis, incorporating student mastery tracking, teacher target-word assignments, vocabulary editing, an in-app research pretest/posttest with offline scoring tooling, and a Researcher Panel for running test sessions from the app.
 
 ---
 
@@ -27,7 +27,7 @@ Each kind of information has one owner; other documents link to it instead of co
 | [`SPEC.md`](SPEC.md) | Product and functional behaviour |
 | [`DATA_MODEL.md`](DATA_MODEL.md) | Firestore schemas, security-rules logic, Worker API contracts |
 | [`DESIGN_REFERENCE.md`](DESIGN_REFERENCE.md) | Visual identity, UI patterns, responsive layout |
-| [`tools/research/README.md`](tools/research/README.md) | Research tooling: instrument bank build, private answer key, emulator tests, researcher administration, export and scoring |
+| [`tools/research/README.md`](tools/research/README.md) | Research tooling: instrument bank build, private answer key, emulator tests, researcher administration (incl. the one-time Researcher Panel operator grant), export and scoring |
 | [`tools/vocab_import/README.md`](tools/vocab_import/README.md) | Oxford 3000/5000 vocabulary import and bundle generation |
 
 **Reading order for a new session:** `CLAUDE.md`, then `HANDOFF.md`, then whichever of `SPEC.md`, `DATA_MODEL.md` or `DESIGN_REFERENCE.md` the task touches.
@@ -121,4 +121,4 @@ npx wrangler deploy --var "ALLOWED_ORIGINS:https://vocably-idn-en.web.app,https:
 Secrets (`OPENAI_API_KEY`) are managed with `wrangler secret`; never print or commit `.dev.vars`.
 
 ### 4. Research data collection
-Production setup for the pretest/posttest and the Placement Test (seeding the bank and placement-key documents, the study and stage windows, enrolling participants, opening stages, export) uses the researcher tooling with the researcher's own service account and is never automatic. See `tools/research/README.md`, and the blockers and open decisions in `HANDOFF.md`.
+Production setup for the pretest/posttest and the Placement Test (seeding the bank and placement-key documents, the study and stage windows, enrolling participants, opening stages, export) uses the researcher tooling with the researcher's own service account and is never automatic. Once that setup and the one-time `operator --grant` are done, the classroom steps (opening/closing stages, authorizing, monitoring, technical retakes) can run from the app's Researcher Panel. See `tools/research/README.md` ("Researcher Panel"), and the blockers and open decisions in `HANDOFF.md`.

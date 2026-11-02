@@ -126,6 +126,7 @@ lib/
       dashboard/
       target_words/
       vocab_management/   # termasuk tambah kata & edit topik kata
+      research_panel/     # Panel Riset — hanya untuk operator peneliti (bagian 10)
   widgets/          # komponen UI reusable (layout responsif, feedback, nav shell, dsb)
   theme/            # theme.dart — single source of truth warna, tipografi, spacing
   utils/            # normalizeWord(), parser penanda cerita, konstanta sentinel — lihat §8
@@ -532,6 +533,9 @@ disatukan atau ditukar-tukar pemahamannya:
   - Hasil untuk siswa hanya **level** (`users.resultLevel`); skor band,
     total, dan penanda mutu tidak pernah disimpan atau ditampilkan —
     diturunkan offline (`bin/export_placement.js`).
+  - **Setiap band responden berasal dari Placement Test riset** (keputusan
+    peneliti): `enrol` hanya membuat peserta tanpa band
+    (`awaiting_placement`); tidak ada lagi kolom band di CSV enrolmen.
   - Attempt **riset** (peserta tanpa band) mengisi band peserta otomatis;
     attempt **belajar** tidak pernah menyentuh data riset. Sinyal (penanda,
     `tabSwitchCount`) tidak pernah memicu tindakan; pembatalan integritas
@@ -575,7 +579,8 @@ disatukan atau ditukar-tukar pemahamannya:
     peserta.
   - **Jangan klaim penyelesaian sesi treatment ke-4 terverifikasi otomatis** —
     aplikasi belum melacak sesi treatment; pembukaan posttest adalah atestasi
-    peneliti (`--confirm-session4-completed`).
+    peneliti (`--confirm-session4-completed` di CLI, atau centang wajib di
+    Panel Riset yang tercatat di `researchAuditLog`).
   - **Keputusan riset yang belum final** (mis. review ahli B2-06, retensi data,
     prosedur retake, akses ekspor) tercatat di `HANDOFF.md` — jangan
     diputuskan sendiri.
@@ -584,9 +589,20 @@ disatukan atau ditukar-tukar pemahamannya:
     Pre, N-gain = (Post − Pre)/(20 − Pre) dan tidak dihitung bila Pre = 20.
     Siswa tidak pernah melihat feedback benar/salah, skor, atau kunci.
 
+- **Panel Riset** (`SPEC.md` §4.3, `DATA_MODEL.md` §6d) — tugas kelas
+  (buka/tutup tahap, otorisasi, pantau, void teknis + retake) untuk **satu**
+  operator peneliti, lewat login biasa. Wewenang = `researchOperators/{uid}`
+  yang **hanya** ditulis tooling (`research_admin.js operator --grant`);
+  jangan pernah membuat jalur client untuk menulisnya. Setiap tulisan panel
+  sempit, diperiksa ulang rules, dan membuat entri `researchAuditLog` di
+  batch yang sama. Panel **tidak pernah** membaca dokumen attempt (memuat
+  jawaban) — progres dibaca dari cermin `researchProgress`; jangan tambahkan
+  baca attempt, skor, atau kunci ke panel. Kebijakan yang belum final
+  (void integritas, band manual, `conditional`, tinjauan) tetap tooling saja.
+
 Placement Test dan Pre/Post Test: dibangun bertahap per milestone yang
-disetujui — jangan melompat ke milestone berikutnya (mis. tooling enrolmen
-peserta tanpa band, deploy) tanpa persetujuan eksplisit.
+disetujui — jangan melompat ke milestone berikutnya (mis. deploy) tanpa
+persetujuan eksplisit.
 
 ### Satu hal lain yang berstatus ditunda
 

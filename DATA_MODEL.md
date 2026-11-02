@@ -807,57 +807,65 @@ attempt placement **riset** yang dinilai mengisi band peserta.
 > `services/research_assessment_service.dart`; tooling peneliti
 > `tools/research/bin/research_admin.js` menulis `researchInstrument` dan
 > `researchParticipants`, mengotorisasi tahap, membatalkan (void) percobaan,
-> dan mengotorisasi retake, serta mengelola studi dan jendela tahap.
+> dan mengotorisasi retake, serta mengelola studi dan jendela tahap. Tugas
+> harian di kelas (buka/tutup tahap, otorisasi, pantau, void teknis + retake)
+> juga bisa dilakukan satu operator peneliti lewat **Panel Riset** di app
+> (§6d).
 > **Status deploy rules dan data riset di produksi: `HANDOFF.md`.**
 
 **Model kepercayaan (Spark, tanpa Cloud Functions):** dokumen
 `researchParticipants`, `researchInstrument` dan `researchStudy` ditulis
-oleh tooling peneliti lokal (Admin SDK, melewati rules). Satu-satunya
-tulisan client ke `researchParticipants` adalah band otomatis dari attempt
-placement riset miliknya yang dinilai dalam batch yang sama (dihitung ulang
-rules, §6). Siswa sendiri yang membuat dan mengisi `researchAssessmentResults`
+oleh tooling peneliti lokal (Admin SDK, melewati rules). Tulisan client ke
+`researchParticipants` hanya dua: band otomatis dari attempt placement riset
+miliknya yang dinilai dalam batch yang sama (dihitung ulang rules, §6), dan
+langkah otorisasi sempit dari **operator Panel Riset** (§6d). Siswa sendiri yang membuat dan mengisi `researchAssessmentResults`
 miliknya, dengan setiap tulisan divalidasi rules. **Tidak pernah disimpan di
 dokumen yang bisa dibaca client:** kunci jawaban, penanda benar/salah, kode
 B/S/T/K, skor.
 
-### `researchParticipants/{uid}` — hanya tooling peneliti yang menulis
+### `researchParticipants/{uid}` — ditulis tooling peneliti (+ band otomatis, + otorisasi dari Panel Riset)
 
 | Field | Tipe | Keterangan |
 |---|---|---|
 | (docId) | uid Firebase | **Identitas yang bisa ditautkan ke orang** — tidak pernah diekspor |
 | `researchId` | string | ID pseudonim acak; satu-satunya ID di ekspor |
-| `band` | `"A2" \| "B1" \| "B2" \| "C1"` \| null | **Boleh kosong** selama menunggu Placement. Diisi otomatis dari attempt placement riset (level + 1), atau oleh peneliti (enrolmen lama `researcher_assigned`; band manual `manual_review`). **Bukan dari `users.cefrLevel`/`resultLevel`** |
+| `band` | `"A2" \| "B1" \| "B2" \| "C1"` \| null | **Kosong saat enrolmen** — setiap band responden berasal dari attempt Placement Test riset (level + 1; keputusan peneliti). Selain itu hanya band manual `manual_review` setelah void integritas. Rules masih menerima dokumen lama `researcher_assigned`, tetapi tooling **tidak lagi membuatnya**. **Bukan dari `users.cefrLevel`/`resultLevel`** |
 | `bandSource` | string \| null | `"placement_test"` \| `"researcher_assigned"` \| `"manual_review"` |
-| `status` | string \| absent | `awaiting_placement` \| `enrolled` \| `excluded` \| `awaiting_manual_band` \| `conditional`. **Absent = `enrolled`** (dokumen dari enrolmen lama dengan band) |
+| `status` | string \| absent | `awaiting_placement` (hasil `enrol`) \| `enrolled` \| `excluded` \| `awaiting_manual_band` \| `conditional`. **Absent = `enrolled`** (dokumen dari enrolmen lama dengan band) |
 | `exclusionReason` | string \| null | mis. `"placement_c1"` |
 | `placementAttemptId` | string \| null | attempt placement riset asal band |
 | `reviewStatus` | null \| `pending` \| `confirmed` \| `not_confirmed` | tinjauan manusia; `pending` memblokir aksi riset. Alasan **hanya** di `researchReviews` |
 | `bandHistory` | array | hanya tooling: entri `revoked` / `restored` / `manual` (band, sumber, attempt, waktu) |
 | `instrumentVersion` | string | `"v1"` (pretest/posttest) |
-| `authorizedAttempts` | map `{placement?: int, preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. Enrolmen sendiri **tidak** membuka pretest/posttest. Posttest dibuka peneliti setelah sesi treatment ke-4; retake = peneliti menaikkan angka ini |
+| `authorizedAttempts` | map `{placement?: int, preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. `enrol` menulis `{placement: 1, preTest: 0, postTest: 0}`: placement riset diizinkan sejak enrolmen (waktunya diatur jendela tahap), pretest/posttest **tidak**. Posttest diizinkan peneliti setelah sesi treatment ke-4 (CLI atau panel, dengan atestasi); retake = peneliti menaikkan angka ini |
 | `cohort` | string | `study` / `pilot` / `test` |
 | `createdAt`, `updatedAt` | Timestamp | |
 
-Rules: pemilik boleh `get` dokumennya sendiri; tidak ada `list`; create /
-delete dari client **selalu ditolak**; update dari client **hanya**
-`validPlacementBandWrite` (status `awaiting_placement` + band kosong + tidak
-ada tinjauan `pending` → band = `pretestTargetBand` attempt riset yang
-dinilai di batch yang sama, atau `excluded/placement_c1` untuk C1).
+Rules: pemilik boleh `get` dokumennya sendiri; operator aktif boleh `get`
+dan `list` (§6d); create / delete dari client **selalu ditolak**; update
+dari client **hanya** `validPlacementBandWrite` (status `awaiting_placement`
++ band kosong + tidak ada tinjauan `pending` → band = `pretestTargetBand`
+attempt riset yang dinilai di batch yang sama, atau `excluded/placement_c1`
+untuk C1) atau `validOperatorParticipantWrite` (operator: otorisasi 0 → 1
+atau retake n → n + 1, §6d).
 
 **Kelayakan pretest/posttest** (rules + `research_admin.js authorize`):
 band A2–C1, `status` `enrolled` (atau absent), tidak ada tinjauan `pending`,
 studi `active`, dan jendela tahap terbuka. `conditional` (band manual)
 **ditolak** sampai kriteria inklusi bersyarat diputuskan. Band dari
 placement butuh atestasi `--acknowledge-placement-policy` saat `authorize`
-(K2 belum divalidasi ahli).
+(K2 belum divalidasi ahli); di panel, atestasi yang sama berupa centang wajib
+yang tercatat di `researchAuditLog`.
 
-### `researchStudy/current` — siklus studi dan jendela tahap (tooling saja; client boleh `get`)
+### `researchStudy/current` — siklus studi dan jendela tahap (status: tooling saja; jendela: tooling atau operator panel; client boleh `get`)
 
 | Field | Tipe | Keterangan |
 |---|---|---|
 | `status` | `setup` \| `active` \| `closed` | `closed` final; semua tulisan riset (attempt belum selesai) beku |
 | `closedAt` | Timestamp \| null | |
-| `stages.placement` / `stages.preTest` / `stages.postTest` | `{openAt, closeAt}` | Timestamp server. Terbuka bila `openAt ≤ request.time < closeAt`; "buka" = `openAt` sekarang, `closeAt` jauh di depan atau yang ditentukan; "tutup" = `closeAt` = waktu server sekarang. Jendela yang tidak ada = tertutup |
+| `stages.placement` / `stages.preTest` / `stages.postTest` | `{openAt, closeAt}` | Timestamp server. Terbuka bila `openAt ≤ request.time < closeAt`; "buka" = `openAt` sekarang, `closeAt` jauh di depan (`9999-12-31T23:59:59Z`) atau yang ditentukan; "tutup" = `closeAt` = waktu server sekarang. Jendela yang tidak ada = tertutup |
+| `operatorSeq` | int \| absent | Jumlah perubahan jendela dari Panel Riset; tiap perubahan menaikkannya tepat 1 dan membuat `researchAuditLog/study_{seq}` (§6d). Absent = 0 |
+| `updatedAt` | Timestamp | |
 
 ### `researchInstrument/{version}_{band}` — data bank publik untuk rules
 
@@ -887,7 +895,7 @@ peneliti sebelum rules ini di-deploy.**
 | `lastAnsweredItemId` | string \| null | Butir yang ditulis pada tulisan terakhir (pembantu rules) |
 | `status` | `"in_progress" \| "completed" \| "voided"` | `voided` hanya oleh tooling peneliti. "Tidak selesai" = tetap `in_progress` (tidak pernah otomatis `completed`) |
 | `startedAt`, `updatedAt`, `completedAt` | Timestamp | Semua = `request.time` (waktu server); `completedAt` null sampai selesai |
-| `voidReason`, `voidedAt` | string, Timestamp | Hanya tooling peneliti (`research_admin.js void`; insiden teknis). Void tidak menghapus jawaban apa pun; retake = peneliti menaikkan `authorizedAttempts[stage]` ke n+1 (`retake`), hanya setelah percobaan n di-void |
+| `voidReason`, `voidedAt` | string, Timestamp | Tooling peneliti (`research_admin.js void`, alasan teks) atau operator panel (hanya kode tetap `technical_interruption`, hanya percobaan `in_progress` yang sedang diotorisasi, §6d). Void tidak menghapus jawaban apa pun; retake = menaikkan `authorizedAttempts[stage]` ke n+1, hanya setelah percobaan n di-void |
 
 Yang ditegakkan rules:
 - **Baca:** percobaan yang sudah ada hanya oleh UID yang tersimpan di
@@ -963,6 +971,110 @@ jangan diedit manual. Skema lengkap & prosedurnya di
 - **Tanpa kunci jawaban** — tidak ada field correct/answer/key/letter/score.
   Kunci privat (ID butir → ID opsi benar) hanya ditulis ke path eksplisit
   di luar repo dan di luar OneDrive, dan tidak pernah dibaca oleh app.
+
+## 6d. Panel Riset — `researchOperators`, `researchRoster`, `researchProgress`, `researchAuditLog`
+
+Panel Riset (`SPEC.md` §4.3) memindahkan tugas kelas dari CLI ke app untuk
+**satu** akun peneliti. Identitas = login Firebase Auth biasa (akun guru);
+wewenang = dokumen `researchOperators/{uid}` yang **hanya** ditulis tooling
+(`research_admin.js operator --grant`). Tidak ada client yang bisa menulis
+dokumen itu, jadi tidak ada akun yang bisa mengangkat dirinya. Menu "Riset"
+yang disembunyikan hanya soal tampilan; **setiap tulisan panel diperiksa
+ulang rules** (`isResearchOperator()` = dokumen ada dan `active == true`,
+dibaca ulang tiap request, sehingga pencabutan berlaku seketika).
+
+### `researchOperators/{uid}` — tooling saja
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `email` | string | e-mail akun (huruf kecil), untuk catatan |
+| `active` | bool | `false` setelah `operator --revoke` (dokumen disimpan sebagai catatan) |
+| `grantedAt`, `revokedAt` | Timestamp \| null | |
+
+Rules: hanya pemilik yang boleh `get`; tidak ada `list`/tulisan client.
+Tooling menolak grant kalau akun tidak ada di Auth, tanpa profil, bukan
+`guru`, peserta riset, atau sudah ada operator aktif lain (satu operator).
+
+### `researchRoster/{uid}` — tooling saja; operator boleh baca
+
+`{ researchId, name, cohort, createdAt }` — nama dari `users.name` saat
+`enrol`, agar panel bisa menampilkan nama di samping ID riset. Dipisah dari
+`researchParticipants` supaya data riset dan ekspor tetap tanpa nama. Nama
+**tidak** ikut berubah kalau siswa mengganti nama setelah enrolmen.
+
+### `researchProgress/{attemptId}` — cermin progres (ditulis siswa pemilik)
+
+ID = ID attempt (`{uid}_research_{n}` untuk placement riset,
+`{uid}_{preTest|postTest}_{n}`).
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `studentId` | uid | pemilik attempt |
+| `stage` | `placement` \| `preTest` \| `postTest` | |
+| `attemptNumber` | int | |
+| `answered` | int | jumlah jawaban tersimpan (**bukan** jawabannya, **bukan** skor) |
+| `total` | 50 \| 20 | |
+| `status` | string | status attempt (`in_progress`, `submitted`, `scored`, `completed`, `voided`) |
+| `updatedAt` | Timestamp | waktu server |
+
+Alasannya: rules tidak bisa membatasi field yang dibaca, jadi kalau operator
+membaca dokumen attempt ia ikut menerima semua jawaban. Panel karena itu
+**tidak pernah** membaca `researchAssessmentResults` atau `placementAttempts`.
+App siswa menulis cermin ini setelah setiap tulisan attempt yang tersimpan
+(best effort: tidak pernah ditunggu dan tidak pernah memblokir siswa); rules
+hanya menerimanya kalau **sama persis** dengan attempt tersimpan (`get()`
+attempt: pemilik, nomor, status, jumlah jawaban). Attempt placement
+**belajar** tidak dicerminkan. Tooling `void`/`placement-void`/
+`placement-restore` ikut memperbarui `status` cermin. Hanya operator yang
+boleh membaca. Kalau cermin tertinggal (siswa offline), tulisan berikutnya
+memperbaikinya; keputusan rules tidak pernah memakai cermin ini.
+
+### `researchAuditLog/{id}` — create-only, operator
+
+`{ action, stage, targetUid, attemptNumber, seq, operatorUid, at,
+session4Confirmed, placementPolicyAcknowledged, reason }` (semua field selalu
+ada). ID diturunkan dari perubahannya, sehingga **setiap perubahan punya
+tepat satu entri dan entri tidak bisa ada tanpa perubahannya** (tulisan
+target mensyaratkan `existsAfter` entri; entri mensyaratkan `getAfter` target
+yang sudah berubah). Tidak bisa diubah atau dihapus.
+
+| Aksi panel | Tulisan dalam satu batch | ID entri |
+|---|---|---|
+| Buka tahap *s* | `researchStudy/current`: `stages.s = {openAt: now, closeAt}` (`closeAt` > now: 9999 = sampai ditutup, atau now + 60/90/120 menit jam perangkat), `operatorSeq` + 1 | `study_{seq}` (`open_stage`) |
+| Tutup tahap *s* | `stages.s.closeAt = now` (hanya bila sedang terbuka), `operatorSeq` + 1 | `study_{seq}` (`close_stage`) |
+| Izinkan pretest/posttest | `researchParticipants/{uid}.authorizedAttempts.{s}` 0 → 1 | `authorize_{s}_{uid}_1` |
+| Ulang karena gangguan teknis | attempt *n* `in_progress` → `voided` (`voidReason: technical_interruption`) + `authorizedAttempts.{s}` n → n+1 | `void_{uid}_{s}_{n}` + `retake_{s}_{uid}_{n+1}` |
+| Izinkan ulang (attempt sudah di-void) | `authorizedAttempts.{s}` n → n+1 | `retake_{s}_{uid}_{n+1}` |
+
+Syarat rules (selain operator aktif dan entri audit):
+- **Jendela:** studi `active`; hanya satu tahap per tulisan; `status` studi
+  tidak pernah boleh berubah; tahap yang sedang terbuka tidak bisa "dibuka"
+  lagi dan tahap tertutup tidak bisa "ditutup".
+- **Otorisasi:** hanya `authorizedAttempts.{s}` + `updatedAt`; peserta punya
+  band A2–C1, `enrolled`, tanpa tinjauan `pending`; bank band itu sudah
+  di-seed; posttest mensyaratkan attempt pretest `completed` dan entri dengan
+  `session4Confirmed: true`; entri wajib `placementPolicyAcknowledged ==
+  (bandSource == 'placement_test')`.
+- **Void/retake:** hanya attempt `in_progress` yang sedang diotorisasi, tanpa
+  mengubah jawaban; retake hanya setelah attempt *n* `voided`; pretest tidak
+  bisa di-void/retake setelah posttest diizinkan.
+- Operator **tidak** bisa: mengubah band/status/cohort/review, membuat atau
+  menghapus peserta, mengubah status studi, menulis roster/operator/kunci/
+  bank/`placementConfig`, membaca attempt, kunci, bank, `researchReviews`,
+  atau profil `users` orang lain.
+
+Batas Firestore 20 `get()` per batch membuat otorisasi massal dikirim **satu
+batch per siswa** (aksi "Izinkan *n* peserta" berjalan berurutan; satu
+penolakan tidak menghentikan yang lain). Payload panel dikunci oleh fixture
+`tools/research/test/fixtures/operator_client_payloads.json` (diuji di Dart
+lewat `test/research_panel_payloads_test.dart` dan diputar ulang terhadap
+rules asli di emulator).
+
+Yang tetap **hanya lewat tooling**: seed instrumen/kunci, status studi,
+enrolmen + roster, grant/revoke operator, tinjauan, void integritas, void
+attempt yang sudah `completed`, semua aksi placement riset selain membuka/
+menutup jendela (void, retake, restore, band manual), ekspor & skoring, dan
+placement belajar (`learning-placement`).
 
 ## 7. Ringkasan Relasi
 

@@ -134,8 +134,10 @@ baliknya. Detail teknis di `DATA_MODEL.md` §10.
 
 **Dua konteks attempt (`DATA_MODEL.md` §6)**
 - **Riset** — untuk peserta yang didaftarkan peneliti **tanpa band**
-  (`awaiting_placement`): satu attempt resmi, hanya saat jendela
-  `placement` dibuka peneliti. Hasil yang dinilai **otomatis** mengisi band
+  (`awaiting_placement`; **semua** responden didaftarkan begini, karena
+  setiap band riset harus berasal dari Placement Test riset): satu attempt
+  resmi, hanya saat jendela `placement` dibuka peneliti (CLI atau Panel
+  Riset, 4.3). Hasil yang dinilai **otomatis** mengisi band
   peserta (level + 1; C1 → dikeluarkan dari kohort). Tidak ada tes ulang
   resmi, kecuali peneliti membatalkan attempt karena gangguan **teknis**
   lalu membuka attempt baru. Penyelesaian placement **tidak** membuka
@@ -358,9 +360,10 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 > ekspor: `tools/research/README.md`. **Status implementasi, deploy, dan
 > validasi: `HANDOFF.md`.** Aplikasi tidak melacak sesi treatment, jadi
 > pembukaan posttest adalah pernyataan (atestasi) peneliti, bukan bukti
-> otomatis bahwa sesi ke-4 selesai. Peserta bisa didaftarkan dengan band
-> dari peneliti (enrolmen lama) atau **tanpa band** lalu mendapat band dari
-> Placement Test riset (3.1).
+> otomatis bahwa sesi ke-4 selesai. Semua peserta didaftarkan **tanpa
+> band** (`research_admin.js enrol`, dengan e-mail atau UID) lalu mendapat
+> band dari Placement Test riset (3.1). Tugas harian (buka/tutup tahap,
+> otorisasi, pantau, gangguan teknis) bisa dari **Panel Riset** (4.3).
 
 **Kontrol tahap (PT-V1.1):** pretest dan posttest punya jendela buka/tutup
 **terpisah** (`researchStudy/current`, waktu server), selain otorisasi per
@@ -444,7 +447,8 @@ siswa mengulang tes dan kejadiannya dicatat.
 
 ### 4.1 Dashboard Guru
 Dua destinasi navigasi (pola navigasi responsif yang sama seperti siswa —
-rail kiri di layar lebar, tab atas di HP):
+rail kiri di layar lebar, tab atas di HP). Akun guru yang terdaftar sebagai
+operator peneliti mendapat destinasi ketiga, **Riset** (4.3):
 
 1. **Set Target Kata** — guru pilih kata mulai dari level CEFR tertentu,
    cari kata yang diinginkan, lalu pakai pola "keranjang target kata" (mirip
@@ -479,11 +483,53 @@ rail kiri di layar lebar, tab atas di HP):
 yang menulis ke bank kosakata. Siswa read-only (lihat 3.5).
 
 ### 4.2 Scope Guru saat ini (skripsi) vs. Pengembangan Lanjutan
-Untuk skripsi, fitur guru dibatasi pada 4.1. **Sisakan ruang arsitektur**
+Untuk skripsi, fitur guru dibatasi pada 4.1 (dan Panel Riset 4.3 khusus
+akun peneliti). **Sisakan ruang arsitektur**
 (data model & routing) untuk pengembangan lanjutan: guru melihat progres
 belajar siswa, baik per-siswa maupun per-kata/kelompok kata. Jangan
 implementasikan fitur ini sekarang, tapi jangan buat keputusan desain data
 yang mempersulit penambahannya nanti.
+
+### 4.3 Panel Riset (khusus operator peneliti)
+
+Satu akun peneliti (akun guru biasa, login biasa) bisa mengelola tes riset
+dari app, tanpa CLI, selama pengambilan data di sekolah. Akun itu
+didaftarkan **sekali** oleh peneliti lewat
+`research_admin.js operator --grant --email <e-mail>` (butuh kredensial
+service account; tidak bisa dilakukan dari app). Guru lain dan siswa tidak
+pernah melihat atau bisa memakai panel. Skema & rules: `DATA_MODEL.md` §6d.
+
+Isi panel (destinasi **Riset**):
+- **Tahap tes** — Placement Test, Pre-Test, Post-Test: status jendela
+  (dibuka sejak/tutup otomatis/ditutup/belum pernah dibuka), ringkasan
+  jumlah peserta per status, tombol **Buka** (sampai ditutup, atau tutup
+  otomatis setelah 60/90/120 menit) dan **Tutup** (dengan konfirmasi). Tahap
+  yang sedang dibuka ditandai stabilo.
+- **Izinkan *n* peserta** — otorisasi massal Pre-Test/Post-Test untuk semua
+  peserta yang siap. Pre-Test mewajibkan centang pernyataan bahwa band
+  berasal dari Placement Test (K2, belum divalidasi ahli); Post-Test
+  tambahan mewajibkan centang **"Sesi treatment ke-4 sudah selesai"**
+  (aplikasi tidak melacak sesi treatment, jadi ini atestasi peneliti).
+  Post-Test hanya bisa diizinkan setelah Pre-Test peserta itu selesai.
+- **Daftar peserta** — nama (roster) + ID riset, lalu satu sel per tahap:
+  belum mulai / mengerjakan *x/n* (bilah progres) / terkirim / band /
+  selesai / dibatalkan / menunggu band / menunggu Pre-Test / tidak ikut
+  (C1) / perlu peneliti. Cari nama atau ID; filter "Bisa ditindak" dan
+  "Sedang mengerjakan". Data diperbarui langsung (listener).
+- Aksi per sel: **Izinkan**; **Ulang (gangguan teknis)** — membatalkan
+  percobaan yang sedang berjalan dan mengizinkan percobaan berikutnya dari
+  awal (jawaban lama tetap disimpan, tidak dipakai; wajib centang "ini
+  gangguan teknis"); **Izinkan ulang** untuk percobaan yang sudah dibatalkan.
+- **Riwayat tindakan** — 12 tindakan panel terakhir (tercatat permanen di
+  `researchAuditLog`).
+
+Panel **tidak pernah** menampilkan jawaban, skor, kunci, atau penanda mutu
+— hanya jumlah jawaban dan status. Hal yang menyangkut kebijakan riset
+yang belum final (void integritas, band manual, peserta `conditional`,
+tinjauan) dan persiapan/penutupan studi tetap lewat tooling peneliti
+(`tools/research/README.md`). Pencabutan operator
+(`operator --revoke`) menghilangkan panel seketika.
+
 
 ## 5. Fitur Utama: 3 Fase Belajar (Storyfier Core)
 
