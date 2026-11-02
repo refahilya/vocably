@@ -238,6 +238,12 @@ describe('placement admin operations (emulator)', { skip: !RUN && 'not inside th
     assert.deepEqual([p.band, p.status, p.authorizedAttempts.placement], [null, 'awaiting_placement', 1]);
     assert.equal((await get('researchStudy', 'current')).status, 'active');
     assert.equal((await get('placementConfig', 'current')).learningOpen, true);
+    assert.equal((await get('researchOperators', 'emuResearcher')).active, true);
+    assert.equal(await get('researchOperators', 'emuTeacher'), undefined);
+    assert.equal((await get('researchRoster', 'emuStudentPlacement')).researchId, 'EMU-PT');
+    assert.equal((await get('researchRoster', 'emuStudentA2')).name, 'Siswa Uji A2');
+    const a2 = await get('researchParticipants', 'emuStudentA2');
+    assert.deepEqual([a2.band, a2.bandSource, a2.status, a2.authorizedAttempts.preTest], ['A2', 'placement_test', 'enrolled', 1]);
     for (const a of result.accounts) await admin.auth.deleteUser(a.uid);
   });
 });

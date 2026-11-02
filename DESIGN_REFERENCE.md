@@ -327,7 +327,10 @@ tersendiri (§6), dengan desain di §3.3.
   setara "Mulai Tes" (solid navy) dan "Nanti Saja" (outline). "Mulai Tes"
   membuka layar tes, yang juga menampilkan pesan bila tes belum tersedia;
   "Nanti Saja" menuju dashboard. Setelah daftar atau masuk, layar auth yang
-  di-push menutup sendiri supaya tawaran ini terlihat.
+  di-push menutup sendiri supaya tawaran ini terlihat. Bila penanda tawaran
+  ditolak server, tawaran yang muncul lagi memuat `AppNotice` error "Pilihanmu
+  belum tersimpan, jadi tawaran ini muncul lagi. Silakan pilih sekali lagi."
+  di antara paragraf dan tombol.
 - **Petunjuk:** lembar putih berisi judul "Tes Penempatan Kosakata",
   paragraf pembuka, dan 8 butir "Petunjuk" — verbatim dari spesifikasi §3.3.
   Tombol "Mulai" (baru) atau "Lanjutkan" (melanjutkan attempt) di bar bawah.

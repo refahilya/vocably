@@ -36,7 +36,11 @@ async function main() {
     const result = await seedEmulator({ target, db, auth, bank, bankJson, password: args.password });
     console.log(`Seeded ${target.projectId} (emulator). Dummy accounts (password as given):`);
     for (const a of result.accounts) {
-      const role = a.participant
+      const role = a.operator
+        ? 'guru, researcher operator (Researcher Panel)'
+        : a.role === 'guru'
+          ? 'guru, not an operator'
+          : a.participant
         ? `participant ${a.participant.researchId}, band ${a.participant.band}, pretest authorized`
         : a.pendingPlacement
           ? `participant ${a.pendingPlacement}, no band (awaiting the Placement Test)`

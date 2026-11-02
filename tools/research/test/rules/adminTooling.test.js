@@ -61,9 +61,17 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
     await db().collection('users').doc(uid).set({ uid, email: `${uid}@example.test`, name: uid, role });
   }
 
+  /**
+   * A participant WITH a band, written by trusted setup in the legacy
+   * researcher-assigned shape (no `status`) the rules still accept. The
+   * tooling itself now only enrols participants without a band (see the
+   * `enrol` tests); these authorization/void tests need a banded one.
+   */
   async function enrol(uid, band = 'A2', researchId = `R-${uid}`, cohort = 'study') {
     await user(uid);
-    await ops.enrolParticipants(db(), { rows: [{ line: 2, uid, researchId, band, cohort }], apply: true });
+    await db().collection(ops.PARTICIPANTS).doc(uid).create({
+      researchId, band, bandSource: 'researcher_assigned', instrumentVersion: 'v1', authorizedAttempts: { preTest: 0, postTest: 0 }, cohort,
+    });
   }
 
   const participant = async (uid) => (await db().collection(ops.PARTICIPANTS).doc(uid).get()).data();
@@ -126,37 +134,78 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
   });
 
   describe('enrol', () => {
-    it('dry run writes nothing; apply creates the exact participant record', async () => {
+    it('dry run writes nothing; apply creates a band-less participant awaiting placement, plus the roster entry', async () => {
       await user('stu100001');
-      const rows = [{ line: 2, uid: 'stu100001', researchId: 'R-01', band: 'B2', cohort: 'pilot' }];
+      const rows = [{ line: 2, uid: 'stu100001', researchId: 'R-01', cohort: 'study' }];
       await ops.enrolParticipants(db(), { rows });
       assert.equal((await db().collection(ops.PARTICIPANTS).get()).size, 0);
+      assert.equal((await db().collection(ops.ROSTER).get()).size, 0);
       await ops.enrolParticipants(db(), { rows, apply: true });
       const p = await participant('stu100001');
       assert.deepEqual(
         { ...p, createdAt: typeof p.createdAt, updatedAt: typeof p.updatedAt },
-        { researchId: 'R-01', band: 'B2', bandSource: 'researcher_assigned', instrumentVersion: 'v1', authorizedAttempts: { preTest: 0, postTest: 0 }, cohort: 'pilot', createdAt: 'object', updatedAt: 'object' }
+        {
+          researchId: 'R-01', band: null, bandSource: null, status: 'awaiting_placement', exclusionReason: null,
+          placementAttemptId: null, reviewStatus: null, instrumentVersion: 'v1',
+          authorizedAttempts: { placement: 1, preTest: 0, postTest: 0 }, cohort: 'study', createdAt: 'object', updatedAt: 'object',
+        }
+      );
+      const r = (await db().collection(ops.ROSTER).doc('stu100001').get()).data();
+      assert.deepEqual({ ...r, createdAt: typeof r.createdAt }, { researchId: 'R-01', name: 'stu100001', cohort: 'study', createdAt: 'object' });
+    });
+
+    it('looks e-mail rows up in Firebase Auth', async () => {
+      const email = `enrol.${Date.now()}@example.test`;
+      const { uid } = await admin.auth.createUser({ email, password: 'dummy-password' });
+      await user(uid);
+      await ops.enrolParticipants(db(), { rows: [{ line: 2, email, researchId: 'R-09', cohort: 'study' }], auth: admin.auth, apply: true });
+      assert.equal((await participant(uid)).status, 'awaiting_placement');
+      await assert.rejects(
+        ops.enrolParticipants(db(), { rows: [{ line: 2, email: 'nobody.here@example.test', researchId: 'R-10', cohort: 'study' }], auth: admin.auth }),
+        (error) => {
+          assert.deepEqual(error.problems, ['line 2: no account with this e-mail']);
+          return true;
+        }
       );
     });
 
-    it('refuses re-enrolment, reused research IDs, non-students and missing profiles — atomically', async () => {
+    it('refuses re-enrolment, reused research IDs, non-students, missing profiles, the operator — atomically', async () => {
       await enrol('stu100001', 'A2', 'R-01');
       await user('guru00001', 'guru');
       await user('stu100002');
+      await user('opr000001', 'siswa');
+      await db().collection('researchOperators').doc('opr000001').set({ active: true });
       const rows = [
-        { line: 2, uid: 'stu100002', researchId: 'R-02', band: 'A2', cohort: 'study' },
-        { line: 3, uid: 'stu100001', researchId: 'R-03', band: 'A2', cohort: 'study' },
-        { line: 4, uid: 'stu100003', researchId: 'R-01', band: 'A2', cohort: 'study' },
-        { line: 5, uid: 'guru00001', researchId: 'R-04', band: 'A2', cohort: 'study' },
+        { line: 2, uid: 'stu100002', researchId: 'R-02', cohort: 'study' },
+        { line: 3, uid: 'stu100001', researchId: 'R-03', cohort: 'study' },
+        { line: 4, uid: 'stu100003', researchId: 'R-01', cohort: 'study' },
+        { line: 5, uid: 'guru00001', researchId: 'R-04', cohort: 'study' },
+        { line: 6, uid: 'opr000001', researchId: 'R-05', cohort: 'study' },
       ];
       await assert.rejects(ops.enrolParticipants(db(), { rows, apply: true }), (error) => {
         assert.ok(error.problems.includes('line 3: already enrolled (enrolment never overwrites)'));
         assert.ok(error.problems.includes('line 4: researchId already used by another participant'));
         assert.ok(error.problems.includes('line 4: no users/{uid} profile for this account'));
         assert.ok(error.problems.includes('line 5: the account is not a student (role must be "siswa")'));
+        assert.ok(error.problems.includes('line 6: the researcher operator cannot be a participant'));
         return true;
       });
       assert.equal((await db().collection(ops.PARTICIPANTS).doc('stu100002').get()).exists, false, 'valid row not written either');
+      assert.equal((await db().collection(ops.ROSTER).doc('stu100002').get()).exists, false);
+    });
+
+    it('a CLI void keeps the panel progress mirror in step', async () => {
+      await seedBank();
+      await enrol('stu100001');
+      await ops.authorizeStage(db(), { uids: ['stu100001'], stage: 'preTest', apply: true });
+      await studentAttempt('stu100001', { count: 2 });
+      await rut.assertSucceeds(
+        fsdk.setDoc(fsdk.doc(client('stu100001'), ops.PROGRESS, 'stu100001_preTest_1'), {
+          studentId: 'stu100001', stage: 'preTest', attemptNumber: 1, answered: 2, total: 20, status: 'in_progress', updatedAt: fsdk.serverTimestamp(),
+        })
+      );
+      await ops.voidAttempt(db(), { uid: 'stu100001', stage: 'preTest', reason: 'listrik padam', apply: true });
+      assert.equal((await db().collection(ops.PROGRESS).doc('stu100001_preTest_1').get()).get('status'), 'voided');
     });
 
     it('students read only their own record and can never write one', async () => {
@@ -164,6 +213,70 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
       await rut.assertSucceeds(fsdk.getDoc(fsdk.doc(client('stu100001'), ops.PARTICIPANTS, 'stu100001')));
       await rut.assertFails(fsdk.getDoc(fsdk.doc(client('stu100002'), ops.PARTICIPANTS, 'stu100001')));
       await rut.assertFails(fsdk.updateDoc(fsdk.doc(client('stu100001'), ops.PARTICIPANTS, 'stu100001'), { 'authorizedAttempts.preTest': 1 }));
+    });
+  });
+
+  describe('operator', () => {
+    const oops = () => require('../../lib/admin/operatorOperations');
+    async function account(role) {
+      const email = `op.${role}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}@example.test`;
+      const { uid } = await admin.auth.createUser({ email, password: 'dummy-password' });
+      if (role) await user(uid, role);
+      return { uid, email };
+    }
+
+    it('grant: dry run writes nothing; apply registers exactly one active guru operator; revoke deactivates', async () => {
+      const a = await account('guru');
+      const dry = await oops().grantOperator(db(), admin.auth, { email: a.email });
+      assert.deepEqual(dry.actions.map((x) => x.type), ['create']);
+      assert.equal((await db().collection('researchOperators').doc(a.uid).get()).exists, false);
+      await oops().grantOperator(db(), admin.auth, { email: a.email.toUpperCase(), apply: true });
+      const record = (await db().collection('researchOperators').doc(a.uid).get()).data();
+      assert.equal(record.active, true);
+      assert.equal(record.email, a.email);
+      assert.deepEqual((await oops().grantOperator(db(), admin.auth, { email: a.email, apply: true })).actions.map((x) => x.type), ['unchanged']);
+
+      // Only one operator.
+      const b = await account('guru');
+      await assert.rejects(oops().grantOperator(db(), admin.auth, { email: b.email, apply: true }), /already the active operator/);
+
+      // The operator can read their record from the client; revoking turns the panel off.
+      await rut.assertSucceeds(fsdk.getDoc(fsdk.doc(client(a.uid), 'researchOperators', a.uid)));
+      await oops().revokeOperator(db(), admin.auth, { email: a.email, apply: true });
+      assert.equal((await db().collection('researchOperators').doc(a.uid).get()).get('active'), false);
+      await rut.assertFails(fsdk.getDocs(fsdk.collection(client(a.uid), ops.PARTICIPANTS)));
+      // Reactivation (or a different account) needs the tooling again.
+      await oops().grantOperator(db(), admin.auth, { email: b.email, apply: true });
+      assert.equal((await db().collection('researchOperators').doc(b.uid).get()).get('active'), true);
+    });
+
+    it('refuses: unknown e-mail, no profile, a student account, a participant', async () => {
+      await assert.rejects(oops().grantOperator(db(), admin.auth, { email: 'nobody.op@example.test' }), /no Firebase Auth account/);
+      await assert.rejects(oops().grantOperator(db(), admin.auth, { email: '' }), /--email/);
+      const noProfile = await account(null);
+      await assert.rejects(oops().grantOperator(db(), admin.auth, { email: noProfile.email }), /no users\/\{uid\} profile/);
+      const student = await account('siswa');
+      await assert.rejects(oops().grantOperator(db(), admin.auth, { email: student.email }), /not a guru account/);
+      const guru = await account('guru');
+      await db().collection(ops.PARTICIPANTS).doc(guru.uid).set({ researchId: 'X' });
+      await assert.rejects(oops().grantOperator(db(), admin.auth, { email: guru.email }), /participant cannot be the operator/);
+      await assert.rejects(oops().revokeOperator(db(), admin.auth, { email: student.email }), /not an operator/);
+    });
+
+    it('the command line needs exactly one of --grant / --revoke and writes only with --apply', async () => {
+      const { run } = require('../../bin/research_admin');
+      const a = await account('guru');
+      const quiet = console.log;
+      console.log = () => {};
+      try {
+        await assert.rejects(run(['operator', '--emulator', '--email', a.email]), /exactly one of --grant or --revoke/);
+        await run(['operator', '--emulator', '--grant', '--email', a.email]);
+        assert.equal((await db().collection('researchOperators').doc(a.uid).get()).exists, false);
+        await run(['operator', '--emulator', '--grant', '--email', a.email, '--apply']);
+        assert.equal((await db().collection('researchOperators').doc(a.uid).get()).get('active'), true);
+      } finally {
+        console.log = quiet;
+      }
     });
   });
 

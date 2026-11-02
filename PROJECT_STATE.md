@@ -1671,6 +1671,20 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 **Verification (2026-11-02, agent), on top of `36984d0`:** `test/placement_entry_flow_test.dart` runs the real `VocablyApp` and router with a fake that delivers the snapshot before the write completes. Against the old code, the 5 navigation tests for "Mulai Tes" failed with no `PlacementTestScreen`, "Nanti Saja" failed on the disposed-controller error, and the 2 sign-up tests failed with the form still on screen. `flutter analyze` 0 issues; `flutter test --concurrency=1` 946/946, 10 of them new; `npm test` 93 passed + 2 skipped (the PDF checks); `npm run test:rules` 129/129; release web build OK; `build/web` scan found 0 key pairs. Real Chrome against the Firestore and Auth emulators, production hosts blocked: the old build landed on the dashboard after "Mulai Tes" and logged a page error. The final build took a new account to the offer, opened the test and returned to the dashboard, sent "Nanti Saja" to the dashboard with no offer after logging out and in, signed in from a pushed login, and showed "Belum dibuka" with learning placement closed; 0 page errors and 0 production requests. Not tested: production Firestore, a physical phone.
 
+*Committed by the owner as `430b8e9` + `5a4679a`.*
+
+### 5zg. Placement Entry Flow: Follow-up Review (2026-11-02 — implemented and verified locally; NOT committed; not hosted)
+
+**Input:** before committing more, the owner asked for a last review of how a failed marker write is reported, of the `CompleteRegistrationController` pattern left alone in §5zf, and of the working tree.
+
+**Marker-write failure.** On real Firestore a refusal arrives in three steps: the local snapshot takes the offer off screen, the rollback snapshot brings it back, then the write's future fails. The auto-dispose prompt controller was gone by then, so the returning offer had a fresh controller and said nothing. **Decision:** `PlacementTestPromptController` is now `keepAlive` and keyed by uid (`build(String uid)`, `markPrompted()` with no argument), so the failure outlives the offer and stays with that student. The offer shows an error `AppNotice` ("Pilihanmu belum tersimpan, jadi tawaran ini muncul lagi. Silakan pilih sekali lagi.") when the controller holds an error, and hides it while a retry is in flight. Navigation is unchanged: "Mulai Tes" still pushes the test first, and the offer with the notice waits beneath it.
+
+**`CompleteRegistrationController`: an actual issue, fixed.** Creating the missing profile moves `_RootRouter` straight to the placement offer through the local snapshot, which disposes the controller before the write completes. Its unconditional `state =` then threw `UnmountedRefException`, reproduced by a new test before the fix. It now checks `ref.mounted`, like the other three controllers.
+
+**Working tree:** 6 files, none staged: the two controllers and their `.g.dart`, the offer screen, and `test/placement_entry_flow_test.dart`, plus `SPEC.md` §3.1, `DESIGN_REFERENCE.md` §5.2, `HANDOFF.md`, and this entry. No rules, models, services, or assets changed.
+
+**Verification (2026-11-02, agent), on top of `5a4679a`:** 4 new tests (a "Nanti Saja" refusal, immediate and through a snapshot rollback; a "Mulai Tes" rollback; completing an unfinished account), and the existing "Mulai Tes" refusal test now also checks the notice after leaving the test. The registration test failed on the unchanged controller with `UnmountedRefException`; the failure tests were written against the new code and were not run against the old code. `flutter analyze` 0 issues; `flutter test --concurrency=1` 950/950. Not rerun because nothing they cover changed: `npm test`, `npm run test:rules`, release build, browser tour.
+
 ## 6. Firebase / Firestore State
 
 *Moved 2026-10-26: current Firebase/Firestore and deployment state is in

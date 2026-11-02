@@ -9,12 +9,16 @@
  *
  * Pretest/posttest:
  *   seed-instrument                         write researchInstrument/{v1}_{band} from the app-safe bank
- *   enrol      --csv <file>                 create participant records (uid,researchId,band,cohort)
+ *   enrol      --csv <file>                 enrol students without a band (email|uid,researchId,cohort):
+ *                                           awaiting the research Placement Test, + roster entry
  *   authorize  --stage preTest|postTest (--uid <uid>... | --cohort <c>) [--confirm-session4-completed]
  *              [--acknowledge-placement-policy]
  *   void       --uid <uid> --stage <s> --reason "<text>" [--allow-completed]
  *   retake     --uid <uid> --stage <s> --reason "<text>"
  *   status     [--uid <uid>]               read-only overview
+ *
+ * Researcher Panel operator (one account; the panel itself is in the app):
+ *   operator   (--grant | --revoke) --email <researcher account e-mail>
  *
  * Placement Test (PT-V1.1) and study lifecycle:
  *   seed-placement     --key <file.private.json>   placementInstrument/placementKey/placementConfig
@@ -41,6 +45,7 @@ const { parseArgs, readBank, openAuditLog, REPO_ROOT } = require('../lib/admin/c
 const { parseParticipantsCsv } = require('../lib/admin/participantsCsv');
 const ops = require('../lib/admin/operations');
 const pops = require('../lib/admin/placementOperations');
+const oops = require('../lib/admin/operatorOperations');
 const { PLACEMENT_BANK_ASSET_RELATIVE_PATH } = require('../lib/placement/constants');
 
 const SPEC = {
@@ -67,6 +72,9 @@ const SPEC = {
   category: 'string',
   band: 'string',
   basis: 'string',
+  email: 'string',
+  grant: 'boolean',
+  revoke: 'boolean',
 };
 
 const SINGLE_UID = ['void', 'retake', 'review', 'placement-void', 'placement-retake', 'placement-restore', 'assign-band'];
@@ -98,7 +106,7 @@ async function run(argv) {
   }
   if (command === 'status' && args.uid.length > 1) throw new Error('status takes at most one --uid');
   const audit = openAuditLog(args.log);
-  const { app, db } = initAdmin(target);
+  const { app, db, auth } = initAdmin(target);
   const apply = Boolean(args.apply);
   const base = { target: { mode: target.mode, projectId: target.projectId }, command, apply };
   const uid = args.uid[0];
@@ -115,9 +123,15 @@ async function run(argv) {
         if (!args.csv) throw new Error('enrol needs --csv <file>');
         const { rows, problems } = parseParticipantsCsv(fs.readFileSync(args.csv, 'utf8'));
         if (problems.length) throw new ops.AdminError(problems);
-        result = await ops.enrolParticipants(db, { rows, apply });
+        result = await ops.enrolParticipants(db, { rows, auth, apply });
         break;
       }
+      case 'operator':
+        if (Boolean(args.grant) === Boolean(args.revoke)) throw new Error('operator needs exactly one of --grant or --revoke');
+        result = args.grant
+          ? await oops.grantOperator(db, auth, { email: args.email, apply })
+          : await oops.revokeOperator(db, auth, { email: args.email, apply });
+        break;
       case 'authorize':
         result = await ops.authorizeStage(db, {
           uids: args.uid,

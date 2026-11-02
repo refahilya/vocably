@@ -98,6 +98,9 @@ baliknya. Detail teknis di `DATA_MODEL.md` §10.
 - "Mulai Tes" selalu membuka layar tes. Kalau tes tidak tersedia, belum
   dibuka, atau gagal dimuat, layar tes itulah yang menjelaskannya; siswa tidak
   pernah dialihkan diam-diam ke dashboard. "Nanti Saja" menuju dashboard.
+- Kalau server menolak penanda `placementTestPrompted`, tawaran muncul lagi
+  (untuk "Mulai Tes": di bawah layar tes) dengan pesan bahwa pilihan belum
+  tersimpan, dan siswa bisa memilih sekali lagi. Navigasi tidak berubah.
 
 **Bentuk tes (spesifikasi §3)**
 - 50 butir, satu per layar, "Soal x dari 50"; label band tidak pernah

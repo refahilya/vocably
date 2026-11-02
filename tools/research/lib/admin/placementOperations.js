@@ -21,7 +21,7 @@
  *   the local audit log — never on documents the student can read.
  */
 
-const { AdminError, canonical, PARTICIPANTS } = require('./operations');
+const { AdminError, canonical, PARTICIPANTS, PROGRESS } = require('./operations');
 const { validatePlacementKey } = require('../placement/build');
 const { PLACEMENT_BANDS } = require('../placement/constants');
 
@@ -252,11 +252,12 @@ async function voidPlacement(db, { uid, category, reason, apply = false }) {
   if (apply) {
     const { FieldValue, Timestamp } = fv();
     await db.runTransaction(async (t) => {
-      const [fa, fp] = [await t.get(aRef), await t.get(pRef)];
+      const [fa, fp, fm] = [await t.get(aRef), await t.get(pRef), await t.get(db.collection(PROGRESS).doc(aRef.id))];
       if (fa.get('status') !== status || fp.get('authorizedAttempts.placement') !== n) {
         throw new AdminError([`${uid}: changed concurrently; nothing written`]);
       }
       t.update(aRef, { status: 'voided', voidCategory: category, voidedFromStatus: status, voidedAt: FieldValue.serverTimestamp() });
+      if (fm.exists) t.update(fm.ref, { status: 'voided', updatedAt: FieldValue.serverTimestamp() });
       const pUpdate = { status: nextStatus, updatedAt: FieldValue.serverTimestamp() };
       if (revokes) {
         Object.assign(pUpdate, {
@@ -315,10 +316,11 @@ async function restorePlacement(db, { uid, reason, apply = false }) {
   if (apply) {
     const { FieldValue, Timestamp } = fv();
     await db.runTransaction(async (t) => {
-      const [fa, fp] = [await t.get(aRef), await t.get(pRef)];
+      const [fa, fp, fm] = [await t.get(aRef), await t.get(pRef), await t.get(db.collection(PROGRESS).doc(aRef.id))];
       if (fa.get('status') !== 'voided' || fp.get('authorizedAttempts.placement') !== n || fp.get('band') != null) {
         throw new AdminError([`${uid}: changed concurrently; nothing written`]);
       }
+      if (fm.exists) t.update(fm.ref, { status: back, updatedAt: FieldValue.serverTimestamp() });
       t.update(aRef, { status: back, voidCategory: FieldValue.delete(), voidedFromStatus: FieldValue.delete(), voidedAt: FieldValue.delete(), restoredAt: FieldValue.serverTimestamp() });
       const update = { ...pUpdate, updatedAt: FieldValue.serverTimestamp() };
       if (back === 'scored') {

@@ -13,12 +13,13 @@ ulang hari ini.
 
 ## 1. Git
 
-- **`vocably`** [terverifikasi 2026-11-02]: branch `main` di `36984d0`
-  ("docs: record level ladder fix"), sama dengan `origin/main` menurut
+- **`vocably`** [terverifikasi 2026-11-02]: branch `main` di `5a4679a`
+  ("docs: record placement entry flow fix"), sama dengan `origin/main` menurut
   pelacakan lokal. Redesain UI ada di `af85e69` + `17a0001`, perbaikan tangga
-  level di `3b359f4` + `36984d0`. **Perbaikan alur masuk Placement Test (§4)
-  ada di working tree, belum di-stage dan belum di-commit:** 12 file terlacak
-  berubah termasuk dokumen, 1 file tes baru.
+  level di `3b359f4` + `36984d0`, perbaikan alur masuk Placement Test di
+  `430b8e9` + `5a4679a`. **Tinjauan lanjutan alur masuk (§4, `PROJECT_STATE.md`
+  §5zg) ada di working tree, belum di-stage dan belum di-commit:** 6 file kode
+  dan tes, ditambah dokumen.
 - **`vocably-ai-worker`** [catatan 2026-10-28, tidak dicek ulang]: `main` di `5bcb5e4`,
   sama dengan `origin/main`. Satu-satunya perubahan lokal: origin
   `http://localhost:5000` di `wrangler.jsonc` — **khusus lokal; jangan
@@ -42,12 +43,15 @@ ulang hari ini.
 ## 3. Hasil verifikasi terakhir
 
 Dijalankan agen pada 2026-11-02 terhadap working tree di atas `36984d0`
-(belum di-commit), setelah perbaikan alur masuk Placement Test (§4):
+(kini di-commit sebagai `430b8e9` + `5a4679a`), setelah perbaikan alur masuk
+Placement Test (§4). Analyzer dan tes Flutter diulang di atas `5a4679a`
+setelah tinjauan lanjutan (§5zg); baris lain tidak diulang karena tooling,
+rules, dan aset tidak berubah:
 
 | Cek | Perintah | Hasil |
 |---|---|---|
 | Analyzer | `flutter analyze` | 0 isu |
-| Tes Flutter | `flutter test --concurrency=1` | **946/946** lulus, termasuk 10 tes alur masuk placement dengan router asli (`test/placement_entry_flow_test.dart`) dan 210 tes responsif (8 viewport, teks 130% di 320 px, HP miring 844×390 dan 568×320, ukuran target tap) |
+| Tes Flutter | `flutter test --concurrency=1` | **950/950** lulus, termasuk 14 tes alur masuk placement dengan router asli (`test/placement_entry_flow_test.dart`) dan 210 tes responsif (8 viewport, teks 130% di 320 px, HP miring 844×390 dan 568×320, ukuran target tap) |
 | Tooling riset | `cd tools/research && npm test` dengan `VOCABLY_PLACEMENT_SOURCE` | **93 lulus, 2 dilewati, 0 gagal** (rebuild bank placement ikut berjalan). 2 yang dilewati (`sourcePdf.test.js`) butuh PDF peneliti dan tidak diulang pada putaran ini; tooling tidak berubah sejak terakhir lulus |
 | Emulator riset + placement | `cd tools/research && npm run test:rules` | **129/129** lulus |
 | Build rilis | `flutter build web --release --dart-define=WORKER_BASE_URL=…` | Berhasil; URL Worker produksi ada di bundle. Peringatan "Wasm dry run failed" sudah dikenal (§7) |
@@ -116,14 +120,18 @@ Dijalankan agen pada 2026-11-02 terhadap working tree di atas `36984d0`
   Keenam level membuka level yang ditekan, tiap pembukaan layar mulai bersih,
   dan level tanpa bundle (C2) menampilkan pesan kosong, termasuk di host
   dengan SPA rewrite seperti Firebase Hosting.
-- **Alur masuk Placement Test (§5zf):** selesai dan diverifikasi lokal, belum
-  di-commit. "Mulai Tes" selalu membuka layar tes, yang juga menjelaskan bila
-  tes tidak tersedia; "Nanti Saja" ke dashboard. Daftar akun baru kini sampai
-  ke tawaran, tidak lagi tertahan di formulir.
+- **Alur masuk Placement Test (§5zf):** selesai di `main`, belum di-hosting.
+  "Mulai Tes" selalu membuka layar tes, yang juga menjelaskan bila tes tidak
+  tersedia; "Nanti Saja" ke dashboard. Daftar akun baru kini sampai ke
+  tawaran, tidak lagi tertahan di formulir.
+- **Tinjauan lanjutan alur masuk (§5zg):** belum di-commit. Bila server menolak
+  penanda tawaran, tawaran yang kembali menampilkan pesan "belum tersimpan";
+  melengkapi akun tanpa profil tidak lagi melempar error setelah controller
+  dibuang. Diuji di tes widget saja, tidak diklik ulang di browser.
 
 ## 5. Blocker sebelum produksi / responden sungguhan
 
-1. **Commit** perbaikan alur masuk Placement Test (pemilik proyek).
+1. **Commit** tinjauan lanjutan alur masuk Placement Test (pemilik proyek).
 2. **Jendela tahap riset:** rules yang kini ter-deploy **mewajibkan**
    `researchStudy/current` dengan jendela tahap terbuka; tanpa dokumen itu
    semua tes riset tertolak (fail closed). Ini perilaku yang benar, bukan

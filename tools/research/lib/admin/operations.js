@@ -113,41 +113,84 @@ async function seedInstrument(db, { bank, bankJson, apply = false }) {
   return { actions, applied: apply };
 }
 
-/** Creates participant records for already-registered student accounts. */
-async function enrolParticipants(db, { rows, instrumentVersion = INSTRUMENT_VERSION, apply = false }) {
+const ROSTER = 'researchRoster';
+const PROGRESS = 'researchProgress';
+const MAX_ENROL_ROWS = 200;
+
+/**
+ * Creates participant records for already-registered student accounts,
+ * WITHOUT a band: each participant is `awaiting_placement` with research
+ * placement attempt 1 authorized, and gets a band only from that Placement
+ * Test (scored by the rules; `DATA_MODEL.md` §6b). Also writes the
+ * operator-only roster entry (`researchRoster/{uid}`: name + research ID)
+ * the Researcher Panel shows. Rows name the account by `uid` or by sign-in
+ * `email` (looked up with [auth]). Refuses the whole file on any problem;
+ * never overwrites a participant or roster entry.
+ */
+async function enrolParticipants(db, { rows, auth, instrumentVersion = INSTRUMENT_VERSION, apply = false }) {
   const problems = [];
+  if (rows.length > MAX_ENROL_ROWS) throw new AdminError([`at most ${MAX_ENROL_ROWS} rows per file`]);
   const existing = await db.collection(PARTICIPANTS).get();
   const takenResearchIds = new Set(existing.docs.map((d) => d.get('researchId')));
   const enrolled = new Set(existing.docs.map((d) => d.id));
+  const seenUids = new Set();
 
+  const resolved = [];
   for (const row of rows) {
-    if (enrolled.has(row.uid)) problems.push(`line ${row.line}: already enrolled (enrolment never overwrites)`);
+    let uid = row.uid;
+    if (!uid) {
+      if (!auth) throw new AdminError(['e-mail rows need Firebase Auth access']);
+      try {
+        uid = (await auth.getUserByEmail(row.email)).uid;
+      } catch {
+        problems.push(`line ${row.line}: no account with this e-mail`);
+        continue;
+      }
+    }
+    if (seenUids.has(uid)) problems.push(`line ${row.line}: the same account appears twice`);
+    seenUids.add(uid);
+    if (enrolled.has(uid)) problems.push(`line ${row.line}: already enrolled (enrolment never overwrites)`);
     if (takenResearchIds.has(row.researchId)) problems.push(`line ${row.line}: researchId already used by another participant`);
-    const user = await db.collection('users').doc(row.uid).get();
+    const user = await db.collection('users').doc(uid).get();
     if (!user.exists) problems.push(`line ${row.line}: no users/{uid} profile for this account`);
     else if (user.get('role') !== 'siswa') problems.push(`line ${row.line}: the account is not a student (role must be "siswa")`);
+    else if (typeof user.get('name') !== 'string' || !user.get('name').trim()) problems.push(`line ${row.line}: the profile has no name`);
+    if ((await db.collection(ROSTER).doc(uid).get()).exists) problems.push(`line ${row.line}: a roster entry already exists for this account`);
+    if ((await db.collection('researchOperators').doc(uid).get()).exists) problems.push(`line ${row.line}: the researcher operator cannot be a participant`);
+    resolved.push({ ...row, uid, name: user.exists ? String(user.get('name') || '').trim() : '' });
   }
   if (problems.length) throw new AdminError(problems);
 
-  const actions = rows.map((row) => ({
+  const actions = resolved.map((row) => ({
     type: 'create',
     path: `${PARTICIPANTS}/${row.uid}`,
     researchId: row.researchId,
-    band: row.band,
     cohort: row.cohort,
+    status: 'awaiting_placement',
+    roster: `${ROSTER}/${row.uid}`,
   }));
   if (apply) {
     const batch = db.batch();
-    for (const row of rows) {
+    for (const row of resolved) {
       batch.create(db.collection(PARTICIPANTS).doc(row.uid), {
         researchId: row.researchId,
-        band: row.band,
-        bandSource: 'researcher_assigned',
+        band: null,
+        bandSource: null,
+        status: 'awaiting_placement',
+        exclusionReason: null,
+        placementAttemptId: null,
+        reviewStatus: null,
         instrumentVersion,
-        authorizedAttempts: { preTest: 0, postTest: 0 },
+        authorizedAttempts: { placement: 1, preTest: 0, postTest: 0 },
         cohort: row.cohort,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+      batch.create(db.collection(ROSTER).doc(row.uid), {
+        researchId: row.researchId,
+        name: row.name,
+        cohort: row.cohort,
+        createdAt: serverTimestamp(),
       });
     }
     await batch.commit();
@@ -297,8 +340,11 @@ async function voidAttempt(db, { uid, stage, reason, allowCompleted = false, app
   if (apply) {
     await db.runTransaction(async (t) => {
       const fresh = await t.get(ref);
+      const progress = await t.get(db.collection(PROGRESS).doc(ref.id));
       if (fresh.get('status') !== status) throw new AdminError([`${uid}: attempt changed concurrently; nothing written`]);
       t.update(ref, { status: 'voided', voidReason: why, voidedAt: serverTimestamp() });
+      // Keep the Researcher Panel's progress mirror in step.
+      if (progress.exists) t.update(progress.ref, { status: 'voided', updatedAt: serverTimestamp() });
     });
   }
   return { actions: [action], applied: apply };
@@ -405,4 +451,6 @@ module.exports = {
   PARTICIPANTS,
   ATTEMPTS,
   INSTRUMENT,
+  ROSTER,
+  PROGRESS,
 };

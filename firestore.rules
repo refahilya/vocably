@@ -388,9 +388,9 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
-    // Placement Test PT-V1.1 (`DATA_MODEL.md` §6). Tested only against the
-    // local Firestore Emulator (`tools/research`, `npm run test:rules`);
-    // NOT deployed.
+    // Placement Test PT-V1.1 (`DATA_MODEL.md` §6). Tested against the local
+    // Firestore Emulator (`tools/research`, `npm run test:rules`); deployment
+    // status: `HANDOFF.md`.
     //
     // Trust model (Spark plan, no Cloud Functions, no Worker involvement):
     // - The answer key lives ONLY in `placementKey/{version}`, which no
@@ -609,7 +609,10 @@ service cloud.firestore {
 
     match /researchStudy/{docId} {
       allow get: if request.auth != null;
-      allow list, write: if false;
+      // The Researcher Panel opens/closes one stage window per write
+      // (`validOperatorStudyWrite`, below); study status stays tooling-only.
+      allow update: if docId == 'current' && isResearchOperator() && validOperatorStudyWrite();
+      allow list, create, delete: if false;
     }
 
     // Trusted-tooling only. The key document is never readable by clients.
@@ -641,8 +644,8 @@ service cloud.firestore {
 
     // ---------------------------------------------------------------------
     // Research pretest/posttest (research Milestone 2a, `DATA_MODEL.md`
-    // §6b). Tested only against the local Firestore Emulator
-    // (`tools/research`, `npm run test:rules`); NOT deployed.
+    // §6b). Tested against the local Firestore Emulator (`tools/research`,
+    // `npm run test:rules`); deployment status: `HANDOFF.md`.
     //
     // Trust model (Spark plan, no Cloud Functions):
     // - `researchParticipants/{uid}` is written ONLY by researcher-controlled
@@ -652,7 +655,9 @@ service cloud.firestore {
     //   authorized; n = attempt n may be created). Clients can read their
     //   own record; their only write is the automatic placement band
     //   (`validPlacementBandWrite`, recomputed by these rules), so nobody
-    //   can pick their band or authorize themselves. A participant may be
+    //   can pick their band or authorize themselves. The single researcher
+    //   operator may additionally authorize / retake through the Researcher
+    //   Panel (`validOperatorParticipantWrite`, below). A participant may be
     //   enrolled without a band (`status: awaiting_placement`); pretest and
     //   posttest additionally need a band, `status: enrolled`, no pending
     //   review and an open stage window (`researchStudy/current`).
@@ -844,10 +849,222 @@ service cloud.firestore {
               && after.status == 'excluded' && after.exclusionReason == 'placement_c1'));
     }
 
-    match /researchParticipants/{uid} {
+    // ---------------------------------------------------------------------
+    // Researcher Panel (`DATA_MODEL.md` §6d). The single researcher operator
+    // signs in with their ordinary guru account; `researchOperators/{uid}`
+    // (`active: true`) is written ONLY by trusted tooling
+    // (`research_admin.js operator --grant`), never by any client, so no
+    // account can promote itself. Every operator write is narrow (one
+    // stage window, one authorization step, one technical void) and must
+    // create its `researchAuditLog` entry in the same batch: the entry's ID
+    // is derived from the change itself, so each change has exactly one
+    // entry and an entry cannot exist without its change. Bands, study
+    // status, enrolment, reviews, keys and banks stay tooling-only. The
+    // operator never reads attempt documents (they hold the answers): the
+    // panel reads `researchProgress`, a counts-and-status mirror that the
+    // rules check against the attempt.
+    // ---------------------------------------------------------------------
+
+    function isResearchOperator() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/researchOperators/$(request.auth.uid)).data.active == true;
+    }
+
+    function auditPath(id) {
+      return /databases/$(database)/documents/researchAuditLog/$(id);
+    }
+
+    function resultPath(id) {
+      return /databases/$(database)/documents/researchAssessmentResults/$(id);
+    }
+
+    function windowOpenAt(w, t) {
+      return w != null && w.openAt is timestamp && w.closeAt is timestamp
+        && w.openAt <= t && t < w.closeAt;
+    }
+
+    // Open (openAt = now, closeAt in the future) or close (closeAt = now,
+    // openAt kept) exactly one stage window [s] of an active study.
+    function operatorWindowWrite(before, after, s) {
+      let w0 = before.stages.get(s, null);
+      let w1 = after.stages.get(s, null);
+      return after.stages.diff(before.stages).affectedKeys().hasOnly([s])
+        && w1 is map && w1.keys().hasOnly(['openAt', 'closeAt'])
+        && ((!windowOpenAt(w0, request.time)
+              && w1.openAt == request.time && w1.closeAt is timestamp && w1.closeAt > request.time)
+          || (windowOpenAt(w0, request.time)
+              && w1.openAt == w0.openAt && w1.closeAt == request.time));
+    }
+
+    function validOperatorStudyWrite() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let seq = before.get('operatorSeq', 0) + 1;
+      return before.status == 'active'
+        && after.diff(before).affectedKeys().hasOnly(['stages', 'updatedAt', 'operatorSeq'])
+        && after.operatorSeq == seq
+        && after.updatedAt == request.time
+        && (operatorWindowWrite(before, after, 'placement')
+          || operatorWindowWrite(before, after, 'preTest')
+          || operatorWindowWrite(before, after, 'postTest'))
+        && existsAfter(auditPath('study_' + string(seq)));
+    }
+
+    // First authorization (0 → 1) of pretest or posttest [s] for [uid]:
+    // active participant with a band, seeded bank, and — for the posttest —
+    // a completed pretest. The session-4 attestation and the placement-band
+    // acknowledgement are recorded (and checked) in the audit entry.
+    function operatorAuthorize(uid, s) {
+      let before = resource.data;
+      let a0 = before.authorizedAttempts;
+      let a1 = request.resource.data.authorizedAttempts;
+      return a1.diff(a0).affectedKeys().hasOnly([s])
+        && a0.get(s, 0) == 0 && a1[s] == 1
+        && researchParticipantActive(before)
+        && exists(/databases/$(database)/documents/researchInstrument/$(before.instrumentVersion + '_' + before.band))
+        && (s == 'preTest'
+          || (a0.preTest is int && a0.preTest >= 1
+            && get(resultPath(uid + '_preTest_' + string(a0.preTest))).data.status == 'completed'))
+        && existsAfter(auditPath('authorize_' + s + '_' + uid + '_1'));
+    }
+
+    // Retake (n → n + 1) after attempt n of [s] is voided (now or earlier).
+    // A pretest retake is refused once the posttest is authorized.
+    function operatorRetake(uid, s) {
+      let before = resource.data;
+      let a0 = before.authorizedAttempts;
+      let a1 = request.resource.data.authorizedAttempts;
+      return a1.diff(a0).affectedKeys().hasOnly([s])
+        && a0.get(s, 0) is int && a0.get(s, 0) >= 1 && a1[s] == a0[s] + 1
+        && (s == 'postTest' || a0.get('postTest', 0) == 0)
+        && researchParticipantActive(before)
+        && getAfter(resultPath(uid + '_' + s + '_' + string(a0[s]))).data.status == 'voided'
+        && existsAfter(auditPath('retake_' + s + '_' + uid + '_' + string(a1[s])));
+    }
+
+    function validOperatorParticipantWrite(uid) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authorizedAttempts', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && (operatorAuthorize(uid, 'preTest') || operatorAuthorize(uid, 'postTest')
+          || operatorRetake(uid, 'preTest') || operatorRetake(uid, 'postTest'));
+    }
+
+    // Technical void of the currently authorized, unfinished attempt. Every
+    // answer is kept; the reason is a fixed code, never free text.
+    function validOperatorVoid(attemptId) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let p = get(participantPath(before.studentId)).data;
+      return before.status == 'in_progress'
+        && after.diff(before).affectedKeys().hasOnly(['status', 'voidReason', 'voidedAt'])
+        && after.status == 'voided'
+        && after.voidReason == 'technical_interruption'
+        && after.voidedAt == request.time
+        && p.authorizedAttempts[before.stage] == before.attemptNumber
+        && (before.stage == 'postTest' || p.authorizedAttempts.postTest == 0)
+        && existsAfter(auditPath('void_' + attemptId));
+    }
+
+    // `researchProgress/{attemptId}` mirrors attempt [a] exactly: owner,
+    // number, status and the number of saved answers — never the answers.
+    // Tooling keeps it in step when it voids or restores an attempt.
+    function progressMirrors(id, a, uid) {
+      let d = request.resource.data;
+      let fields = ['studentId', 'stage', 'attemptNumber', 'answered', 'total', 'status', 'updatedAt'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.studentId == uid && a.studentId == uid
+        && d.attemptNumber == a.attemptNumber
+        && d.status == a.status
+        && d.updatedAt == request.time
+        && ((d.stage == 'placement' && a.context == 'research'
+              && id == uid + '_research_' + string(a.attemptNumber)
+              && d.total == 50 && d.answered == a.answers.size())
+          || (d.stage in ['preTest', 'postTest'] && d.stage == a.stage
+              && id == uid + '_' + d.stage + '_' + string(a.attemptNumber)
+              && d.total == 20 && d.answered == a.responses.size()));
+    }
+
+    function progressAttemptPath(id, stage) {
+      return stage == 'placement' ? placementAttemptPath(id) : resultPath(id);
+    }
+
+    // Audit entry: the operator, the server time, and the change it
+    // describes — which must be part of this same batch.
+    function validAuditEntry(id) {
+      let d = request.resource.data;
+      let fields = ['action', 'stage', 'targetUid', 'attemptNumber', 'seq', 'operatorUid', 'at',
+                    'session4Confirmed', 'placementPolicyAcknowledged', 'reason'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.operatorUid == request.auth.uid
+        && d.at == request.time
+        && ((d.action in ['open_stage', 'close_stage']
+              && d.stage in ['placement', 'preTest', 'postTest']
+              && d.seq is int && id == 'study_' + string(d.seq)
+              && d.targetUid == null && d.attemptNumber == null && d.reason == null
+              && d.session4Confirmed == false && d.placementPolicyAcknowledged == false
+              && getAfter(/databases/$(database)/documents/researchStudy/current).data.operatorSeq == d.seq
+              && (d.action == 'open_stage'
+                ? getAfter(/databases/$(database)/documents/researchStudy/current).data.stages[d.stage].openAt == request.time
+                : getAfter(/databases/$(database)/documents/researchStudy/current).data.stages[d.stage].closeAt == request.time))
+          || (d.action == 'authorize'
+              && d.stage in ['preTest', 'postTest'] && d.targetUid is string
+              && d.attemptNumber == 1 && d.seq == null && d.reason == null
+              && id == 'authorize_' + d.stage + '_' + d.targetUid + '_1'
+              && getAfter(participantPath(d.targetUid)).data.authorizedAttempts[d.stage] == 1
+              && d.session4Confirmed == (d.stage == 'postTest')
+              && d.placementPolicyAcknowledged == (getAfter(participantPath(d.targetUid)).data.bandSource == 'placement_test'))
+          || (d.action == 'retake'
+              && d.stage in ['preTest', 'postTest'] && d.targetUid is string
+              && d.attemptNumber is int && d.attemptNumber >= 2 && d.seq == null
+              && d.reason == 'technical_interruption'
+              && d.session4Confirmed == false && d.placementPolicyAcknowledged == false
+              && id == 'retake_' + d.stage + '_' + d.targetUid + '_' + string(d.attemptNumber)
+              && getAfter(participantPath(d.targetUid)).data.authorizedAttempts[d.stage] == d.attemptNumber)
+          || (d.action == 'void'
+              && d.stage in ['preTest', 'postTest'] && d.targetUid is string
+              && d.attemptNumber is int && d.attemptNumber >= 1 && d.seq == null
+              && d.reason == 'technical_interruption'
+              && d.session4Confirmed == false && d.placementPolicyAcknowledged == false
+              && id == 'void_' + d.targetUid + '_' + d.stage + '_' + string(d.attemptNumber)
+              && getAfter(resultPath(d.targetUid + '_' + d.stage + '_' + string(d.attemptNumber))).data.status == 'voided'));
+    }
+
+    match /researchOperators/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null && request.auth.uid == uid && validPlacementBandWrite(uid);
-      allow list, create, delete: if false;
+      allow list, write: if false;
+    }
+
+    // Name + research ID per participant, written by `enrol`; operator only.
+    match /researchRoster/{uid} {
+      allow read: if isResearchOperator();
+      allow write: if false;
+    }
+
+    match /researchProgress/{attemptId} {
+      allow read: if isResearchOperator();
+      // Written only by the attempt's own student, after each saved write
+      // (best effort: a refused mirror never affects the attempt itself).
+      allow create, update: if request.auth != null
+        && request.resource.data.studentId == request.auth.uid
+        && progressMirrors(attemptId,
+             get(progressAttemptPath(attemptId, request.resource.data.stage)).data,
+             request.auth.uid);
+      allow delete: if false;
+    }
+
+    match /researchAuditLog/{logId} {
+      allow read: if isResearchOperator();
+      allow create: if isResearchOperator() && validAuditEntry(logId);
+      allow update, delete: if false;
+    }
+
+    match /researchParticipants/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isResearchOperator());
+      allow list: if isResearchOperator();
+      allow update: if request.auth != null
+        && ((request.auth.uid == uid && validPlacementBandWrite(uid))
+          || (isResearchOperator() && validOperatorParticipantWrite(uid)));
+      allow create, delete: if false;
     }
 
     // Trusted, read-only bank data used by the rules above. Clients never
@@ -877,11 +1094,12 @@ service cloud.firestore {
       // authorized for this stage (a superseded attempt is frozen), and only
       // while the stage window is open (a closed window or study freezes it).
       allow update: if request.auth != null
-        && resource.data.studentId == request.auth.uid
-        && resource.data.status == 'in_progress'
-        && researchParticipant().authorizedAttempts[resource.data.stage] == resource.data.attemptNumber
-        && researchStageOpen(resource.data.stage)
-        && (validResearchAnswerWrite() || validResearchCompletion());
+        && ((resource.data.studentId == request.auth.uid
+            && resource.data.status == 'in_progress'
+            && researchParticipant().authorizedAttempts[resource.data.stage] == resource.data.attemptNumber
+            && researchStageOpen(resource.data.stage)
+            && (validResearchAnswerWrite() || validResearchCompletion()))
+          || (isResearchOperator() && validOperatorVoid(attemptId)));
 
       allow delete: if false;
     }

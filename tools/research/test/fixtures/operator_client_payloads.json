@@ -1,0 +1,145 @@
+{
+  "description": "Exact Firestore writes of the Researcher Panel (DATA_MODEL.md §6d). Asserted against the app's builders by test/research_panel_payloads_test.dart and replayed against firestore.rules by tools/research/test/rules/operatorRules.test.js. {{name}} is a placeholder (a whole-string placeholder keeps the value's type); the marker string stands for FieldValue.serverTimestamp(); {\"$timestamp\": iso} is a fixed timestamp; {\"$timestampMillisFromNow\": ms} is device-clock now + ms.",
+  "serverTimestampMarker": "__serverTimestamp__",
+  "openEndedCloseAt": "9999-12-31T23:59:59.000Z",
+  "batches": {
+    "openStage": [
+      {
+        "op": "update",
+        "path": "researchStudy/current",
+        "data": {
+          "stages.{{stage}}": { "openAt": "__serverTimestamp__", "closeAt": { "$timestamp": "9999-12-31T23:59:59.000Z" } },
+          "operatorSeq": "{{seq}}",
+          "updatedAt": "__serverTimestamp__"
+        }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/study_{{seq}}",
+        "data": {
+          "action": "open_stage", "stage": "{{stage}}", "targetUid": null, "attemptNumber": null, "seq": "{{seq}}",
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": false, "placementPolicyAcknowledged": false, "reason": null
+        }
+      }
+    ],
+    "openStageTimed": [
+      {
+        "op": "update",
+        "path": "researchStudy/current",
+        "data": {
+          "stages.{{stage}}": { "openAt": "__serverTimestamp__", "closeAt": { "$timestampMillisFromNow": 7200000 } },
+          "operatorSeq": "{{seq}}",
+          "updatedAt": "__serverTimestamp__"
+        }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/study_{{seq}}",
+        "data": {
+          "action": "open_stage", "stage": "{{stage}}", "targetUid": null, "attemptNumber": null, "seq": "{{seq}}",
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": false, "placementPolicyAcknowledged": false, "reason": null
+        }
+      }
+    ],
+    "closeStage": [
+      {
+        "op": "update",
+        "path": "researchStudy/current",
+        "data": {
+          "stages.{{stage}}.closeAt": "__serverTimestamp__",
+          "operatorSeq": "{{seq}}",
+          "updatedAt": "__serverTimestamp__"
+        }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/study_{{seq}}",
+        "data": {
+          "action": "close_stage", "stage": "{{stage}}", "targetUid": null, "attemptNumber": null, "seq": "{{seq}}",
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": false, "placementPolicyAcknowledged": false, "reason": null
+        }
+      }
+    ],
+    "authorizePreTest": [
+      {
+        "op": "update",
+        "path": "researchParticipants/{{uid}}",
+        "data": { "authorizedAttempts.preTest": 1, "updatedAt": "__serverTimestamp__" }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/authorize_preTest_{{uid}}_1",
+        "data": {
+          "action": "authorize", "stage": "preTest", "targetUid": "{{uid}}", "attemptNumber": 1, "seq": null,
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": false, "placementPolicyAcknowledged": true, "reason": null
+        }
+      }
+    ],
+    "authorizePostTest": [
+      {
+        "op": "update",
+        "path": "researchParticipants/{{uid}}",
+        "data": { "authorizedAttempts.postTest": 1, "updatedAt": "__serverTimestamp__" }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/authorize_postTest_{{uid}}_1",
+        "data": {
+          "action": "authorize", "stage": "postTest", "targetUid": "{{uid}}", "attemptNumber": 1, "seq": null,
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": true, "placementPolicyAcknowledged": true, "reason": null
+        }
+      }
+    ],
+    "voidAndRetake": [
+      {
+        "op": "update",
+        "path": "researchAssessmentResults/{{uid}}_{{stage}}_{{n}}",
+        "data": { "status": "voided", "voidReason": "technical_interruption", "voidedAt": "__serverTimestamp__" }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/void_{{uid}}_{{stage}}_{{n}}",
+        "data": {
+          "action": "void", "stage": "{{stage}}", "targetUid": "{{uid}}", "attemptNumber": "{{n}}", "seq": null,
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": false, "placementPolicyAcknowledged": false, "reason": "technical_interruption"
+        }
+      },
+      {
+        "op": "update",
+        "path": "researchParticipants/{{uid}}",
+        "data": { "authorizedAttempts.{{stage}}": "{{next}}", "updatedAt": "__serverTimestamp__" }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/retake_{{stage}}_{{uid}}_{{next}}",
+        "data": {
+          "action": "retake", "stage": "{{stage}}", "targetUid": "{{uid}}", "attemptNumber": "{{next}}", "seq": null,
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": false, "placementPolicyAcknowledged": false, "reason": "technical_interruption"
+        }
+      }
+    ],
+    "retakeOnly": [
+      {
+        "op": "update",
+        "path": "researchParticipants/{{uid}}",
+        "data": { "authorizedAttempts.{{stage}}": "{{next}}", "updatedAt": "__serverTimestamp__" }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/retake_{{stage}}_{{uid}}_{{next}}",
+        "data": {
+          "action": "retake", "stage": "{{stage}}", "targetUid": "{{uid}}", "attemptNumber": "{{next}}", "seq": null,
+          "operatorUid": "{{operator}}", "at": "__serverTimestamp__",
+          "session4Confirmed": false, "placementPolicyAcknowledged": false, "reason": "technical_interruption"
+        }
+      }
+    ]
+  }
+}

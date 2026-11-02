@@ -3,41 +3,47 @@
 /**
  * Strict parser for the researcher's enrolment CSV.
  *
- * Header, exactly and in this order: `uid,researchId,band,cohort`
- * - uid:        the student's Firebase Auth UID (letters, digits, `_`, `-`; 6–128).
+ * Header, exactly and in this order — one of:
+ *   `email,researchId,cohort`   (the student's sign-in e-mail; the tooling
+ *                                looks the UID up in Firebase Auth)
+ *   `uid,researchId,cohort`     (the student's Firebase Auth UID)
+ * - email:      a plain e-mail address (no quotes, commas or spaces).
+ * - uid:        letters, digits, `_`, `-`; 6–128.
  * - researchId: the pseudonymous study ID used in every export
  *               (letters, digits, `_`, `-`; 2–32; starts with a letter or
  *               digit, so a spreadsheet never reads it as a formula).
  *               Never a name or e-mail.
- * - band:       A2, B1, B2 or C1 — assigned by the researcher.
  * - cohort:     study, pilot or test.
  *
- * Anything else is rejected: missing or extra columns, quotes, empty
- * fields, duplicate UIDs or research IDs, unknown bands or cohorts. The
- * whole file is refused if any row is invalid; problems name the line
- * number only, never echo a field value that could be personal data.
+ * There is no band column: every research band comes from the participant's
+ * research Placement Test (`DATA_MODEL.md` §6b). Anything else is rejected:
+ * missing or extra columns, quotes, empty fields, duplicate accounts or
+ * research IDs, unknown cohorts. The whole file is refused if any row is
+ * invalid; problems name the line number only, never echo a field value
+ * that could be personal data.
  */
 
-const { BANDS } = require('../constants');
-
-const HEADER = ['uid', 'researchId', 'band', 'cohort'];
+const ID_COLUMNS = ['email', 'uid'];
+const HEADERS = ID_COLUMNS.map((id) => [id, 'researchId', 'cohort']);
 const COHORTS = ['study', 'pilot', 'test'];
 const UID_RE = /^[A-Za-z0-9_-]{6,128}$/;
+const EMAIL_RE = /^[^\s@,"]{1,64}@[^\s@,"]{1,253}\.[^\s@,".]{2,63}$/;
 const RESEARCH_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/;
 
 function parseParticipantsCsv(text) {
   const problems = [];
   const rows = [];
-  const lines = String(text).replace(/^\uFEFF/, '').split(/\r?\n/);
+  const lines = String(text).replace(/^﻿/, '').split(/\r?\n/);
   while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
 
   if (!lines.length) return { rows, problems: ['the file is empty'] };
-  const header = lines[0].split(',').map((h) => h.trim());
-  if (header.join(',') !== HEADER.join(',')) {
-    return { rows, problems: [`line 1: the header must be exactly "${HEADER.join(',')}"`] };
+  const header = lines[0].split(',').map((h) => h.trim()).join(',');
+  const idColumn = ID_COLUMNS.find((_, i) => HEADERS[i].join(',') === header);
+  if (!idColumn) {
+    return { rows, problems: [`line 1: the header must be exactly "${HEADERS[0].join(',')}" or "${HEADERS[1].join(',')}" (no band column: bands come from the research Placement Test)`] };
   }
 
-  const seenUids = new Set();
+  const seenIds = new Set();
   const seenResearchIds = new Set();
   for (let i = 1; i < lines.length; i++) {
     const lineNo = i + 1;
@@ -51,24 +57,24 @@ function parseParticipantsCsv(text) {
       continue;
     }
     const cells = line.split(',').map((c) => c.trim());
-    if (cells.length !== HEADER.length) {
-      problems.push(`line ${lineNo}: expected ${HEADER.length} columns, found ${cells.length}`);
+    if (cells.length !== 3) {
+      problems.push(`line ${lineNo}: expected 3 columns, found ${cells.length}`);
       continue;
     }
-    const [uid, researchId, band, cohort] = cells;
+    const [rawId, researchId, cohort] = cells;
+    const id = idColumn === 'email' ? rawId.toLowerCase() : rawId;
     const before = problems.length;
-    if (!UID_RE.test(uid)) problems.push(`line ${lineNo}: invalid uid`);
+    if (idColumn === 'email' ? !EMAIL_RE.test(id) : !UID_RE.test(id)) problems.push(`line ${lineNo}: invalid ${idColumn}`);
     if (!RESEARCH_ID_RE.test(researchId)) problems.push(`line ${lineNo}: invalid researchId`);
-    if (!BANDS.includes(band)) problems.push(`line ${lineNo}: band must be one of ${BANDS.join(', ')}`);
     if (!COHORTS.includes(cohort)) problems.push(`line ${lineNo}: cohort must be one of ${COHORTS.join(', ')}`);
-    if (seenUids.has(uid)) problems.push(`line ${lineNo}: duplicate uid`);
+    if (seenIds.has(id)) problems.push(`line ${lineNo}: duplicate ${idColumn}`);
     if (seenResearchIds.has(researchId)) problems.push(`line ${lineNo}: duplicate researchId`);
-    seenUids.add(uid);
+    seenIds.add(id);
     seenResearchIds.add(researchId);
-    if (problems.length === before) rows.push({ line: lineNo, uid, researchId, band, cohort });
+    if (problems.length === before) rows.push({ line: lineNo, [idColumn]: id, researchId, cohort });
   }
   if (!problems.length && !rows.length) problems.push('the file has no participant rows');
   return { rows: problems.length ? [] : rows, problems };
 }
 
-module.exports = { parseParticipantsCsv, HEADER, COHORTS, UID_RE, RESEARCH_ID_RE };
+module.exports = { parseParticipantsCsv, HEADERS, COHORTS, UID_RE, EMAIL_RE, RESEARCH_ID_RE };

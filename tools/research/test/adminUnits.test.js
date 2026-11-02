@@ -14,7 +14,8 @@ const { assessPrivateOutputDir } = require('../lib/safeOutput');
 const { formatPlacementStatus } = require('../lib/admin/operations');
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..');
-const HEADER = 'uid,researchId,band,cohort';
+const HEADER = 'uid,researchId,cohort';
+const EMAIL_HEADER = 'email,researchId,cohort';
 const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'vocably-admin-'));
 
 test('placement status: separates attempt status, answered count, stored level and target band', () => {
@@ -32,49 +33,61 @@ test('placement status: never infers a value that is not stored', () => {
   assert.equal(formatPlacementStatus({ n: 1, status: 'scored', answered: 50, targetBand: 'B1' }), 'placement=#1 scored answered=50/50 level=- targetBand=B1');
 });
 
-test('participants CSV: accepts a valid file (BOM, CRLF, trailing newline)', () => {
-  const { rows, problems } = parseParticipantsCsv(`\uFEFF${HEADER}\r\nabcdef123,R-01,A2,study\r\nghijkl456,R-02,C1,pilot\r\n`);
+test('participants CSV: accepts a valid uid file (BOM, CRLF, trailing newline)', () => {
+  const { rows, problems } = parseParticipantsCsv(`\uFEFF${HEADER}\r\nabcdef123,R-01,study\r\nghijkl456,R-02,pilot\r\n`);
   assert.deepEqual(problems, []);
-  assert.deepEqual(rows.map((r) => [r.line, r.uid, r.researchId, r.band, r.cohort]), [
-    [2, 'abcdef123', 'R-01', 'A2', 'study'],
-    [3, 'ghijkl456', 'R-02', 'C1', 'pilot'],
+  assert.deepEqual(rows.map((r) => [r.line, r.uid, r.researchId, r.cohort]), [
+    [2, 'abcdef123', 'R-01', 'study'],
+    [3, 'ghijkl456', 'R-02', 'pilot'],
   ]);
 });
 
-test('participants CSV: rejects headers that are missing, extra or reordered', () => {
-  for (const header of ['uid,researchId,band', 'uid,researchId,band,cohort,name', 'researchId,uid,band,cohort', '']) {
+test('participants CSV: accepts sign-in e-mails (lower-cased) instead of UIDs', () => {
+  const { rows, problems } = parseParticipantsCsv(`${EMAIL_HEADER}\nSiswa.Satu@Sekolah.sch.id,R-01,study\nsiswa2@example.test,R-02,study\n`);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(rows.map((r) => [r.email, r.uid, r.researchId]), [
+    ['siswa.satu@sekolah.sch.id', undefined, 'R-01'],
+    ['siswa2@example.test', undefined, 'R-02'],
+  ]);
+});
+
+test('participants CSV: there is no band column (bands come from the research Placement Test)', () => {
+  for (const header of ['uid,researchId,band,cohort', 'email,researchId,band,cohort', 'uid,researchId', 'uid,researchId,cohort,name', 'researchId,uid,cohort', 'uid,email,researchId,cohort', '']) {
     const { rows, problems } = parseParticipantsCsv(`${header}\nabcdef123,R-01,A2,study\n`);
     assert.equal(rows.length, 0);
     assert.ok(problems.length, header);
   }
+  assert.match(parseParticipantsCsv('uid,researchId,band,cohort\nabcdef123,R-01,A2,study\n').problems[0], /no band column/);
 });
 
 test('participants CSV: rejects bad rows and refuses the whole file', () => {
   const { rows, problems } = parseParticipantsCsv(
     [
       HEADER,
-      'abcdef123,R-01,A2,study',
-      'abcdef123,R-02,A2,study', // duplicate uid
-      'zzzzzz999,R-01,B1,study', // duplicate researchId
-      'yyyyyy888,R-03,C2,study', // bad band
-      'xxxxxx777,R-04,b1,study', // band is case-sensitive
-      'wwwwww666,R-05,A2,class', // bad cohort
-      'vvvvvv555,siswa@sekolah,A2,study', // e-mail as research ID
-      'short,R-06,A2,study', // uid too short
-      'uuuuuu444,R-07,A2', // missing column
-      'tttttt333,R-08,A2,study,extra', // extra column
-      '"ssssss222",R-09,A2,study', // quotes
+      'abcdef123,R-01,study',
+      'abcdef123,R-02,study', // duplicate uid
+      'zzzzzz999,R-01,study', // duplicate researchId
+      'wwwwww666,R-05,class', // bad cohort
+      'vvvvvv555,siswa@sekolah,study', // e-mail as research ID
+      'short,R-06,study', // uid too short
+      'uuuuuu444,R-07', // missing column
+      'tttttt333,R-08,study,extra', // extra column
+      '"ssssss222",R-09,study', // quotes
       '',
-      'rrrrrr111,R-10,A2,study',
-      'qqqqqq000,-R11,A2,study', // research ID starting with '-' (spreadsheet formula)
+      'rrrrrr111,R-10,study',
+      'qqqqqq000,-R11,study', // research ID starting with '-' (spreadsheet formula)
     ].join('\n')
   );
   assert.equal(rows.length, 0, 'nothing is accepted when any row is invalid');
-  for (const fragment of ['line 3: duplicate uid', 'line 4: duplicate researchId', 'line 5: band', 'line 6: band', 'line 7: cohort', 'line 8: invalid researchId', 'line 9: invalid uid', 'line 10: expected 4 columns', 'line 11: expected 4 columns', 'line 12: quotes', 'line 13: empty line', 'line 15: invalid researchId']) {
+  for (const fragment of ['line 3: duplicate uid', 'line 4: duplicate researchId', 'line 5: cohort', 'line 6: invalid researchId', 'line 7: invalid uid', 'line 8: expected 3 columns', 'line 9: expected 3 columns', 'line 10: quotes', 'line 11: empty line', 'line 13: invalid researchId']) {
     assert.ok(problems.some((p) => p.startsWith(fragment)), fragment);
   }
   assert.ok(!problems.some((p) => p.includes('siswa@sekolah')), 'field values are never echoed');
   assert.deepEqual(parseParticipantsCsv(`${HEADER}\n`).problems, ['the file has no participant rows']);
+  const emails = parseParticipantsCsv(`${EMAIL_HEADER}\nnot-an-email,R-01,study\na@b.co,R-02,study\nA@B.co,R-03,study\n`);
+  assert.ok(emails.problems.includes('line 2: invalid email'));
+  assert.ok(emails.problems.includes('line 4: duplicate email'));
+  assert.ok(!emails.problems.some((p) => p.includes('not-an-email')), 'e-mails are never echoed');
 });
 
 test('target: refuses no target, both targets, and non-local or non-demo emulators', () => {
