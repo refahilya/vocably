@@ -19,9 +19,12 @@ class PlacementTestPromptController extends _$PlacementTestPromptController {
 
   Future<void> markPrompted(String uid) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() {
+    final result = await AsyncValue.guard(() {
       return ref.read(userServiceProvider).markPlacementTestPrompted(uid);
     });
+    // The write itself moves the root router off the offer, which disposes
+    // this controller before the server answers.
+    if (ref.mounted) state = result;
   }
 }
 

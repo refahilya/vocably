@@ -17,6 +17,12 @@ import 'placement_test_screen.dart';
 /// on to the dashboard on its own — this screen doesn't navigate there
 /// itself, only ever forward into the test (for "Mulai Tes") or nowhere
 /// (for "Nanti Saja", letting the router's rebuild do the rest).
+///
+/// "Mulai Tes" must push **before** the write. Firestore delivers the local
+/// snapshot ahead of the write's future, so by the time an awaited write
+/// returns this screen is already gone and the student is on the dashboard.
+/// The pushed route sits above the router's home and survives that swap. The
+/// test screen itself explains when it is unavailable.
 class PlacementTestOfferScreen extends ConsumerWidget {
   const PlacementTestOfferScreen({super.key, required this.profile});
 
@@ -27,15 +33,15 @@ class PlacementTestOfferScreen extends ConsumerWidget {
     final promptState = ref.watch(placementTestPromptControllerProvider);
     final isSubmitting = promptState.isLoading;
 
-    Future<void> handleChoice({required bool startNow}) async {
-      await ref
-          .read(placementTestPromptControllerProvider.notifier)
-          .markPrompted(profile.uid);
-      if (startNow && context.mounted) {
+    void handleChoice({required bool startNow}) {
+      if (startNow) {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => PlacementTestScreen(uid: profile.uid)),
         );
       }
+      ref
+          .read(placementTestPromptControllerProvider.notifier)
+          .markPrompted(profile.uid);
     }
 
     return Scaffold(

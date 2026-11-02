@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/auth_providers.dart';
 import '../theme/theme.dart';
 import 'app_layout.dart';
 
@@ -59,7 +61,7 @@ class _MarkerStrokePainter extends CustomPainter {
 
 /// Sign-in family of screens: a navy cover beside the form on wide windows, a
 /// short cover above it on phones.
-class AppAuthScaffold extends StatelessWidget {
+class AppAuthScaffold extends ConsumerWidget {
   const AppAuthScaffold({
     super.key,
     required this.title,
@@ -74,7 +76,19 @@ class AppAuthScaffold extends StatelessWidget {
   static const _tagline = 'Belajar kosakata bahasa Inggris lewat cerita.';
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Sign-up, and a login opened from it, are pushed above the root router.
+    // Signing in changes what the router shows beneath them, so they have to
+    // get out of the way themselves. The router's own screen has nothing to
+    // close, and it swaps that screen anyway.
+    if (Navigator.of(context).canPop()) {
+      ref.listen(appAuthStatusProvider, (_, status) {
+        if (status is AppAuthSignedIn) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= AppBreakpoints.medium;

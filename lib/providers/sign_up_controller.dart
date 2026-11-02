@@ -40,7 +40,7 @@ class SignUpController extends _$SignUpController {
     String? teacherCode,
   }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    final result = await AsyncValue.guard(() async {
       final authService = ref.read(authServiceProvider);
       final userService = ref.read(userServiceProvider);
 
@@ -73,5 +73,8 @@ class SignUpController extends _$SignUpController {
         rethrow;
       }
     });
+    // A profile that lands signs the student in, which closes the form and
+    // disposes this controller before the write's future completes.
+    if (ref.mounted) state = result;
   }
 }

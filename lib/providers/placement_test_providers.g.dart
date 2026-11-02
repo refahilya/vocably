@@ -41,7 +41,7 @@ final class PlacementTestPromptControllerProvider
 }
 
 String _$placementTestPromptControllerHash() =>
-    r'261468c3fe85e74c50b402ccde0df17f4a20ea7e';
+    r'a41ffb7ec8c60ed64b34c4926ef2b30c74847680';
 
 /// Flips `users.placementTestPrompted` to `true` the moment the one-time
 /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
@@ -183,7 +183,7 @@ final class PlacementTestControllerProvider
 }
 
 String _$placementTestControllerHash() =>
-    r'3427554997d39ed9ef9dab727a32c33ba64d75f9';
+    r'd5d54d82c25706cb70c6757ffeaa6a94cc8373cb';
 
 /// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
 ///

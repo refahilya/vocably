@@ -11,8 +11,10 @@ class LoginController extends _$LoginController {
 
   Future<void> submit({required String email, required String password}) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() {
+    final result = await AsyncValue.guard(() {
       return ref.read(authServiceProvider).signIn(email: email, password: password);
     });
+    // Signing in replaces the login screen, which disposes this controller.
+    if (ref.mounted) state = result;
   }
 }
