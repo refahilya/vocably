@@ -10,44 +10,126 @@ part of 'placement_test_providers.dart';
 // ignore_for_file: type=lint, type=warning
 /// Flips `users.placementTestPrompted` to `true` the moment the one-time
 /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
+///
+/// Kept alive per student: the write's local snapshot takes the offer off
+/// screen before the server answers, and a refusal rolls that snapshot back
+/// and brings the offer back. The failure has to outlive the offer screen in
+/// between so the returning offer can say why it is there again.
 
 @ProviderFor(PlacementTestPromptController)
 final placementTestPromptControllerProvider =
-    PlacementTestPromptControllerProvider._();
+    PlacementTestPromptControllerFamily._();
 
 /// Flips `users.placementTestPrompted` to `true` the moment the one-time
 /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
+///
+/// Kept alive per student: the write's local snapshot takes the offer off
+/// screen before the server answers, and a refusal rolls that snapshot back
+/// and brings the offer back. The failure has to outlive the offer screen in
+/// between so the returning offer can say why it is there again.
 final class PlacementTestPromptControllerProvider
     extends $AsyncNotifierProvider<PlacementTestPromptController, void> {
   /// Flips `users.placementTestPrompted` to `true` the moment the one-time
   /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
-  PlacementTestPromptControllerProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'placementTestPromptControllerProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  ///
+  /// Kept alive per student: the write's local snapshot takes the offer off
+  /// screen before the server answers, and a refusal rolls that snapshot back
+  /// and brings the offer back. The failure has to outlive the offer screen in
+  /// between so the returning offer can say why it is there again.
+  PlacementTestPromptControllerProvider._({
+    required PlacementTestPromptControllerFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'placementTestPromptControllerProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$placementTestPromptControllerHash();
 
+  @override
+  String toString() {
+    return r'placementTestPromptControllerProvider'
+        ''
+        '($argument)';
+  }
+
   @$internal
   @override
   PlacementTestPromptController create() => PlacementTestPromptController();
+
+  @override
+  bool operator ==(Object other) {
+    return other is PlacementTestPromptControllerProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
 String _$placementTestPromptControllerHash() =>
-    r'a41ffb7ec8c60ed64b34c4926ef2b30c74847680';
+    r'fa436bc8128505dba3cd24de50774129f5b316d0';
 
 /// Flips `users.placementTestPrompted` to `true` the moment the one-time
 /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
+///
+/// Kept alive per student: the write's local snapshot takes the offer off
+/// screen before the server answers, and a refusal rolls that snapshot back
+/// and brings the offer back. The failure has to outlive the offer screen in
+/// between so the returning offer can say why it is there again.
+
+final class PlacementTestPromptControllerFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          PlacementTestPromptController,
+          AsyncValue<void>,
+          void,
+          FutureOr<void>,
+          String
+        > {
+  PlacementTestPromptControllerFamily._()
+    : super(
+        retry: null,
+        name: r'placementTestPromptControllerProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: false,
+      );
+
+  /// Flips `users.placementTestPrompted` to `true` the moment the one-time
+  /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
+  ///
+  /// Kept alive per student: the write's local snapshot takes the offer off
+  /// screen before the server answers, and a refusal rolls that snapshot back
+  /// and brings the offer back. The failure has to outlive the offer screen in
+  /// between so the returning offer can say why it is there again.
+
+  PlacementTestPromptControllerProvider call(String uid) =>
+      PlacementTestPromptControllerProvider._(argument: uid, from: this);
+
+  @override
+  String toString() => r'placementTestPromptControllerProvider';
+}
+
+/// Flips `users.placementTestPrompted` to `true` the moment the one-time
+/// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
+///
+/// Kept alive per student: the write's local snapshot takes the offer off
+/// screen before the server answers, and a refusal rolls that snapshot back
+/// and brings the offer back. The failure has to outlive the offer screen in
+/// between so the returning offer can say why it is there again.
 
 abstract class _$PlacementTestPromptController extends $AsyncNotifier<void> {
-  FutureOr<void> build();
+  late final _$args = ref.$arg as String;
+  String get uid => _$args;
+
+  FutureOr<void> build(String uid);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
@@ -60,7 +142,7 @@ abstract class _$PlacementTestPromptController extends $AsyncNotifier<void> {
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, build);
+    return element.handleCreate(ref, () => build(_$args));
   }
 }
 

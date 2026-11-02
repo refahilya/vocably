@@ -5,6 +5,7 @@ import '../../../models/app_user.dart';
 import '../../../providers/placement_test_providers.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/app_brand.dart';
+import '../../../widgets/app_feedback.dart';
 import '../../../widgets/app_layout.dart';
 import 'placement_test_screen.dart';
 
@@ -23,14 +24,23 @@ import 'placement_test_screen.dart';
 /// returns this screen is already gone and the student is on the dashboard.
 /// The pushed route sits above the router's home and survives that swap. The
 /// test screen itself explains when it is unavailable.
+///
+/// If the server refuses the write, Firestore rolls the snapshot back and
+/// this offer returns (beneath the test, for "Mulai Tes"). It then says the
+/// choice was not saved, so the student is not left wondering why it is back.
 class PlacementTestOfferScreen extends ConsumerWidget {
   const PlacementTestOfferScreen({super.key, required this.profile});
 
   final AppUser profile;
 
+  static const notSavedMessage =
+      'Pilihanmu belum tersimpan, jadi tawaran ini muncul lagi. '
+      'Silakan pilih sekali lagi.';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final promptState = ref.watch(placementTestPromptControllerProvider);
+    final prompt = placementTestPromptControllerProvider(profile.uid);
+    final promptState = ref.watch(prompt);
     final isSubmitting = promptState.isLoading;
 
     void handleChoice({required bool startNow}) {
@@ -39,9 +49,7 @@ class PlacementTestOfferScreen extends ConsumerWidget {
           MaterialPageRoute(builder: (_) => PlacementTestScreen(uid: profile.uid)),
         );
       }
-      ref
-          .read(placementTestPromptControllerProvider.notifier)
-          .markPrompted(profile.uid);
+      ref.read(prompt.notifier).markPrompted();
     }
 
     return Scaffold(
@@ -65,6 +73,10 @@ class PlacementTestOfferScreen extends ConsumerWidget {
                     'mengambilnya nanti lewat menu Level.',
                     style: AppTextStyles.body,
                   ),
+                  if (promptState.hasError && !isSubmitting) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const AppNotice(text: notSavedMessage, tone: AppTone.error),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   FilledButton(
                     onPressed: isSubmitting ? null : () => handleChoice(startNow: true),

@@ -12,18 +12,21 @@ part 'placement_test_providers.g.dart';
 
 /// Flips `users.placementTestPrompted` to `true` the moment the one-time
 /// automatic offer (`SPEC.md` §3.1) is shown, whatever the student picks.
-@riverpod
+///
+/// Kept alive per student: the write's local snapshot takes the offer off
+/// screen before the server answers, and a refusal rolls that snapshot back
+/// and brings the offer back. The failure has to outlive the offer screen in
+/// between so the returning offer can say why it is there again.
+@Riverpod(keepAlive: true)
 class PlacementTestPromptController extends _$PlacementTestPromptController {
   @override
-  FutureOr<void> build() {}
+  FutureOr<void> build(String uid) {}
 
-  Future<void> markPrompted(String uid) async {
+  Future<void> markPrompted() async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(() {
       return ref.read(userServiceProvider).markPlacementTestPrompted(uid);
     });
-    // The write itself moves the root router off the offer, which disposes
-    // this controller before the server answers.
     if (ref.mounted) state = result;
   }
 }

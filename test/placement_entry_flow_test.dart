@@ -15,6 +15,7 @@ import 'package:vocably/providers/dashboard_providers.dart';
 import 'package:vocably/providers/placement_test_providers.dart';
 import 'package:vocably/providers/research_assessment_providers.dart';
 import 'package:vocably/providers/vocab_bundle_providers.dart';
+import 'package:vocably/screens/auth/complete_registration_screen.dart';
 import 'package:vocably/screens/auth/login_screen.dart';
 import 'package:vocably/screens/auth/sign_up_screen.dart';
 import 'package:vocably/screens/student/dashboard/dashboard_screen.dart';
@@ -50,6 +51,40 @@ class _FirestoreLikeUserService extends UserService {
 class _RefusingUserService extends UserService {
   @override
   Future<void> markPlacementTestPrompted(String uid) async {
+    throw Exception('permission-denied');
+  }
+}
+
+/// Completing an orphaned account as Firestore does: the new profile reaches
+/// the auth listener before the write's future completes.
+class _ProfileCreatingUserService extends UserService {
+  _ProfileCreatingUserService(this.status);
+
+  final ValueNotifier<AppAuthStatus> status;
+  final serverAnswer = Completer<void>();
+
+  @override
+  Future<void> createStudentProfile({
+    required String uid,
+    required String email,
+    required String name,
+  }) async {
+    status.value = AppAuthSignedIn(_student(prompted: false));
+    await serverAnswer.future;
+  }
+}
+
+/// A refusal as Firestore delivers it: the local snapshot first, then the
+/// rollback snapshot, then the failed future.
+class _RollingBackUserService extends _FirestoreLikeUserService {
+  _RollingBackUserService(super.profile);
+
+  @override
+  Future<void> markPlacementTestPrompted(String uid) async {
+    promptedUids.add(uid);
+    profile.value = _student(prompted: true);
+    await serverAnswer.future;
+    profile.value = _student(prompted: false);
     throw Exception('permission-denied');
   }
 }
@@ -114,8 +149,9 @@ Future<void> _pumpApp(
 /// The real app from signed out, with the auth status as a live value.
 Future<void> _pumpSignedOutApp(
   WidgetTester tester,
-  ValueNotifier<AppAuthStatus> status,
-) async {
+  ValueNotifier<AppAuthStatus> status, {
+  UserService? userService,
+}) async {
   addTearDown(status.dispose);
   await tester.pumpWidget(
     ProviderScope(
@@ -127,6 +163,8 @@ Future<void> _pumpSignedOutApp(
           ref.onDispose(() => status.removeListener(rebuild));
           return status.value;
         }),
+        if (userService != null)
+          userServiceProvider.overrideWithValue(userService),
         placementServiceProvider.overrideWithValue(FakePlacementService()),
         researchAssessmentServiceProvider.overrideWithValue(
           FakeResearchAssessmentService(),
@@ -218,6 +256,26 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(SignUpScreen), findsOneWidget);
+    });
+
+    testWidgets('completing an unfinished account reaches the offer', (
+      tester,
+    ) async {
+      final status = ValueNotifier<AppAuthStatus>(
+        const AppAuthNeedsProfile(uid: 'student-1', email: 'siswa@example.com'),
+      );
+      final service = _ProfileCreatingUserService(status);
+      await _pumpSignedOutApp(tester, status, userService: service);
+      expect(find.byType(CompleteRegistrationScreen), findsOneWidget);
+
+      await tester.enterText(find.byType(TextFormField), 'Siswa Baru');
+      await tester.tap(find.text('Lengkapi sebagai Siswa'));
+      await tester.pumpAndSettle();
+      service.serverAnswer.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CompleteRegistrationScreen), findsNothing);
+      expect(find.byType(PlacementTestOfferScreen), findsOneWidget);
     });
   });
 
@@ -312,6 +370,28 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PlacementTestScreen), findsOneWidget);
+
+      // The offer stayed beneath the test and says why it is still there.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(PlacementTestOfferScreen), findsOneWidget);
+      expect(find.text(PlacementTestOfferScreen.notSavedMessage), findsOneWidget);
+    });
+
+    testWidgets('stays in the test when the server rolls the mark back', (
+      tester,
+    ) async {
+      final profile = ValueNotifier(_student(prompted: false));
+      final service = _RollingBackUserService(profile);
+      await _pumpApp(tester, profile: profile, userService: service);
+
+      await _choose(tester, 'Mulai Tes', service);
+
+      expect(find.byType(PlacementTestScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(PlacementTestOfferScreen), findsOneWidget);
+      expect(find.text(PlacementTestOfferScreen.notSavedMessage), findsOneWidget);
     });
   });
 
@@ -329,6 +409,41 @@ void main() {
       expect(find.byType(PlacementTestScreen), findsNothing);
       expect(find.byType(PlacementTestOfferScreen), findsNothing);
       expect(service.promptedUids, ['student-1']);
+      expect(find.text(PlacementTestOfferScreen.notSavedMessage), findsNothing);
+    });
+
+    testWidgets('says the choice was not saved when the server refuses it', (
+      tester,
+    ) async {
+      await _pumpApp(
+        tester,
+        profile: ValueNotifier(_student(prompted: false)),
+        userService: _RefusingUserService(),
+      );
+
+      await tester.tap(find.text('Nanti Saja'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PlacementTestOfferScreen), findsOneWidget);
+      expect(find.text(PlacementTestOfferScreen.notSavedMessage), findsOneWidget);
+    });
+
+    testWidgets('says so again after Firestore rolls the mark back', (
+      tester,
+    ) async {
+      final profile = ValueNotifier(_student(prompted: false));
+      final service = _RollingBackUserService(profile);
+      await _pumpApp(tester, profile: profile, userService: service);
+
+      await tester.tap(find.text('Nanti Saja'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DashboardScreen), findsOneWidget);
+
+      service.serverAnswer.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PlacementTestOfferScreen), findsOneWidget);
+      expect(find.text(PlacementTestOfferScreen.notSavedMessage), findsOneWidget);
     });
   });
 }

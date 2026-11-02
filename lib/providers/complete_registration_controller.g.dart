@@ -35,7 +35,7 @@ final class CompleteRegistrationControllerProvider
 }
 
 String _$completeRegistrationControllerHash() =>
-    r'696be3328fd6ae9194be0bac0c70537ab8426f92';
+    r'07be2d13862d1da3328b97ba5a250f8c6c5eed78';
 
 abstract class _$CompleteRegistrationController extends $AsyncNotifier<void> {
   FutureOr<void> build();

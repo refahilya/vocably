@@ -19,10 +19,13 @@ class CompleteRegistrationController extends _$CompleteRegistrationController {
     required String name,
   }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() {
+    final result = await AsyncValue.guard(() {
       return ref
           .read(userServiceProvider)
           .createStudentProfile(uid: uid, email: email, name: name);
     });
+    // The new profile's local snapshot moves the root router on to the
+    // offer, which disposes this controller before the server answers.
+    if (ref.mounted) state = result;
   }
 }
