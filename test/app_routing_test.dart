@@ -11,12 +11,14 @@ import 'package:vocably/models/vocab_bundle_entry.dart';
 import 'package:vocably/providers/auth_providers.dart';
 import 'package:vocably/providers/dashboard_providers.dart';
 import 'package:vocably/providers/history_providers.dart';
+import 'package:vocably/providers/research_panel_providers.dart';
 import 'package:vocably/providers/vocab_bundle_providers.dart';
 import 'package:vocably/screens/auth/complete_registration_screen.dart';
 import 'package:vocably/screens/auth/login_screen.dart';
 import 'package:vocably/screens/student/dashboard/dashboard_screen.dart';
 import 'package:vocably/screens/student/history/history_screen.dart';
 import 'package:vocably/screens/student/placement_test/placement_test_offer_screen.dart';
+import 'package:vocably/screens/teacher/research_panel/research_panel_screen.dart';
 import 'package:vocably/screens/teacher/target_words/target_words_screen.dart';
 import 'package:vocably/screens/teacher/vocab_management/vocab_management_screen.dart';
 import 'package:vocably/services/auth_service.dart';
@@ -26,6 +28,8 @@ import 'package:vocably/services/learning_progress_service.dart';
 import 'package:vocably/services/learning_session_service.dart';
 import 'package:vocably/utils/role.dart';
 import 'package:vocably/widgets/app_nav_shell.dart';
+
+import 'support/fake_research_panel_service.dart';
 
 /// `DashboardScreen`/`HistoryScreen` (Milestone 6) and `TargetWordsScreen`
 /// (Milestone 8) hit real Firestore-backed providers as soon as they build —
@@ -98,6 +102,7 @@ void main() {
     AppAuthStatus status, {
     AuthService? authService,
     bool isNarrow = false,
+    FakeResearchPanelService? panel,
   }) async {
     tester.view.physicalSize = isNarrow
         ? const Size(390, 800)
@@ -110,6 +115,10 @@ void main() {
       ProviderScope(
         overrides: [
           appAuthStatusProvider.overrideWith((ref) => status),
+          // No account is an operator unless the test says so.
+          researchPanelServiceProvider.overrideWithValue(
+            panel ?? FakeResearchPanelService(operators: const {}),
+          ),
           if (authService != null)
             authServiceProvider.overrideWithValue(authService),
           targetWordSetServiceProvider.overrideWithValue(
@@ -296,6 +305,59 @@ void main() {
         expect(fakeAuth.signOutCalled, isTrue);
       },
     );
+  });
+
+  group('researcher operator (Researcher Panel)', () {
+    testWidgets('the active operator gets a third destination, Riset', (
+      tester,
+    ) async {
+      final panel = FakeResearchPanelService(operators: {'teacher-1'});
+      await pumpWithStatus(tester, AppAuthSignedIn(teacherProfile), panel: panel);
+      await tester.pumpAndSettle();
+      expect(find.text('Riset'), findsOneWidget);
+      await tester.tap(find.text('Riset'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResearchPanelScreen), findsOneWidget);
+      expect(find.text('Tahap tes'), findsOneWidget);
+    });
+
+    testWidgets('a guru who is not the operator never sees Riset', (
+      tester,
+    ) async {
+      await pumpWithStatus(
+        tester,
+        AppAuthSignedIn(teacherProfile),
+        panel: FakeResearchPanelService(operators: {'someone-else'}),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Riset'), findsNothing);
+      expect(find.byType(ResearchPanelScreen), findsNothing);
+    });
+
+    testWidgets('a student is never routed to the panel, even with an operator record', (
+      tester,
+    ) async {
+      await pumpWithStatus(
+        tester,
+        AppAuthSignedIn(studentProfile),
+        panel: FakeResearchPanelService(operators: {studentProfile.uid}),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Riset'), findsNothing);
+    });
+
+    testWidgets('revoking the operator removes the destination live', (
+      tester,
+    ) async {
+      final panel = FakeResearchPanelService(operators: {'teacher-1'});
+      await pumpWithStatus(tester, AppAuthSignedIn(teacherProfile), panel: panel);
+      await tester.pumpAndSettle();
+      expect(find.text('Riset'), findsOneWidget);
+      panel.operators = {};
+      panel.changed();
+      await tester.pumpAndSettle();
+      expect(find.text('Riset'), findsNothing);
+    });
   });
 
   group('other auth states are unchanged by Stage 5', () {

@@ -8,6 +8,7 @@ import '../models/placement_attempt.dart';
 import '../models/placement_instrument.dart';
 import '../models/placement_status.dart';
 import '../models/research_instrument.dart';
+import '../models/research_panel.dart';
 import '../models/research_participant.dart';
 import '../models/research_study.dart';
 import 'firebase_service.dart';
@@ -137,6 +138,19 @@ class PlacementService {
   Future<void> submit(String attemptId) => _guard(
     () => _attemptRef(attemptId).update(PlacementAttemptRecord.submitData(FieldValue.serverTimestamp())),
   );
+
+  /// Mirrors a RESEARCH attempt's counts and status into `researchProgress`
+  /// for the Researcher Panel (`DATA_MODEL.md` §6d); learning attempts are
+  /// never mirrored. Best effort: never throws, never awaited by a decision.
+  Future<void> mirrorProgress(PlacementAttemptRecord attempt) async {
+    final data = ResearchProgressMirror.forPlacement(attempt, FieldValue.serverTimestamp());
+    if (data == null) return;
+    try {
+      await _db.collection('researchProgress').doc(attempt.id).set(data).timeout(timeout);
+    } catch (_) {
+      // Offline, refused or timed out: the next saved write repeats it.
+    }
+  }
 
   /// Scores a submitted attempt: proposes each possible result in one batch
   /// (attempt + `users` level + — research — the participant band). The

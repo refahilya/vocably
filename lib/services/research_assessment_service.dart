@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/research_attempt.dart';
 import '../models/research_attempt_plan.dart';
 import '../models/research_instrument.dart';
+import '../models/research_panel.dart';
 import '../models/research_participant.dart';
 import '../models/research_study.dart';
 import 'firebase_service.dart';
@@ -180,6 +181,23 @@ class ResearchAssessmentService {
       ResearchAttemptRecord.completionData(FieldValue.serverTimestamp()),
     ),
   );
+
+  /// Mirrors [attempt]'s counts and status into `researchProgress` for the
+  /// Researcher Panel (`DATA_MODEL.md` §6d). Best effort: never throws, and
+  /// nothing the student does waits for it or depends on it — the rules
+  /// accept the mirror only when it equals the stored attempt, and the next
+  /// saved write repeats it.
+  Future<void> mirrorProgress(ResearchAttemptRecord attempt) async {
+    try {
+      await _db
+          .collection('researchProgress')
+          .doc(attempt.attemptId)
+          .set(ResearchProgressMirror.forResearch(attempt, FieldValue.serverTimestamp()))
+          .timeout(timeout);
+    } catch (_) {
+      // Offline, refused or timed out: the panel shows the previous count.
+    }
+  }
 
   /// The study lifecycle document (`researchStudy/current`); a missing
   /// document reads as a closed study.

@@ -355,4 +355,19 @@ void main() {
     await controller().reload();
     expect(state(), isA<PlacementTestReady>());
   });
+
+  test('Researcher Panel mirror: a research attempt is mirrored after start, every answer, submit and scoring', () async {
+    service.participant = pendingParticipant();
+    await load();
+    await controller().start();
+    expect(service.mirrors.last.context, PlacementContext.research);
+    expect(service.mirrors.last.answers, isEmpty);
+    await controller().select('A');
+    expect(service.mirrors.last.answers.length, 1);
+    await answerAll([10, 9, 7, 3, 0]);
+    expect(service.mirrors.last.answers.length, 50);
+    await controller().submit();
+    expect(service.mirrors.map((m) => m.status), containsAllInOrder([PlacementAttemptStatus.submitted, PlacementAttemptStatus.scored]));
+    expect(service.mirrors.every((m) => m.id == '${uid}_research_1'), isTrue);
+  });
 }

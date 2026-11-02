@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/placement_attempt.dart';
@@ -231,6 +233,8 @@ class PlacementTestController extends _$PlacementTestController {
   }
 
   void _enter(PlacementAttemptRecord attempt, {bool showIntro = false}) {
+    // Research attempts only (the service ignores learning attempts).
+    unawaited(_service.mirrorProgress(attempt));
     final instrument = _instrument!;
     final items = <PlacementItem>[];
     for (final id in attempt.itemOrder) {
@@ -319,10 +323,9 @@ class PlacementTestController extends _$PlacementTestController {
       await _service.saveAnswer(attemptId: current.attempt.id, itemId: item.id, answer: answer);
       final latest = state;
       if (latest is PlacementTestAnswering) {
-        _set(latest.copyWith(
-          attempt: latest.attempt.copyWith(answers: {...latest.attempt.answers, item.id: answer}),
-          clearSaving: true,
-        ));
+        final saved = latest.attempt.copyWith(answers: {...latest.attempt.answers, item.id: answer});
+        unawaited(_service.mirrorProgress(saved));
+        _set(latest.copyWith(attempt: saved, clearSaving: true));
       }
     } on ResearchServiceException catch (error) {
       await _afterFailedWrite(current, error, itemId: item.id, answer: answer);
@@ -345,6 +348,7 @@ class PlacementTestController extends _$PlacementTestController {
         await _load();
         return;
       }
+      unawaited(_service.mirrorProgress(stored));
       final landed = itemId != null && stored.answers[itemId] == answer;
       _set(previous.copyWith(
         attempt: stored,
@@ -402,6 +406,7 @@ class PlacementTestController extends _$PlacementTestController {
     try {
       final stored = await _service.fetchAttempt(current.attempt.id);
       if (stored != null && stored.status == PlacementAttemptStatus.submitted) {
+        unawaited(_service.mirrorProgress(stored));
         await _score(stored);
       } else if (writeError != null) {
         await _afterFailedWrite(current, writeError);
@@ -426,6 +431,7 @@ class PlacementTestController extends _$PlacementTestController {
     try {
       final stored = await _service.fetchAttempt(attempt.id);
       if (stored != null && stored.status == PlacementAttemptStatus.scored) {
+        unawaited(_service.mirrorProgress(stored));
         _set(PlacementTestResult(stored, justFinished: true));
         return;
       }

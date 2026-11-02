@@ -11,6 +11,8 @@ import 'package:vocably/models/app_user.dart';
 import 'package:vocably/models/learning_progress.dart';
 import 'package:vocably/models/learning_session.dart';
 import 'package:vocably/models/placement_instrument.dart';
+import 'package:vocably/models/research_panel.dart';
+import 'package:vocably/models/research_participant.dart';
 import 'package:vocably/models/research_attempt.dart';
 import 'package:vocably/models/research_instrument.dart';
 import 'package:vocably/models/target_word_set.dart';
@@ -25,6 +27,7 @@ import 'package:vocably/providers/learning_cart_providers.dart';
 import 'package:vocably/providers/learning_session_controller.dart';
 import 'package:vocably/providers/placement_test_providers.dart';
 import 'package:vocably/providers/research_assessment_providers.dart';
+import 'package:vocably/providers/research_panel_providers.dart';
 import 'package:vocably/providers/vocab_bundle_providers.dart';
 import 'package:vocably/providers/vocab_management_providers.dart';
 import 'package:vocably/screens/auth/complete_registration_screen.dart';
@@ -43,6 +46,7 @@ import 'package:vocably/screens/student/research_assessment/research_assessment_
 import 'package:vocably/screens/student/vocab_browser/learning_cart_screen.dart';
 import 'package:vocably/screens/student/vocab_browser/vocab_browser_screen.dart';
 import 'package:vocably/screens/student/vocab_browser/word_detail_screen.dart';
+import 'package:vocably/screens/teacher/research_panel/research_panel_screen.dart';
 import 'package:vocably/screens/teacher/target_words/set_target_word_screen.dart';
 import 'package:vocably/screens/teacher/target_words/target_words_screen.dart';
 import 'package:vocably/screens/teacher/vocab_management/edit_kata_screen.dart';
@@ -63,6 +67,7 @@ import 'package:vocably/widgets/stepper_header.dart';
 import '../support/app_fonts.dart';
 import '../support/fake_placement_service.dart';
 import '../support/fake_research_assessment_service.dart';
+import '../support/fake_research_panel_service.dart';
 
 /// Every screen, at every required viewport, with the real fonts and the
 /// longest content the app can meet. A RenderFlex overflow or an unbounded
@@ -280,8 +285,36 @@ List<dynamic> _overrides({
     research ?? FakeResearchAssessmentService(participant: participantFor()),
   ),
   researchAssessmentRandomProvider.overrideWithValue(Random(3)),
+  researchPanelServiceProvider.overrideWithValue(_panel()),
   if (instrument != null) researchInstrumentProvider('v1').overrideWith((ref) async => instrument),
 ];
+
+/// A full class with the longest names and every cell state the panel can show.
+FakeResearchPanelService _panel() => FakeResearchPanelService(
+  operators: {'teacher-1'},
+  study: activeStudy(open: {PanelStage.preTest}),
+  participants: [
+    for (var i = 0; i < 6; i++)
+      panelParticipant(
+        's$i',
+        researchId: 'PENELITIAN-SMK-${i.toString().padLeft(3, '0')}',
+        status: i == 0 ? ResearchParticipantStatus.awaitingPlacement : ResearchParticipantStatus.enrolled,
+        pre: i >= 3 ? 1 : 0,
+        post: i == 5 ? 1 : 0,
+      ),
+  ],
+  roster: [
+    for (var i = 0; i < 6; i++)
+      PanelRosterEntry(uid: 's$i', name: 'Muhammad Rizky Ramadhan Putra Wijayakusuma $i', researchId: 'PENELITIAN-SMK-$i'),
+  ],
+  progress: [
+    panelProgress('s0', PanelStage.placement, answered: 37),
+    panelProgress('s3', PanelStage.preTest, answered: 19),
+    panelProgress('s4', PanelStage.preTest, status: 'voided'),
+    panelProgress('s5', PanelStage.preTest, answered: 20, status: 'completed'),
+    panelProgress('s5', PanelStage.postTest, answered: 4),
+  ],
+);
 
 void main() {
   late ResearchInstrument instrument;
@@ -370,6 +403,15 @@ void main() {
     'session detail': SessionDetailScreen(session: _session),
     'set target': SetTargetWordScreen(profile: _teacher),
     'edit word': Scaffold(body: EditKataScreen(profile: _teacher)),
+    'researcher panel': AppNavShell(
+      onLogout: () {},
+      destinations: [
+        AppNavDestination(label: 'Target Kata', icon: Icons.track_changes, body: TargetWordsScreen(profile: _teacher)),
+        AppNavDestination(label: 'Kosakata', icon: Icons.menu_book, body: VocabManagementScreen(profile: _teacher)),
+        AppNavDestination(label: 'Riset', icon: Icons.fact_check_outlined, body: ResearchPanelScreen(profile: _teacher)),
+      ],
+      initialIndex: 2,
+    ),
   };
 
   group('renders without overflow at every viewport', () {
@@ -653,5 +695,6 @@ void main() {
     testWidgets('dashboard', (tester) => expectTargets(tester, cases['student shell']!));
     testWidgets('vocabulary browser', (tester) => expectTargets(tester, const VocabBrowserScreen()));
     testWidgets('placement instructions', (tester) => expectTargets(tester, const PlacementTestScreen(uid: 'student-1')));
+    testWidgets('researcher panel', (tester) => expectTargets(tester, cases['researcher panel']!));
   });
 }

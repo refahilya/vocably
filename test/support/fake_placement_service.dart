@@ -41,6 +41,13 @@ class FakePlacementService extends PlacementService {
   int submitCalls = 0;
   int scoreCalls = 0;
   int hiddenCalls = 0;
+
+  /// Progress mirrors the app asked for, in order (the real service skips
+  /// learning attempts).
+  final mirrors = <PlacementAttemptRecord>[];
+
+  @override
+  Future<void> mirrorProgress(PlacementAttemptRecord attempt) async => mirrors.add(attempt);
   String? userResultLevel;
   String? userResultAttemptId;
 

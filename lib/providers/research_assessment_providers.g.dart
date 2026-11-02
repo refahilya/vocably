@@ -434,7 +434,7 @@ final class ResearchAssessmentControllerProvider
 }
 
 String _$researchAssessmentControllerHash() =>
-    r'd8859856ae58451f88512761b7a2cf589ee7f810';
+    r'b4b06f166997a2065e433fafc62bfd76c112ca15';
 
 /// Drives one pretest or posttest attempt for [uid] (`SPEC.md` §3.7,
 /// `DATA_MODEL.md` §6b).

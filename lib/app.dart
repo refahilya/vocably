@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'models/app_user.dart';
 import 'providers/auth_providers.dart';
+import 'providers/research_panel_providers.dart';
 import 'screens/auth/complete_registration_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/student/dashboard/dashboard_screen.dart';
 import 'screens/student/history/history_screen.dart';
 import 'screens/student/placement_test/placement_test_offer_screen.dart';
+import 'screens/teacher/research_panel/research_panel_screen.dart';
 import 'screens/teacher/target_words/target_words_screen.dart';
 import 'screens/teacher/vocab_management/vocab_management_screen.dart';
 import 'theme/theme.dart';
@@ -44,6 +46,14 @@ class _RootRouter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(appAuthStatusProvider);
+    // The Researcher Panel destination appears only for the active
+    // researcher operator (`DATA_MODEL.md` §6d) — a display decision; the
+    // rules enforce every panel action on their own.
+    final isOperator = switch (status) {
+      AppAuthSignedIn(:final profile) when profile.role == Role.guru =>
+        ref.watch(researchOperatorProvider(profile.uid)).value == true,
+      _ => false,
+    };
 
     return switch (status) {
       AppAuthLoading() => const _LoadingScreen(),
@@ -61,7 +71,7 @@ class _RootRouter extends ConsumerWidget {
         PlacementTestOfferScreen(profile: profile),
       AppAuthSignedIn(:final profile) => AppNavShell(
         destinations: profile.role == Role.guru
-            ? _teacherDestinations(profile)
+            ? _teacherDestinations(profile, isOperator: isOperator)
             : _studentDestinations(profile),
         onLogout: () => ref.read(authServiceProvider).signOut(),
       ),
@@ -88,10 +98,11 @@ List<AppNavDestination> _studentDestinations(AppUser profile) {
   ];
 }
 
-/// Destinations for a signed-in `guru`: Target Kata (Milestone 8) and
+/// Destinations for a signed-in `guru`: Target Kata (Milestone 8),
 /// Kosakata (vocabulary management — Tambah Kosakata & Edit Kata,
-/// Milestone 8 — see `CLAUDE.md` §7).
-List<AppNavDestination> _teacherDestinations(AppUser profile) {
+/// Milestone 8 — see `CLAUDE.md` §7) and, for the researcher operator
+/// only, Riset (the Researcher Panel, `SPEC.md` §4.3).
+List<AppNavDestination> _teacherDestinations(AppUser profile, {bool isOperator = false}) {
   return [
     AppNavDestination(
       label: 'Target Kata',
@@ -103,6 +114,12 @@ List<AppNavDestination> _teacherDestinations(AppUser profile) {
       icon: Icons.menu_book,
       body: VocabManagementScreen(profile: profile),
     ),
+    if (isOperator)
+      AppNavDestination(
+        label: 'Riset',
+        icon: Icons.fact_check_outlined,
+        body: ResearchPanelScreen(profile: profile),
+      ),
   ];
 }
 

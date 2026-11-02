@@ -50,6 +50,12 @@ class FakeResearchAssessmentService extends ResearchAssessmentService {
   int completeCalls = 0;
   int readCalls = 0;
 
+  /// Progress mirrors the app asked for (`researchProgress`), in order.
+  final mirrors = <ResearchAttemptRecord>[];
+
+  @override
+  Future<void> mirrorProgress(ResearchAttemptRecord attempt) async => mirrors.add(attempt);
+
   /// Runs just before a write is evaluated (to simulate another tab).
   void Function()? beforeNextWrite;
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -205,6 +206,7 @@ class ResearchAssessmentController extends _$ResearchAssessmentController {
         case ResearchStageKind.invalid:
           _set(const ResearchAssessmentInvalid());
         case ResearchStageKind.completed:
+          if (snapshot.attempt != null) unawaited(_service.mirrorProgress(snapshot.attempt!));
           _set(const ResearchAssessmentCompleted());
         case ResearchStageKind.notStarted:
           await _loadInstrument();
@@ -240,6 +242,9 @@ class ResearchAssessmentController extends _$ResearchAssessmentController {
     ResearchAttemptRecord attempt, {
     bool showIntro = false,
   }) async {
+    // Every path that rebuilds from a stored attempt (resume, after a create,
+    // after a saved answer) keeps the Researcher Panel's mirror current.
+    unawaited(_service.mirrorProgress(attempt));
     switch (attempt.status) {
       case ResearchAttemptStatus.completed:
         _set(const ResearchAssessmentCompleted());
@@ -492,6 +497,7 @@ class ResearchAssessmentController extends _$ResearchAssessmentController {
     }
     switch (stored?.status) {
       case ResearchAttemptStatus.completed:
+        unawaited(_service.mirrorProgress(stored!));
         _set(const ResearchAssessmentCompleted());
       case ResearchAttemptStatus.voided:
         await _load();

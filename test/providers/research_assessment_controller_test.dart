@@ -656,4 +656,25 @@ void main() {
       },
     );
   });
+
+  group('Researcher Panel progress mirror', () {
+    test('mirrors the stored attempt after create, each answer and completion — best effort', () async {
+      await settle(pre);
+      await ctl(pre).start();
+      expect(server.mirrors.last.responses, isEmpty);
+      for (var i = 0; i < 20; i++) {
+        await answerCurrent(inProgress(pre).currentItem.substantiveOptions.first.id);
+        if (i < 19) expect(server.mirrors.last.responses.length, i + 1);
+      }
+      expect(container.read(pre), isA<ResearchAssessmentCompleted>());
+      expect(server.mirrors.last.status, ResearchAttemptStatus.completed);
+      expect(server.mirrors.map((m) => m.attemptId).toSet(), {preId()});
+    });
+
+    test('resuming an attempt refreshes a mirror that may have been missed', () async {
+      seedAttempt(answered: 5);
+      await settle(pre);
+      expect(server.mirrors.single.responses.length, 5);
+    });
+  });
 }

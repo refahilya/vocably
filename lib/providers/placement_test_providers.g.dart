@@ -265,7 +265,7 @@ final class PlacementTestControllerProvider
 }
 
 String _$placementTestControllerHash() =>
-    r'd5d54d82c25706cb70c6757ffeaa6a94cc8373cb';
+    r'a5d2c5f564eb470b869bd3f321d08afb47b78651';
 
 /// Drives the Placement Test for [uid] (`SPEC.md` §3.1, `DATA_MODEL.md` §6).
 ///
