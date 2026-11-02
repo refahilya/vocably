@@ -95,6 +95,9 @@ baliknya. Detail teknis di `DATA_MODEL.md` §10.
   **hanya muncul sekali seumur akun**: begitu ditampilkan,
   `users.placementTestPrompted = true` apa pun pilihan siswa. Sesudah itu,
   satu-satunya jalan masuk adalah link di kartu Level dashboard (3.2).
+- "Mulai Tes" selalu membuka layar tes. Kalau tes tidak tersedia, belum
+  dibuka, atau gagal dimuat, layar tes itulah yang menjelaskannya; siswa tidak
+  pernah dialihkan diam-diam ke dashboard. "Nanti Saja" menuju dashboard.
 
 **Bentuk tes (spesifikasi §3)**
 - 50 butir, satu per layar, "Soal x dari 50"; label band tidak pernah

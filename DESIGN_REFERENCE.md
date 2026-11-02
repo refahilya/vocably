@@ -325,7 +325,9 @@ tersendiri (§6), dengan desain di §3.3.
 
 - **Tawaran otomatis** (sekali seumur akun): layar sambutan dengan dua aksi
   setara "Mulai Tes" (solid navy) dan "Nanti Saja" (outline). "Mulai Tes"
-  membuka layar tes.
+  membuka layar tes, yang juga menampilkan pesan bila tes belum tersedia;
+  "Nanti Saja" menuju dashboard. Setelah daftar atau masuk, layar auth yang
+  di-push menutup sendiri supaya tawaran ini terlihat.
 - **Petunjuk:** lembar putih berisi judul "Tes Penempatan Kosakata",
   paragraf pembuka, dan 8 butir "Petunjuk" — verbatim dari spesifikasi §3.3.
   Tombol "Mulai" (baru) atau "Lanjutkan" (melanjutkan attempt) di bar bawah.

@@ -13,12 +13,12 @@ ulang hari ini.
 
 ## 1. Git
 
-- **`vocably`** [terverifikasi 2026-11-02]: branch `main` di `17a0001`
-  ("docs: record redesign and rules deployment"), sama dengan `origin/main`
-  menurut pelacakan lokal. Redesain UI ada di commit `af85e69` + `17a0001`.
-  **Perbaikan tangga level (§4) ada di working tree, belum di-stage dan belum
-  di-commit:** 13 file terlacak berubah termasuk dokumen, tanpa file baru
-  atau dihapus.
+- **`vocably`** [terverifikasi 2026-11-02]: branch `main` di `36984d0`
+  ("docs: record level ladder fix"), sama dengan `origin/main` menurut
+  pelacakan lokal. Redesain UI ada di `af85e69` + `17a0001`, perbaikan tangga
+  level di `3b359f4` + `36984d0`. **Perbaikan alur masuk Placement Test (§4)
+  ada di working tree, belum di-stage dan belum di-commit:** 12 file terlacak
+  berubah termasuk dokumen, 1 file tes baru.
 - **`vocably-ai-worker`** [catatan 2026-10-28, tidak dicek ulang]: `main` di `5bcb5e4`,
   sama dengan `origin/main`. Satu-satunya perubahan lokal: origin
   `http://localhost:5000` di `wrangler.jsonc` — **khusus lokal; jangan
@@ -41,20 +41,21 @@ ulang hari ini.
 
 ## 3. Hasil verifikasi terakhir
 
-Dijalankan agen pada 2026-11-02 terhadap working tree di atas `17a0001`
-(belum di-commit), setelah perbaikan tangga level (§4):
+Dijalankan agen pada 2026-11-02 terhadap working tree di atas `36984d0`
+(belum di-commit), setelah perbaikan alur masuk Placement Test (§4):
 
 | Cek | Perintah | Hasil |
 |---|---|---|
 | Analyzer | `flutter analyze` | 0 isu |
-| Tes Flutter | `flutter test --concurrency=1` | **936/936** lulus, termasuk 23 tes baru untuk tangga level dan 210 tes responsif (8 viewport, teks 130% di 320 px, HP miring 844×390 dan 568×320, ukuran target tap) |
+| Tes Flutter | `flutter test --concurrency=1` | **946/946** lulus, termasuk 10 tes alur masuk placement dengan router asli (`test/placement_entry_flow_test.dart`) dan 210 tes responsif (8 viewport, teks 130% di 320 px, HP miring 844×390 dan 568×320, ukuran target tap) |
 | Tooling riset | `cd tools/research && npm test` dengan `VOCABLY_PLACEMENT_SOURCE` | **93 lulus, 2 dilewati, 0 gagal** (rebuild bank placement ikut berjalan). 2 yang dilewati (`sourcePdf.test.js`) butuh PDF peneliti dan tidak diulang pada putaran ini; tooling tidak berubah sejak terakhir lulus |
 | Emulator riset + placement | `cd tools/research && npm run test:rules` | **129/129** lulus |
 | Build rilis | `flutter build web --release --dart-define=WORKER_BASE_URL=…` | Berhasil; URL Worker produksi ada di bundle. Peringatan "Wasm dry run failed" sudah dikenal (§7) |
 | Kunci/secret di `build/web` | Pindai nama file, pola secret, dan sidik jari kunci asli (hanya hitungan) | **0 temuan:** 0/50 pasangan kunci placement, 0/80 pasangan kunci pretest, 0 nama field kunci, 0 pola secret, 0 host/proyek emulator |
+| Browser, alur masuk placement | Build `--profile` final + Chrome + Firestore/Auth emulator, host produksi diblokir | Daftar akun baru sampai ke tawaran; "Mulai Tes" membuka petunjuk tes, lalu kembali ke dashboard; "Nanti Saja" ke dashboard, dan tawaran tidak muncul lagi setelah keluar-masuk; masuk dari Login yang di-push berhasil; dengan tes ditutup, "Mulai Tes" menampilkan "Belum dibuka". 0 pageerror, 0 request produksi. Build lama mereproduksi kedua bug |
 | Browser, tangga level | Build `--profile` + Chrome + emulator + server dengan SPA fallback, host produksi diblokir | Keenam level terbuka benar di dashboard sungguhan dan hanya mengambil bundle-nya sendiri; C2 menampilkan pesan kosong; 0 error konsol, 0 request ke host produksi. Build sebelum perbaikan C2: filter B1 → C1 + POS tidak terbawa ke pembukaan berikutnya, halaman 2 bertahan setelah Keranjang, membuka B2 saat animasi tutup menghasilkan B2 bersih, C1 benar di 1280 px |
 | Browser, redesain | Build `--profile` + Chrome headless + emulator + Worker tiruan, sebelum perbaikan tangga level | Masuk, alur 3 fase sampai Selesai, Riwayat, Pelajari Kembali, Keranjang, Pre-Test 20 soal, Placement, target guru, tambah/edit kata: semua tuntas; 0 overflow horizontal pada 8 viewport + 2 lanskap; 1 error konsol, yaitu 400 yang disengaja |
-| Integritas | `git diff` | `firestore.rules`, indeks, `firebase.json`, kedua bank soal, `lib/models` tidak berubah; 0 file ter-stage |
+| Integritas | `git diff` | `firestore.rules`, indeks, `firebase.json`, aset, `lib/models`, `lib/services` tidak berubah; 0 file ter-stage |
 
 - **Tidak diuji:** token Firebase asli + Firestore produksi/staging, runtime
   produksi, Worker dan LLM asli (uji browser memakai Worker tiruan), Chrome
@@ -111,14 +112,18 @@ Dijalankan agen pada 2026-11-02 terhadap working tree di atas `17a0001`
   `widgets/app_layout.dart`. Logika, rules, data, kontrak Worker, skoring,
   dan bank soal tidak berubah. Tidak ada layar profil/pengaturan atau
   manajemen siswa di aplikasi, jadi keduanya tidak termasuk.
-- **Tangga level dashboard (§5ze):** selesai dan diverifikasi lokal, belum
-  di-commit. Keenam level membuka level yang ditekan, tiap pembukaan layar
-  mulai bersih, dan level tanpa bundle (C2) menampilkan pesan kosong, termasuk
-  di host dengan SPA rewrite seperti Firebase Hosting.
+- **Tangga level dashboard (§5ze):** selesai di `main`, belum di-hosting.
+  Keenam level membuka level yang ditekan, tiap pembukaan layar mulai bersih,
+  dan level tanpa bundle (C2) menampilkan pesan kosong, termasuk di host
+  dengan SPA rewrite seperti Firebase Hosting.
+- **Alur masuk Placement Test (§5zf):** selesai dan diverifikasi lokal, belum
+  di-commit. "Mulai Tes" selalu membuka layar tes, yang juga menjelaskan bila
+  tes tidak tersedia; "Nanti Saja" ke dashboard. Daftar akun baru kini sampai
+  ke tawaran, tidak lagi tertahan di formulir.
 
 ## 5. Blocker sebelum produksi / responden sungguhan
 
-1. **Commit** perbaikan tangga level (pemilik proyek).
+1. **Commit** perbaikan alur masuk Placement Test (pemilik proyek).
 2. **Jendela tahap riset:** rules yang kini ter-deploy **mewajibkan**
    `researchStudy/current` dengan jendela tahap terbuka; tanpa dokumen itu
    semua tes riset tertolak (fail closed). Ini perilaku yang benar, bukan
@@ -183,7 +188,7 @@ Dijalankan agen pada 2026-11-02 terhadap working tree di atas `17a0001`
 
 ## 8. Langkah berikutnya
 
-1. Review lalu commit perbaikan tangga level (pemilik proyek).
+1. Review lalu commit perbaikan alur masuk Placement Test (pemilik proyek).
 2. Coba redesain di HP Android sungguhan, termasuk keyboard layar dan
    posisi miring; ulangi M1 dan `AppLifecycleListener` (pindah tab) di sana
    (`tools/research/README.md` "Placement Test checklist").
