@@ -33,7 +33,7 @@ ulang hari ini.
 
 | Komponen | Status | Bukti |
 |---|---|---|
-| Flutter web (Firebase Hosting) | **Ter-hosting** di `https://vocably-idn-en.web.app` (build dengan `Last-Modified: Mon, 02 Nov 2026 17:55:05 GMT`; isi build persis tidak diverifikasi). Build itu **tanpa header keamanan** (tanpa CSP / `X-Frame-Options` / `nosniff`) — perbaikan §5zi **belum di-deploy** | `curl -I` 2026-11-03 [terverifikasi]; scan OWASP ZAP produksi 2026-11-03 (§3) |
+| Flutter web (Firebase Hosting) | **Ter-deploy 2026-11-03 ~08.09 WIB** (`Last-Modified: Tue, 03 Nov 2026 01:08:58 GMT`) oleh agen atas izin eksplisit pemilik proyek: build rilis dari commit `5b9c1f3` (§5zi), **dengan header keamanan** di `web.app` dan `firebaseapp.com`. Hanya Hosting; rules tidak di-deploy | Keluaran `firebase deploy --only hosting`; `curl -I` kedua domain; scan ZAP produksi sesudah deploy (§3b) [terverifikasi] |
 | Cloudflare Worker | Versi `0bec79ee-2958-475e-97fe-64ababf31c9c` (deploy 2026-10-15T17:08Z UTC) dengan override `--var ALLOWED_ORIGINS`, mencakup seluruh pekerjaan Co-Write | [catatan] `wrangler deployments list` 2026-10-16 (`PROJECT_STATE.md` §5t) |
 | Firestore rules | Ter-deploy ke `vocably-idn-en` pada 2026-11-02 00.52 WIB (rules riset + Placement Test). **`firestore.rules` di working tree sudah berubah sejak itu (Panel Riset) dan BELUM di-deploy** — produksi belum punya rules panel | Keluaran deploy 2026-11-02 (`PROJECT_STATE.md` §5zc); diff working tree [terverifikasi 2026-11-03] |
 | Index | `firestore.indexes.json` ter-deploy 2026-11-02; tidak berubah (panel hanya memakai index otomatis satu field) | Keluaran deploy; status pembangunan index tidak dicek |
@@ -106,7 +106,8 @@ setelah Panel Riset dibangun:
 | Sesi login di bawah CSP yang sama (build profile + emulator Firestore/Auth `demo-vocably-test`; hanya `connect-src` ditambah host emulator untuk uji ini) | `siswa.b1@example.test` login → dashboard (baca Firestore) → Jelajah B1 (bundle aset) → detail kata (dictionaryapi + TTS) → Pre-Test: attempt dibuat dan satu jawaban tersimpan (`status --emulator`: `in_progress 1/20`); 0 pelanggaran CSP |
 | Probe CSP di halaman yang sama (skrip halaman sendiri) | Diizinkan: dictionaryapi, Worker (401 tanpa token), googleapis, gstatic, fonts.gstatic, audio. Diblokir: inline script, `eval`, skrip eksternal asing, `connect-src` asing, framing |
 | ZAP ke server lokal sesudah perbaikan | 10038/10020/10021 hilang. Sisa: **CSP: style-src unsafe-inline (10055, Medium)** — diterima, lihat §7 |
-| **Belum:** scan ZAP produksi sesudah deploy | Menunggu deploy Hosting oleh/atas izin pemilik proyek |
+| **Produksi sesudah deploy** (`curl -I`, Chrome, ZAP baseline + probe CORS) | Kelima header ada di `web.app` & `firebaseapp.com`, tanpa header CORS untuk `Origin` asing. App tampil, Firebase SDK 12.17.0 terinisialisasi, 0 pelanggaran CSP, login salah → "Email atau password salah.". ZAP: 10038/10020/10021 **hilang**; sisa di Vocably hanya 10055 `style-src unsafe-inline`; 10098 hanya pada `www.gstatic.com`, `fonts.gstatic.com`, `api.dictionaryapi.dev`. Temuan Low baru: Worker tanpa HSTS (10035) |
+| Belum diuji di produksi | Login akun sungguhan, Firestore tulis, Co-Write/cerita di bawah CSP (diuji lokal terhadap emulator, kecuali Worker); HP Android, Firefox, Safari |
 
 ## 4. Posisi fitur
 
@@ -146,10 +147,9 @@ setelah Panel Riset dibangun:
    `seed-placement --key …`, `study --status active`, lalu `operator --grant`
    untuk akun peneliti — dengan service account milik peneliti dan izin
    eksplisit. Belum pernah dilakukan. Perintah persis: §8.
-4. **Deploy ulang Hosting dengan header keamanan (§5zi):** build produksi
-   saat ini tanpa CSP/anti-clickjacking. Build rilis lalu
-   `firebase deploy --only hosting --project vocably-idn-en`, cek
-   `curl -I https://vocably-idn-en.web.app/`, lalu scan ZAP ulang.
+4. ~~Deploy Hosting dengan header keamanan~~ — selesai 2026-11-03 (§2, §3b).
+   Sisa: uji sekali dengan akun sungguhan (login, Firestore, Co-Write) di HP
+   di bawah CSP.
 5. **Validasi ahli instrumen** (pretest/posttest dan aturan K2 placement) dan
    **pilot** pada siswa non-responden — belum.
 6. **Persiapan responden (35–40 siswa):** akun siswa (daftar sendiri di app),
@@ -208,14 +208,16 @@ setelah Panel Riset dibangun:
 | ZAP "Cross-Domain Misconfiguration" (10098) pada `www.gstatic.com`, `fonts.gstatic.com`, `api.dictionaryapi.dev` | Bukan origin Vocably; CDN/API publik dan app butuh `*` untuk memuatnya. Tidak bisa/perlu diubah |
 | Loader SDK Firebase (`firebase_web_sdk_loader_web.dart`) memakai nama global internal FlutterFire (`firebase_core`/`firebase_auth`/`firebase_firestore`) | Kalau upgrade FlutterFire mengubahnya atau plugin web baru ditambah, Firebase gagal start (layar error init) — cek di browser setelah upgrade |
 | Worker produksi juga menerima origin `http://localhost:5555` (README "Deployment" §3), padahal `DATA_MODEL.md` §10.1 menyebut produksi tidak boleh menerima localhost | Inkonsistensi dokumen lama; tidak diubah di §5zi (Worker repo terpisah, butuh deploy). Risiko kecil: tetap perlu ID token Firebase |
+| Worker tidak mengirim `Strict-Transport-Security` (ZAP 10035, Low) | Ditemukan pada scan 2026-11-03; tidak diubah (repo Worker terpisah, butuh deploy Worker) |
 | `canvaskit.wasm` dimuat dari `www.gstatic.com`; di cache kosong pada jaringan lambat bisa puluhan detik (46 s teramati saat uji lokal) | Perilaku bawaan Flutter; opsi self-host (`--no-web-resources-cdn`) belum dievaluasi |
 | Tes otomatis void percobaan pretest **selesai** belum memeriksa `responses` tetap utuh (void panel `in_progress` sudah diperiksa) | Celah tes kecil |
 | Belum diverifikasi: E2E Co-Write di Chrome terhadap Worker produksi; redesain dan panel di HP Android sungguhan | Terbuka |
 
 ## 8. Langkah berikutnya
 
-1. Deploy Hosting dengan header keamanan (§5 no. 4) dan scan ZAP produksi
-   ulang; uji login/kamus/Co-Write sekali di HP sungguhan di bawah CSP.
+1. Uji login/kamus/Co-Write sekali dengan akun sungguhan di HP di bawah CSP
+   yang kini live (§3b); bila ada yang gagal, cek Console untuk
+   `Refused to … Content Security Policy`.
 2. Uji panel sekali lagi secara manual di emulator (checklist "Researcher
    Panel" di `tools/research/README.md`), sebaiknya juga dari HP sungguhan.
 3. Keputusan peneliti di §6 (validasi K2, teks panel, kebijakan e-mail,
