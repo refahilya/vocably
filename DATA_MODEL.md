@@ -1192,6 +1192,14 @@ bisa dibuka lewat DevTools). Ini **project/repo terpisah** dari Flutter app
     menegakkannya, dan `curl` mengabaikannya. Yang benar-benar menjaga
     Worker adalah verifikasi ID token + rate limiting. CORS mencegah
     halaman web orang lain memakai Worker ini dari browser pengguna.
+  - **Firebase Hosting tidak mengirim header CORS sama sekali**, dan
+    `test/hosting_security_headers_test.dart` menolak header
+    `Access-Control-*` di `firebase.json`. Temuan OWASP ZAP "Cross-Domain
+    Misconfiguration" (`Access-Control-Allow-Origin: *`) datang dari respons
+    pihak ketiga (`www.gstatic.com`, `fonts.gstatic.com`,
+    `api.dictionaryapi.dev`), bukan dari origin Vocably — lihat `README.md`
+    "Deployment" §1. Header security Hosting (CSP, anti-clickjacking) juga
+    didokumentasikan di sana.
 
 ### 10.2 Endpoint
 

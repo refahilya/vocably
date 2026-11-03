@@ -1,0 +1,10 @@
+/* Shown until Flutter paints its first frame, so a slow connection sees the
+   navy cover instead of a blank page. Kept out of index.html so the page
+   itself has no inline code (CSP in firebase.json, README "Deployment"). */
+html, body { margin: 0; height: 100%; background: #1B1F5C; }
+#app-splash {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font: 700 28px Georgia, 'Times New Roman', serif;
+}
+#app-splash span { border-bottom: 5px solid #FFCF56; padding: 0 2px 2px; }

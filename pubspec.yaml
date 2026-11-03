@@ -37,6 +37,11 @@ dependencies:
   firebase_core: ^4.13.0
   firebase_auth: ^6.5.7
   cloud_firestore: ^6.8.0
+  # Already resolved through firebase_core; listed directly because
+  # lib/services/firebase_web_sdk_loader_web.dart reads its
+  # supportedFirebaseJsSdkVersion to preload the SDK without inline scripts
+  # (CSP, firebase.json). Owner-authorized 2026-11-03.
+  firebase_core_web: ^3.10.0
   flutter_riverpod: ^3.3.2
   riverpod_annotation: ^4.0.3
   http: ^1.6.0

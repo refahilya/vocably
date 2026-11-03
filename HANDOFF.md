@@ -13,12 +13,12 @@ ulang hari ini.
 
 ## 1. Git
 
-- **`vocably`** [terverifikasi 2026-11-03]: branch `main` di `49f6a7a`
-  ("docs: record placement entry flow review"), **2 commit di depan
-  `origin/main`** menurut pelacakan lokal (`066dc6d` + `49f6a7a`, tinjauan
-  lanjutan alur masuk §5zg; belum di-push). **Panel Riset + enrolmen tanpa
-  band (§4, `PROJECT_STATE.md` §5zh) ada di working tree, belum di-stage dan
-  belum di-commit** (kode, rules, tooling, tes, dokumen).
+- **`vocably`** [terverifikasi 2026-11-03]: sebelum perbaikan keamanan,
+  `main` = `origin/main` di `4704341` ("chore: ignore Firebase Hosting
+  cache"); Panel Riset (`0c531ac`, `b8946fa`, `a025343`) dan konfigurasi
+  Hosting (`17ed34c`) sudah di-commit dan di-push oleh pemilik proyek.
+  Perbaikan temuan OWASP ZAP (`PROJECT_STATE.md` §5zi) di-commit dan di-push
+  agen dengan izin eksplisit pemilik proyek — hash: `git log`.
 - **`vocably-ai-worker`** [catatan 2026-10-28, tidak dicek ulang]: `main` di `5bcb5e4`,
   sama dengan `origin/main`. Satu-satunya perubahan lokal: origin
   `http://localhost:5000` di `wrangler.jsonc` — **khusus lokal; jangan
@@ -33,7 +33,7 @@ ulang hari ini.
 
 | Komponen | Status | Bukti |
 |---|---|---|
-| Flutter web (Firebase Hosting) | **Belum di-hosting**; `firebase.json` tidak punya blok `"hosting"` | [terverifikasi 2026-11-03] |
+| Flutter web (Firebase Hosting) | **Ter-hosting** di `https://vocably-idn-en.web.app` (build dengan `Last-Modified: Mon, 02 Nov 2026 17:55:05 GMT`; isi build persis tidak diverifikasi). Build itu **tanpa header keamanan** (tanpa CSP / `X-Frame-Options` / `nosniff`) — perbaikan §5zi **belum di-deploy** | `curl -I` 2026-11-03 [terverifikasi]; scan OWASP ZAP produksi 2026-11-03 (§3) |
 | Cloudflare Worker | Versi `0bec79ee-2958-475e-97fe-64ababf31c9c` (deploy 2026-10-15T17:08Z UTC) dengan override `--var ALLOWED_ORIGINS`, mencakup seluruh pekerjaan Co-Write | [catatan] `wrangler deployments list` 2026-10-16 (`PROJECT_STATE.md` §5t) |
 | Firestore rules | Ter-deploy ke `vocably-idn-en` pada 2026-11-02 00.52 WIB (rules riset + Placement Test). **`firestore.rules` di working tree sudah berubah sejak itu (Panel Riset) dan BELUM di-deploy** — produksi belum punya rules panel | Keluaran deploy 2026-11-02 (`PROJECT_STATE.md` §5zc); diff working tree [terverifikasi 2026-11-03] |
 | Index | `firestore.indexes.json` ter-deploy 2026-11-02; tidak berubah (panel hanya memakai index otomatis satu field) | Keluaran deploy; status pembangunan index tidak dicek |
@@ -95,6 +95,19 @@ setelah Panel Riset dibangun:
   folder scratchpad sesi agen; `firestore-debug.log` di scratchpad `pt-spike`
   dan `pt-probe` (fase sebelumnya). Tidak berisi data nyata.
 
+### 3b. Keamanan Hosting — temuan OWASP ZAP (2026-11-03, agen; §5zi)
+
+| Cek | Hasil |
+|---|---|
+| ZAP 2.17.0 headless (spider + client spider Firefox + passive) ke **produksi** sebelum perbaikan | Medium: CSP Header Not Set (10038, 4 URL), Missing Anti-clickjacking Header (10020); Low: nosniff (10021). Cross-Domain Misconfiguration (10098) **hanya** pada `www.gstatic.com`, `fonts.gstatic.com`, `api.dictionaryapi.dev` — bukan pada Hosting maupun Worker [terverifikasi] |
+| CORS origin sendiri (`curl` dengan `Origin` asing) | Hosting: tanpa header CORS. Worker: preflight/POST dengan origin asing atau `null` tanpa `Access-Control-Allow-Origin`; origin produksi di-echo + `Vary: Origin` [terverifikasi] |
+| `flutter analyze` / `flutter test --concurrency=1` | 0 isu / **1007/1007** (999 + 8 di `test/hosting_security_headers_test.dart`) |
+| Build rilis + server lokal yang memasang header dari `firebase.json` (emulator Hosting & `firebase serve` **tidak** memasang `headers`) | App tampil, splash hilang, Firebase app `vocably-idn-en` terinisialisasi, login salah → "Email atau password salah." lewat Auth produksi; 0 pelanggaran CSP; stylesheet engine Flutter terpasang |
+| Sesi login di bawah CSP yang sama (build profile + emulator Firestore/Auth `demo-vocably-test`; hanya `connect-src` ditambah host emulator untuk uji ini) | `siswa.b1@example.test` login → dashboard (baca Firestore) → Jelajah B1 (bundle aset) → detail kata (dictionaryapi + TTS) → Pre-Test: attempt dibuat dan satu jawaban tersimpan (`status --emulator`: `in_progress 1/20`); 0 pelanggaran CSP |
+| Probe CSP di halaman yang sama (skrip halaman sendiri) | Diizinkan: dictionaryapi, Worker (401 tanpa token), googleapis, gstatic, fonts.gstatic, audio. Diblokir: inline script, `eval`, skrip eksternal asing, `connect-src` asing, framing |
+| ZAP ke server lokal sesudah perbaikan | 10038/10020/10021 hilang. Sisa: **CSP: style-src unsafe-inline (10055, Medium)** — diterima, lihat §7 |
+| **Belum:** scan ZAP produksi sesudah deploy | Menunggu deploy Hosting oleh/atas izin pemilik proyek |
+
 ## 4. Posisi fitur
 
 - **Milestone 1–8:** selesai (riwayat `PROJECT_STATE.md` §2, §5–§5n).
@@ -106,8 +119,8 @@ setelah Panel Riset dibangun:
 - **Placement Test PT-V1.1 (§5za–§5zg):** selesai di `main`, rules lama
   ter-deploy, app belum di-hosting, kunci & bank belum di-seed ke produksi.
   **K2 belum divalidasi ahli/pembimbing.**
-- **Panel Riset + enrolmen tanpa band (§5zh):** selesai di working tree,
-  **belum di-commit, rules belum di-deploy**:
+- **Panel Riset + enrolmen tanpa band (§5zh):** selesai dan di-commit;
+  status deploy rules panel tidak dicek ulang (lihat §2):
   - grant/revoke operator satu kali lewat CLI (`operator --grant/--revoke
     --email`), identitas = login guru biasa;
   - rules operator sempit + `researchAuditLog` wajib per tindakan;
@@ -122,8 +135,8 @@ setelah Panel Riset dibangun:
 
 ## 5. Blocker sebelum produksi / responden sungguhan
 
-1. **Commit** pekerjaan Panel Riset (pemilik proyek), dan push kedua commit
-   §5zg yang belum di-push.
+1. ~~Commit & push Panel Riset~~ — selesai (`0c531ac`, `b8946fa`, `a025343`
+   ada di `origin/main`, [terverifikasi 2026-11-03]).
 2. **Deploy rules baru** (`firebase deploy --only firestore:rules`) — tanpa
    ini panel tidak berfungsi di produksi (semua tulisan panel ditolak rules
    lama) dan app yang di-hosting akan gagal menulis cermin progres (diabaikan
@@ -133,9 +146,10 @@ setelah Panel Riset dibangun:
    `seed-placement --key …`, `study --status active`, lalu `operator --grant`
    untuk akun peneliti — dengan service account milik peneliti dan izin
    eksplisit. Belum pernah dilakukan. Perintah persis: §8.
-4. **Konfigurasi Firebase Hosting:** `firebase.json` belum punya blok
-   `"hosting"` (`README.md` "Deployment"); app dengan panel belum bisa dipakai
-   di sekolah sebelum di-hosting.
+4. **Deploy ulang Hosting dengan header keamanan (§5zi):** build produksi
+   saat ini tanpa CSP/anti-clickjacking. Build rilis lalu
+   `firebase deploy --only hosting --project vocably-idn-en`, cek
+   `curl -I https://vocably-idn-en.web.app/`, lalu scan ZAP ulang.
 5. **Validasi ahli instrumen** (pretest/posttest dan aturan K2 placement) dan
    **pilot** pada siswa non-responden — belum.
 6. **Persiapan responden (35–40 siswa):** akun siswa (daftar sendiri di app),
@@ -190,12 +204,18 @@ setelah Panel Riset dibangun:
 | "Coba lagi" Per Kata hanya meng-invalidate `historyWordEntriesProvider` | Observasi, belum diverifikasi |
 | Binding Rate Limiting native Cloudflare belum dipastikan | Terbuka |
 | Build `--wasm` gagal (`flutter_tts` memakai JS interop lama) | Pakai build JS |
+| **CSP `style-src 'unsafe-inline'`** (ZAP 10055, Medium) | Diterima: engine Flutter menyisipkan `<style>` sendiri yang isinya beda per browser/versi; Hosting statis tidak bisa nonce. `script-src` tetap ketat (`README.md` "Deployment" §1) |
+| ZAP "Cross-Domain Misconfiguration" (10098) pada `www.gstatic.com`, `fonts.gstatic.com`, `api.dictionaryapi.dev` | Bukan origin Vocably; CDN/API publik dan app butuh `*` untuk memuatnya. Tidak bisa/perlu diubah |
+| Loader SDK Firebase (`firebase_web_sdk_loader_web.dart`) memakai nama global internal FlutterFire (`firebase_core`/`firebase_auth`/`firebase_firestore`) | Kalau upgrade FlutterFire mengubahnya atau plugin web baru ditambah, Firebase gagal start (layar error init) — cek di browser setelah upgrade |
+| Worker produksi juga menerima origin `http://localhost:5555` (README "Deployment" §3), padahal `DATA_MODEL.md` §10.1 menyebut produksi tidak boleh menerima localhost | Inkonsistensi dokumen lama; tidak diubah di §5zi (Worker repo terpisah, butuh deploy). Risiko kecil: tetap perlu ID token Firebase |
+| `canvaskit.wasm` dimuat dari `www.gstatic.com`; di cache kosong pada jaringan lambat bisa puluhan detik (46 s teramati saat uji lokal) | Perilaku bawaan Flutter; opsi self-host (`--no-web-resources-cdn`) belum dievaluasi |
 | Tes otomatis void percobaan pretest **selesai** belum memeriksa `responses` tetap utuh (void panel `in_progress` sudah diperiksa) | Celah tes kecil |
 | Belum diverifikasi: E2E Co-Write di Chrome terhadap Worker produksi; redesain dan panel di HP Android sungguhan | Terbuka |
 
 ## 8. Langkah berikutnya
 
-1. Review lalu commit pekerjaan Panel Riset (pemilik proyek); push.
+1. Deploy Hosting dengan header keamanan (§5 no. 4) dan scan ZAP produksi
+   ulang; uji login/kamus/Co-Write sekali di HP sungguhan di bawah CSP.
 2. Uji panel sekali lagi secara manual di emulator (checklist "Researcher
    Panel" di `tools/research/README.md`), sebaiknya juga dari HP sungguhan.
 3. Keputusan peneliti di §6 (validasi K2, teks panel, kebijakan e-mail,
@@ -227,7 +247,7 @@ setelah Panel Riset dibangun:
    npm run admin -- enrol --csv C:\vocably-private\peserta.csv @P              # dry run
    npm run admin -- enrol --csv C:\vocably-private\peserta.csv @P --apply --log C:\vocably-private\audit\admin.private.jsonl
 
-   # f. Hosting (setelah blok "hosting" ditambahkan ke firebase.json, README "Deployment")
+   # f. Hosting (blok "hosting" + header keamanan sudah di firebase.json, README "Deployment")
    cd ..\..
    flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-worker.refahilyaa.workers.dev
    firebase deploy --only hosting --project vocably-idn-en

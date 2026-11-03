@@ -85,23 +85,35 @@ flutter build web --release --dart-define=WORKER_BASE_URL=https://vocably-ai-wor
 - **AI proxy:** Cloudflare Worker at `https://vocably-ai-worker.refahilyaa.workers.dev` (separate repository). Its allowed CORS origins are the two Hosting domains plus the local development origin `http://localhost:5555`.
 
 ### 1. Hosting configuration
-`firebase.json` needs a `"hosting"` block before the first Hosting deploy:
-```json
-"hosting": {
-  "public": "build/web",
-  "ignore": [
-    "firebase.json",
-    "**/.*",
-    "**/node_modules/**"
-  ],
-  "rewrites": [
-    {
-      "source": "**",
-      "destination": "/index.html"
-    }
-  ]
-}
-```
+The `"hosting"` block in `firebase.json` serves `build/web` with an SPA rewrite to `/index.html` and adds security headers to every response (`"source": "**"`):
+
+| Header | Value / purpose |
+|---|---|
+| `Content-Security-Policy` | Allow-list of what the page may load (below). `frame-ancestors 'none'` blocks clickjacking. |
+| `X-Frame-Options` | `DENY`, the anti-clickjacking header for browsers without `frame-ancestors`. |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+
+The CSP allows only what the app uses:
+
+| Directive | Sources | Why |
+|---|---|---|
+| `script-src` | `'self'` `'wasm-unsafe-eval'` `https://www.gstatic.com` | App bundle, CanvasKit (WebAssembly) and the Firebase JS SDK. **No `'unsafe-inline'`, `'unsafe-eval'` or hashes.** |
+| `style-src` | `'self'` `'unsafe-inline'` | The Flutter engine injects its own `<style>` elements, whose text differs per browser and Flutter version; static Hosting cannot send per-response nonces. Accepted residual risk. |
+| `connect-src` | `'self'`, `www.gstatic.com`, `fonts.gstatic.com`, `firestore`/`identitytoolkit`/`securetoken.googleapis.com`, the Worker, `api.dictionaryapi.dev` | Every origin the app calls. |
+| `font-src` | `'self'` `data:` `https://fonts.gstatic.com` | Bundled fonts plus Flutter's fallback fonts. |
+| `img-src` / `media-src` / `worker-src` | `'self'` (+ `data:`/`blob:` for images and workers) | Pronunciation uses browser TTS; no audio files are fetched. |
+| `frame-src` | `https://vocably-idn-en.firebaseapp.com` | Firebase Auth helper frame, if ever used. |
+| `default-src` / `base-uri` / `form-action` / `object-src` | `'self'` / `'self'` / `'self'` / `'none'` | |
+
+The CSP shapes two pieces of app code:
+- **No inline script or style in `web/index.html`.** The splash lives in `web/splash.js` and `web/splash.css`.
+- **The Firebase JS SDK is preloaded from Dart.** FlutterFire normally loads the SDK by injecting inline `<script>` tags, which this CSP blocks. `lib/services/firebase_web_sdk_loader_web.dart` imports the same bundles before `Firebase.initializeApp`, using FlutterFire's own `supportedFirebaseJsSdkVersion`. **Adding another FlutterFire web plugin** (Storage, Analytics, ...) means adding its bundle to that loader's map. Calling another origin means adding it to `connect-src`.
+
+`test/hosting_security_headers_test.dart` guards this configuration. `firebase serve` and the Hosting emulator **do not apply** custom `headers`, so check them on a preview channel or after a deploy (`curl -I https://vocably-idn-en.web.app/`).
+
+**Third-party CORS.** An OWASP ZAP scan reports "Cross-Domain Misconfiguration" (`Access-Control-Allow-Origin: *`) on `www.gstatic.com`, `fonts.gstatic.com` and `api.dictionaryapi.dev`. Those are public CDN and API responses outside this project, and the app needs that header to load them. Vocably's own origins send no permissive CORS: Hosting sends no CORS headers, and the Worker echoes only allow-listed origins (`DATA_MODEL.md` §10.1).
 
 ### 2. Build, then deploy rules, indexes and Hosting
 ```bash

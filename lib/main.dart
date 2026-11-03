@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'firebase_options.dart';
 import 'services/firebase_emulator_config.dart';
+import 'services/firebase_web_sdk_loader.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,9 @@ Future<void> main() async {
               isRelease: kReleaseMode,
             ) ==
             FirebaseTarget.emulators;
+    // Web: load the Firebase JS SDK without inline scripts, which the CSP
+    // forbids (see firebase_web_sdk_loader.dart).
+    await preloadFirebaseWebSdk();
     await Firebase.initializeApp(
       options: kUseFirebaseEmulators && useEmulators
           ? emulatorFirebaseOptions(DefaultFirebaseOptions.currentPlatform)
