@@ -365,7 +365,7 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 > prosedur) — PDF itu memuat kunci jawaban sehingga **tidak** disimpan di
 > repo. Instrumen **tidak boleh disebut valid/reliabel** sebelum validasi
 > ahli dan uji coba pada siswa non-responden dilakukan. Bank soal aman-app:
-> `assets/research/instrument_v1.json` (tanpa kunci, di-generate lewat
+> `assets/research/instrument_v<n>.json` (versi aktif v2; tanpa kunci, di-generate lewat
 > `tools/research/`); rules: `DATA_MODEL.md` §6b; tooling peneliti dan
 > ekspor: `tools/research/README.md`. **Status implementasi, deploy, dan
 > validasi: `HANDOFF.md`.** Sesi treatment resmi dicatat aplikasi

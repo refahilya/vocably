@@ -6,7 +6,7 @@ Aturan kerja dan hierarki kebenaran ada di `CLAUDE.md` §0 — kode, tes, Git,
 dan bukti deploy selalu mengalahkan dokumen ini. Verifikasi ulang fakta yang
 penting untuk tugasmu sebelum mengandalkannya.
 
-**Snapshot: 2026-11-03 (sore).** Label: **[terverifikasi]** = dicek langsung
+**Snapshot: 2026-11-07** (instrumen v2; sisanya dari 2026-11-03). Label: **[terverifikasi]** = dicek langsung
 pada tanggal itu · **[dilaporkan pemilik]** = hasil yang dilaporkan pemilik
 proyek, tidak direproduksi agen · **[catatan]** = tercatat di riwayat, tidak
 dicek ulang hari ini · **[asumsi]** = keputusan sementara agen yang perlu
@@ -14,12 +14,12 @@ dikonfirmasi peneliti.
 
 ## 1. Git
 
-- **`vocably`** [terverifikasi 2026-11-06]: pekerjaan treatment riset
-  (`PROJECT_STATE.md` §5zj) di-commit pemilik proyek di `main` di atas
-  `984052b` dalam tiga commit: `f6e6215` (rules + tooling), `8590ea5` (app
-  Flutter + tes), dan commit dokumentasi sesudahnya. **Belum di-push** saat
-  snapshot ini ditulis — cek `git status -sb` / `git branch -vv`. Kode yang
-  ter-deploy (rules dan Hosting, §2) = isi commit ini.
+- **`vocably`** [terverifikasi 2026-11-07]: `main` = `origin/main` di
+  `cd9f80b` (treatment riset, §5zj, tiga commit; di-push pemilik). Kode yang
+  ter-deploy (rules dan Hosting, §2) = isi commit itu.
+  **Instrumen v2 (§5zk) belum di-commit** — seluruhnya di working tree untuk
+  ditinjau dan di-commit pemilik. Data v2 **sudah di-seed ke produksi dari
+  working tree ini** (§2); Hosting **belum** di-deploy ulang.
 - **`vocably-ai-worker`** [catatan 2026-10-28, tidak dicek ulang]: `main` di
   `5bcb5e4`, sama dengan `origin/main`. Satu-satunya perubahan lokal: origin
   `http://localhost:5000` di `wrangler.jsonc` — **khusus lokal; jangan
@@ -37,10 +37,23 @@ dikonfirmasi peneliti.
 | Flutter web (Firebase Hosting) | **Ter-deploy 2026-11-03 06:36 UTC** (`Last-Modified: Tue, 03 Nov 2026 06:36:07 GMT`): build rilis working tree (§5zj), `WORKER_BASE_URL` produksi. `main.dart.js` live = build lokal (SHA-256 sama); kelima header keamanan ada di `web.app` & `firebaseapp.com`; app tampil di Chrome 390 px, Firebase SDK 12.17.0, 0 error konsol / pelanggaran CSP | `firebase deploy --only hosting`; `curl -I`; Playwright [terverifikasi] |
 | Cloudflare Worker | Versi `0bec79ee-…` (deploy 2026-10-15) dengan override `--var ALLOWED_ORIGINS`. **CORS dicek ulang 2026-11-03:** preflight dari `https://vocably-idn-en.web.app` → `204` + `Access-Control-Allow-Origin` origin itu + `Vary: Origin`; origin asing → tanpa ACAO | `curl -X OPTIONS` [terverifikasi]; versi [catatan] |
 | Index | `firestore.indexes.json` ter-deploy 2026-11-02; tidak berubah (query treatment memakai index yang sudah ada / index otomatis satu field) | [catatan] |
-| Data riset produksi | `researchInstrument` 4, `placementInstrument` 1, `researchStudy/current` **active** (belum ada jendela tahap yang pernah dibuka), **operator aktif 1** (grant dilaporkan pemilik: `unchanged`/`active: true`), **rencana treatment `t1` ter-seed** (`researchTreatmentPlan` 4 dokumen + `researchStudy/current.treatment = {planVersion: t1, makeupDeadlineDays: 2}`, di-seed agen 2026-11-03 dengan dry-run → apply → re-run `unchanged`, log `C:\vocably-private\audit\admin.private.jsonl`). **0** peserta, roster, attempt, catatan treatment, entri audit | Inspeksi baca-saja Admin SDK sebelum & sesudah deploy [terverifikasi] |
+| Data riset produksi | `researchInstrument` **8** (`v1_*` + `v2_*`; v2 di-seed agen 2026-11-07 atas izin pemilik: dry-run → apply → re-run `unchanged`), `placementInstrument` 1, `researchStudy/current` **active** (belum ada jendela tahap yang pernah dibuka), **operator aktif 1** (grant dilaporkan pemilik: `unchanged`/`active: true`), **rencana treatment aktif `t2`** (`researchTreatmentPlan` 8 dokumen `t1_*` + `t2_*`; `researchStudy/current.treatment = {planVersion: t2, makeupDeadlineDays: 2}` sejak 2026-11-07, sebelumnya `t1`; 0 set sesi riset pernah dibuka. Riwayat `t1`: `researchTreatmentPlan` 4 dokumen + `researchStudy/current.treatment = {planVersion: t1, makeupDeadlineDays: 2}`, di-seed agen 2026-11-03 dengan dry-run → apply → re-run `unchanged`, log `C:\vocably-private\audit\admin.private.jsonl`). **0** peserta, roster, attempt, catatan treatment, entri audit | Inspeksi baca-saja Admin SDK sebelum & sesudah deploy [terverifikasi] |
 | Data non-riset produksi | 3 `users`, 60 `learningSessions`, 38 `learningProgress` (data uji pengembangan), 2 `targetWordSets` biasa untuk semua siswa (`YEcZWDt5…` A1 3 kata **tanpa tanggal akhir**; `test-m6-target` kedaluwarsa), 4.952 `vocabWords` [catatan] | Inspeksi baca-saja (hitungan saja) [terverifikasi] |
 
 ## 3. Hasil verifikasi terakhir
+
+**Instrumen v2 (§5zk), dijalankan agen 2026-11-07 terhadap working tree:**
+
+| Cek | Hasil |
+|---|---|
+| PDF v2 → diff terhadap bank v1 (skrip baca-saja) | Tepat **8 teks pengecoh** berubah, sesuai catatan peneliti; kata, nomor, kelas kata, ID butir sama |
+| `build_instrument.js` (PDF v2) | 80 butir, §3.4 cocok, kunci 5/5/5/5, 320 ID opsi unik, teks kunci 78 exact + 2 wrapped, 80/80 kata di bundle; `--check` → `instrument_v2.json` up to date |
+| Kunci v2 ⇄ kunci v1 (hitungan saja) | Huruf kunci sama **80/80**, teks kunci sama 80/80; ID opsi berbeda 320/320 (versi ikut di-hash) |
+| `sourcePdf.test.js` dengan PDF & kunci v2 | 2/2 (rebuild = bank ter-commit; kunci privat = build baru) |
+| Rencana `t2` | `--check` OK; *seed*, urutan sesi, dan alokasi **identik dengan `t1`** |
+| `npm test` | **106 lulus, 3 dilewati, 0 gagal** (+2 tes rencana) |
+| `npm run test:rules` | **188/188** |
+| `flutter analyze` / `flutter test --concurrency=1` | 0 isu / **1054/1054** (+3: aset & service v2) |
 
 Dijalankan agen pada 2026-11-03 terhadap working tree treatment (§5zj):
 
@@ -109,11 +122,18 @@ peneliti 1280 px + siswa 390 px:
 - **Modul riset Pre/Post Test** (§5v–§5y, §5za), **Placement Test PT-V1.1**
   (§5za–§5zg; **K2 belum divalidasi ahli/pembimbing**), **Panel Riset +
   enrolmen tanpa band** (§5zh): di `main`, rules & Hosting ter-deploy.
+- **Instrumen Pre/Post-Test v2 (§5zk): dibangun & diverifikasi lokal; belum
+  di-commit, belum di produksi.** v1 + 8 teks pengecoh direvisi validator
+  (A2-15 b, A2-17 d, B1-02 d, B1-04 b, B1-10 a, B1-18 b & d, B2-20 d); butir,
+  kata, kunci sama. Versi aktif tooling = v2; app mem-bundle v1 & v2 dan
+  memuat bank sesuai `instrumentVersion` peserta; rencana `t2` = alokasi `t1`.
+  PDF v1 tidak diarsipkan (keputusan pemilik; v1 tidak pernah dipakai untuk
+  data) — v1 tercatat lewat bank di Git, kunci privat, dan SHA-256 PDF.
 - **Treatment riset (§5zj): selesai, ter-deploy (rules + Hosting), rencana
-  `t1` ter-seed; di-commit (§1).**
+  `t1` ter-seed; di-commit & di-push (§1).**
   - rencana 4 × 5 kata per band dari 20 kata Pre/Post-Test, diacak **sekali
     per band** dari *seed* tercatat, dikunci (`researchTreatmentPlan`,
-    create-only; file `tools/research/plans/treatment_plan_t1.json`);
+    create-only; file `tools/research/plans/treatment_plan_t1.json`, penerusnya `t2`);
   - Opsi B: set `targetWordSets` per sesi dengan `research`, siswa hadir
     ditandai di Panel, jendela 60/90/120 menit; susulan satu kali per siswa
     (`rtm_{uid}`, batas 2 hari, bisa diubah); pembukaan ulang ≤ 12 jam;
@@ -128,12 +148,16 @@ peneliti 1280 px + siswa 390 px:
 
 ## 5. Blocker sebelum mengundang responden
 
-1. **Push** commit treatment (pemilik proyek; §1). Produksi sudah memakai
-   kode ini; tanpa push, `origin/main` dan produksi tidak sinkron.
+1. **Instrumen v2: commit + deploy Hosting** (§8 langkah 1–2). Bank `v2_*` dan
+   rencana `t2` sudah di produksi; app yang ter-deploy belum memuat bank v2,
+   jadi peserta v2 belum bisa mengerjakan tes. **Jangan `enrol` siapa pun sebelum Hosting di-deploy:**
+   peserta mencatat versi instrumen saat di-enrol, dan rules menolak sesi
+   treatment bila versi peserta ≠ versi rencana aktif.
 2. **Validasi ahli instrumen** (guru bahasa Inggris; Pre/Post-Test, aturan K2
-   dan "+1 band") — belum. **Bila butir berubah**, bank & kunci harus
-   dibangun ulang sebagai versi baru dan **rencana treatment ikut versi baru**
-   (`t2`); rencana `t1` di produksi tetap tidak dipakai.
+   dan "+1 band"): revisi 8 pengecoh dari validator sudah masuk sebagai v2;
+   **status validasi formal (lembar validasi, mis. Aiken's V) belum
+   dilaporkan** — instrumen tetap tidak boleh disebut valid/reliabel. Revisi
+   isi berikutnya = versi baru lagi (`v3`, rencana `t3`).
 3. **Gladi teknis** di sekolah (2–3 siswa non-responden, HP & jaringan
    sekolah, cohort `pilot`/`test`): login, placement, pretest, **satu sesi
    treatment lengkap dengan cerita & Co-Write Worker produksi**, posttest,
@@ -163,12 +187,12 @@ izin wali sudah ditangani; kebijakan retensi/akses ditunda.
 
 | Asumsi | Alasan | Cara mengubah |
 |---|---|---|
-| Urutan sesi `t1` = **urutan acak bawaan** (grup G1..G4 sesuai hasil acak), sama untuk semua band | Peneliti belum memberi urutan per band; urutan acak netral | Bangun `t2` dengan `--order`, `seed-treatment --plan …t2` (diizinkan selama belum ada sesi `t1` yang dibuka) |
+| Urutan sesi `t1`/`t2` = **urutan acak bawaan** (grup G1..G4 sesuai hasil acak), sama untuk semua band | Peneliti belum memberi urutan per band; urutan acak netral. `t2` sengaja memakai *seed* & urutan `t1` (keputusan pemilik 2026-11-07) | Rencana versi baru dengan `--order`, `seed-treatment --plan …` (diizinkan selama belum ada sesi rencana aktif yang dibuka) |
 | Batas susulan dihitung dari **tutupnya pembukaan pertama** sesi itu (+2 hari) | Titik waktu yang pasti dan tercatat | `seed-treatment --makeup-days N` (1–14) |
 | Susulan hanya ditawarkan **setelah** jendela sesi itu tutup; selama masih buka → "Buka ulang sesi" (≤ 12 jam sejak pembukaan pertama, untuk terlambat/gangguan teknis) | Membedakan "terlambat hari itu" dari "tidak hadir" | Kode Panel & rules (`kTreatmentReopenLimit`, `validRegularOpening`) |
 | Selama susulan belum dipakai, siswa boleh **melewatkan satu sesi** dan lanjut ke sesi berikutnya bersama kelas, lalu menyusul | Tanpa ini, siswa yang absen sekali tertahan dan otomatis gugur; sesuai "satu susulan" | Rules `validResearchSessionCreate` |
 | "Sesi di luar kelas" ditangani dengan: **mulai hanya di dalam jendela** untuk siswa yang ditandai hadir + atestasi pengawasan + **tanda `completed_after_window`** di ekspor (selesai setelah jendela tutup). Lokasi fisik tidak dideteksi (tanpa GPS) | Web app tidak bisa membuktikan lokasi; GPS menambah risiko privasi dan tidak andal di dalam gedung | Keputusan desain; bandingkan dengan lembar hadir |
-| Rencana `t1` **di-seed ke produksi sekarang**, sebelum validasi ahli | Sesuai bank `v1` yang sudah ter-seed; berversi, tidak memblokir versi baru | Lihat blocker 2 |
+| Rencana `t1` di-seed ke produksi 2026-11-03, sebelum validasi ahli; digantikan `t2` saat v2 di-seed | Berversi; tidak memblokir versi baru | Lihat blocker 1–2 |
 | Siswa yang menyusul sesi 4 mengerjakan Post-Test setelah peneliti **mengizinkan & membuka** Post-Test lagi untuknya | Otorisasi per siswa dan jendela tahap yang bisa dibuka berulang sudah ada | — |
 
 **Masih terbuka (milik peneliti):**
@@ -231,12 +255,28 @@ izin wali sudah ditangani; kebijakan retensi/akses ditunda.
 
 ## 8. Langkah berikutnya
 
-1. **Push** tiga commit treatment ke `origin/main` (pemilik; §1).
-2. **Validasi guru** atas instrumen & K2; bila ada revisi butir → bank v2,
-   kunci v2, rencana `t2` (`tools/research/README.md` "Research treatment").
-3. **Gladi teknis** di sekolah dengan cohort `pilot`/`test` (blocker 3), lalu
+1. **Tinjau & commit instrumen v2** (pemilik): bank `assets/research/instrument_v2.json`,
+   rencana `tools/research/plans/treatment_plan_t2.json`, konstanta tooling &
+   app, tes, dokumen. Kunci v2 privat ada di
+   `C:\Users\refah\vocably-private\instrument_v2_key.private.json` (jangan di-commit).
+2. **Produksi v2.** Seed **sudah** dijalankan agen 2026-11-07 (perintah di
+   bawah, dry-run → apply dengan log → re-run `unchanged`). Tersisa: **build +
+   `firebase deploy --only hosting`** dari kode yang sudah di-commit (izin pemilik):
+
+   ```powershell
+   npm run admin -- seed-instrument @P                                    # dry run: 4 × create v2_*, v1_* tidak disentuh → lalu @L
+   node bin/build_treatment_plan.js --check plans/treatment_plan_t2.json
+   npm run admin -- seed-treatment --plan plans/treatment_plan_t2.json @P # dry run → lalu @L (ganti t1 → t2; boleh karena belum ada sesi t1)
+   npm run admin -- status @P
+   # lalu: flutter build web --release --dart-define=WORKER_BASE_URL=… ; firebase deploy --only hosting
+   ```
+
+   Rules **tidak** perlu di-deploy ulang (membaca `researchInstrument/{versi}_{band}`
+   sesuai versi peserta).
+3. **Konfirmasi status validasi formal** instrumen & K2 dari validator.
+4. **Gladi teknis** di sekolah dengan cohort `pilot`/`test` (blocker 3), lalu
    bersihkan data uji (blocker 4).
-4. Mulai studi (PowerShell, `tools\research`, `$P` = produksi; dry-run dulu):
+5. Mulai studi (PowerShell, `tools\research`, `$P` = produksi; dry-run dulu):
 
    ```powershell
    $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\vocably-private\service-account.json"
@@ -252,7 +292,7 @@ izin wali sudah ditangani; kebijakan retensi/akses ditunda.
    npm run export:placement -- --key <placement_key.private.json> --out-dir <folder> @P
    ```
 
-   Rencana `t1` sudah ter-seed; ubah batas susulan dengan
-   `npm run admin -- seed-treatment --plan plans/treatment_plan_t1.json --makeup-days N @P @L`.
-5. Setelah gladi: uji Co-Write/cerita di HP dengan Worker produksi; bila ada
+   Setelah langkah 2, rencana aktif = `t2`; ubah batas susulan dengan
+   `npm run admin -- seed-treatment --plan plans/treatment_plan_t2.json --makeup-days N @P @L`.
+6. Setelah gladi: uji Co-Write/cerita di HP dengan Worker produksi; bila ada
    `Refused to … Content Security Policy` di Console, catat dan laporkan.

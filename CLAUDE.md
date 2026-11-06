@@ -134,7 +134,7 @@ lib/
 
 assets/
   vocab/            # vocab_a1.json … vocab_c1.json — bundle bank kosakata (§11 DATA_MODEL)
-  research/         # instrument_v1.json — bank soal Pre/Post Test, TANPA kunci jawaban (bagian 10)
+  research/         # instrument_v<n>.json — bank soal Pre/Post Test per versi, TANPA kunci jawaban (bagian 10)
   placement/        # placement_bank_pt_v1_1.json — bank Placement Test, TANPA kunci (bagian 10)
   fonts/            # Plus Jakarta Sans & Literata (subset, lisensi OFL)
 
@@ -233,7 +233,7 @@ dulu kalau perlu penyesuaian.
   di-generate ulang lewat `tools/research/bin/build_instrument.js`.
 - **Kunci jawaban Pre/Post Test tidak boleh masuk repo, aset Flutter, kode
   app, Firestore, Worker, log, atau pesan test.** Bank aman-app
-  (`assets/research/instrument_v1.json`) sengaja tanpa kunci; kunci privat
+  (`assets/research/instrument_v<n>.json`) sengaja tanpa kunci; kunci privat
   hanya ditulis ke path eksplisit di luar repo & di luar OneDrive (lihat
   `tools/research/README.md`).
 - **Jangan pernah memberi akun siswa izin tulis ke `vocabWords`.** Bank
@@ -552,14 +552,17 @@ disatukan atau ditukar-tukar pemahamannya:
   kesatuan di dalam aplikasi.
   - **Sumber tunggal instrumen:** PDF peneliti
     `Rancangan_Instrumen_Pretest_Vocably.pdf` (tidak disimpan di repo karena
-    memuat kunci jawaban). 4 band (A2, B1, B2, C1) × 20 butir pilihan ganda:
+    memuat kunci jawaban). **Versi aktif = v2** (revisi 8 pengecoh dari
+    validator; butir, kata, dan kunci sama dengan v1); revisi isi berikutnya =
+    versi baru (bank, kunci, rencana treatment), **jangan pernah mengedit
+    bank yang sudah ter-seed**. 4 band (A2, B1, B2, C1) × 20 butir pilihan ganda:
     4 opsi arti bahasa Indonesia + "Saya tidak tahu kata ini". Pretest &
     posttest memakai 20 butir yang sama per siswa; posttest **segera setelah
     sesi treatment ke-4** (4 sesi × 5 kata, alur Storyfier → Cloze →
     Co-Write). Rencana sampel **35–40 siswa**.
   - **Validasi ahli & uji coba pada non-responden masih belum dilakukan** —
     jangan sebut instrumen ini valid/reliabel.
-  - **Letak komponen:** bank soal aman-app `assets/research/instrument_v1.json`
+  - **Letak komponen:** bank soal aman-app `assets/research/instrument_v<n>.json`
     (tanpa kunci; hanya di-generate ulang lewat
     `tools/research/bin/build_instrument.js`); rules riset di
     `firestore.rules` (`DATA_MODEL.md` §6b), diuji di **emulator lokal**

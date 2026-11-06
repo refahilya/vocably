@@ -839,7 +839,7 @@ B/S/T/K, skor.
 | `placementAttemptId` | string \| null | attempt placement riset asal band |
 | `reviewStatus` | null \| `pending` \| `confirmed` \| `not_confirmed` | tinjauan manusia; `pending` memblokir aksi riset. Alasan **hanya** di `researchReviews` |
 | `bandHistory` | array | hanya tooling: entri `revoked` / `restored` / `manual` (band, sumber, attempt, waktu) |
-| `instrumentVersion` | string | `"v1"` (pretest/posttest) |
+| `instrumentVersion` | string | versi instrumen pretest/posttest yang dipakai peserta; `enrol` menulis versi aktif (`"v2"`) |
 | `authorizedAttempts` | map `{placement?: int, preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. `enrol` menulis `{placement: 1, preTest: 0, postTest: 0}`: placement riset diizinkan sejak enrolmen (waktunya diatur jendela tahap), pretest/posttest **tidak**. Posttest diizinkan peneliti (CLI atau panel) hanya setelah **keempat sesi treatment resmi tercatat** di `researchTreatment/{uid}` (§6e), plus atestasi sesi ke-4; retake = peneliti menaikkan angka ini |
 | `cohort` | string | `study` / `pilot` / `test` |
 | `createdAt`, `updatedAt` | Timestamp | |
@@ -874,7 +874,7 @@ yang tercatat di `researchAuditLog`.
 
 `{ instrumentVersion, band, optionIds: {itemId: [4 ID opsi]}, optionTexts:
 {itemId: {optionId: teks}}, sourceBankSha256 }` — salinan data **publik** dari
-`assets/research/instrument_v1.json` (§6c), dibangun oleh
+`assets/research/instrument_{version}.json` (§6c), dibangun oleh
 `tools/research/lib/instrumentDocs.js`. **Tanpa kunci jawaban.** Dipakai rules
 lewat `get()` untuk memvalidasi ID opsi dan teks opsi (literal sebesar ini di
 dalam rules melampaui batas 1000 ekspresi per request). Client tidak boleh
@@ -947,15 +947,18 @@ privat; file analisis hanya memuat `researchId` (lihat
 
 ## 6c. Bank soal riset — aset statis, bukan Firestore (Milestone 1 modul riset)
 
-Soal Pre/Post Test dibaca dari **`assets/research/instrument_v1.json`**,
-bukan dari Firestore. File ini di-generate (dan divalidasi) dari PDF
+Soal Pre/Post Test dibaca dari **`assets/research/instrument_{version}.json`**
+(versi = `instrumentVersion` peserta; `v1` dan `v2` ikut di-bundle),
+bukan dari Firestore. Versi aktif **v2** = v1 dengan 8 teks pengecoh direvisi
+validator (butir, kata, kunci sama; semua ID opsi berbeda karena versi ikut
+di-hash). Bank yang sudah ter-seed tidak pernah diedit: revisi isi = versi baru. File ini di-generate (dan divalidasi) dari PDF
 instrumen peneliti oleh `tools/research/bin/build_instrument.js` —
 jangan diedit manual. Skema lengkap & prosedurnya di
 `tools/research/README.md`; ringkasnya:
 
 | Field | Keterangan |
 |---|---|
-| `instrumentVersion` | `"v1"` |
+| `instrumentVersion` | `"v1"`, `"v2"` (aktif) |
 | `source` | judul, nama file, dan SHA-256 PDF sumber |
 | `dontKnowOption` | `{ id: "dont_know", text: "Saya tidak tahu kata ini" }` — pilihan terpisah, bukan salah satu opsi, tidak pernah jadi kunci |
 | `items[]` | 80 butir: `id` (`A2-01` … `C1-20`), `band`, `number`, `word`, `pos` (`noun`/`verb`/`adjective`), `posLabel`, `options[4]` berisi `{ id, text }` |
@@ -1103,8 +1106,8 @@ rencana baru.
 
 | Field | Tipe | Keterangan |
 |---|---|---|
-| `planVersion` | string (`t1`…) | |
-| `instrumentVersion` | string | versi bank sumber (`v1`) |
+| `planVersion` | string (`t1`, `t2`…; aktif `t2`) | |
+| `instrumentVersion` | string | versi bank sumber (`t1` → `v1`, `t2` → `v2`) |
 | `band` | `A2`\|`B1`\|`B2`\|`C1` | |
 | `sessions` | map `'1'..'4'` → array 5 kata | kata = `normalizeWord(word)` bank, urutan rencana |
 | `itemIds` | map `'1'..'4'` → array 5 ID butir | |
