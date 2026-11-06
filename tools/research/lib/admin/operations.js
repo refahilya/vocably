@@ -16,11 +16,11 @@
  * - re-checks the state inside a transaction when it writes, so a
  *   concurrent change makes it fail instead of acting on stale data.
  *
- * Posttest authorization is a researcher-controlled gate: the tooling can
- * check the pretest is completed, but it cannot verify that treatment
- * session 4 happened (no session tracking exists yet). It therefore
- * requires the researcher's explicit `confirmSession4` attestation and
- * says so in the result for the audit log.
+ * Posttest authorization is a researcher-controlled gate: the tooling
+ * checks the pretest is completed and that all four official treatment
+ * sessions are recorded (`researchTreatment/{uid}`, `DATA_MODEL.md` §6e),
+ * and still requires the researcher's explicit `confirmSession4`
+ * attestation (supervision and attendance are not visible to the system).
  */
 
 const { BANDS, ITEMS_PER_BAND, INSTRUMENT_VERSION } = require('../constants');
@@ -32,6 +32,8 @@ const PARTICIPANTS = 'researchParticipants';
 const ATTEMPTS = 'researchAssessmentResults';
 const INSTRUMENT = 'researchInstrument';
 const STAGES = ['preTest', 'postTest'];
+const TREATMENT = 'researchTreatment';
+const TREATMENT_SESSIONS = ['1', '2', '3', '4'];
 const MAX_REASON_LENGTH = 300;
 
 class AdminError extends Error {
@@ -198,6 +200,12 @@ async function enrolParticipants(db, { rows, auth, instrumentVersion = INSTRUMEN
   return { actions, applied: apply };
 }
 
+/** Official treatment sessions recorded for [uid] (sorted keys '1'..'4'). */
+async function treatmentSessionsRecorded(db, uid) {
+  const snap = await db.collection(TREATMENT).doc(uid).get();
+  return snap.exists ? Object.keys(snap.get('sessions') || {}).filter((k) => TREATMENT_SESSIONS.includes(k)).sort() : [];
+}
+
 async function pretestCompleted(db, uid, participant) {
   const n = participant.authorizedAttempts.preTest;
   if (!(n >= 1)) return false;
@@ -218,7 +226,7 @@ async function authorizeStage(db, { uids, cohort, stage, confirmSession4 = false
   }
   if (stage === 'postTest' && !confirmSession4) {
     throw new AdminError([
-      'opening the posttest needs --confirm-session4-completed: the tooling cannot verify treatment session 4, so the researcher must attest it',
+      'opening the posttest needs --confirm-session4-completed: the tooling checks the recorded treatment sessions but cannot see attendance or supervision, so the researcher must attest session 4',
     ]);
   }
 
@@ -274,6 +282,13 @@ async function authorizeStage(db, { uids, cohort, stage, confirmSession4 = false
       reject('pretest not completed');
       continue;
     }
+    if (stage === 'postTest') {
+      const done = await treatmentSessionsRecorded(db, snap.id);
+      if (done.length !== TREATMENT_SESSIONS.length) {
+        reject(`treatment not completed (${done.length}/4 official sessions recorded)`);
+        continue;
+      }
+    }
     eligible.push(snap);
   }
   if (problems.length) throw new AdminError([...new Set(problems)]);
@@ -284,7 +299,7 @@ async function authorizeStage(db, { uids, cohort, stage, confirmSession4 = false
     researchId: snap.get('researchId'),
     stage,
     attemptNumber: 1,
-    ...(stage === 'postTest' ? { attestation: 'researcher confirmed treatment session 4 completed' } : {}),
+    ...(stage === 'postTest' ? { attestation: 'researcher confirmed treatment session 4 completed', treatmentSessions: '4/4 recorded' } : {}),
     ...(snap.get('bandSource') === 'placement_test'
       ? { placementPolicy: 'researcher acknowledged the K2 placement band (not expert-validated)' }
       : {}),
@@ -419,6 +434,7 @@ async function stageStatus(db, { uid } = {}) {
       }
       row.stages[stage] = { authorized, attempts };
     }
+    row.treatment = await treatmentSessionsRecorded(db, snap.id);
     rows.push(row);
   }
   return rows.sort((a, b) => String(a.researchId).localeCompare(String(b.researchId)));
@@ -447,10 +463,12 @@ module.exports = {
   authorizeRetake,
   stageStatus,
   formatPlacementStatus,
+  treatmentSessionsRecorded,
   canonical,
   PARTICIPANTS,
   ATTEMPTS,
   INSTRUMENT,
   ROSTER,
   PROGRESS,
+  TREATMENT,
 };

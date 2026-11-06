@@ -76,6 +76,13 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
 
   const participant = async (uid) => (await db().collection(ops.PARTICIPANTS).doc(uid).get()).data();
 
+  /** Records treatment sessions 1..[count] as completed (`DATA_MODEL.md` §6e). */
+  async function recordTreatment(uid, count = 4) {
+    const sessions = {};
+    for (let n = 1; n <= count; n++) sessions[String(n)] = { sessionId: `ls${n}`, setId: `rt_t1_A2_s${n}_o1`, kind: 'regular', recordedAt: new Date() };
+    await db().collection(ops.TREATMENT).doc(uid).set({ studentId: uid, planVersion: 't1', sessions, lastRecorded: count, updatedAt: new Date() });
+  }
+
   /** A student creates an attempt (as the app would) and answers [count] items with "tidak tahu". */
   async function studentAttempt(uid, { stage = 'preTest', n = 1, band = 'A2', count = 0, complete = false } = {}) {
     const { itemOrder, optionOrder } = fixtures.orderFor(band);
@@ -307,7 +314,7 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
       assert.equal((await participant('stu100003')).authorizedAttempts.preTest, 0, 'other cohort untouched');
     });
 
-    it('the posttest needs the researcher attestation and a completed pretest', async () => {
+    it('the posttest needs the researcher attestation, a completed pretest and four recorded treatment sessions', async () => {
       await seedBank();
       await enrol('stu100001');
       await ops.authorizeStage(db(), { uids: ['stu100001'], stage: 'preTest', apply: true });
@@ -326,8 +333,15 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
           status: 'completed', completedAt: fsdk.serverTimestamp(), updatedAt: fsdk.serverTimestamp(),
         })
       );
+      await recordTreatment('stu100001', 3);
+      await assert.rejects(
+        ops.authorizeStage(db(), { uids: ['stu100001'], stage: 'postTest', confirmSession4: true, apply: true }),
+        /treatment not completed \(3\/4/
+      );
+      await recordTreatment('stu100001', 4);
       const result = await ops.authorizeStage(db(), { uids: ['stu100001'], stage: 'postTest', confirmSession4: true, apply: true });
       assert.match(result.actions[0].attestation, /session 4/);
+      assert.equal(result.actions[0].treatmentSessions, '4/4 recorded');
       await rut.assertSucceeds(studentAttempt('stu100001', { stage: 'postTest' }));
     });
   });
@@ -377,6 +391,7 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
 
     it('pretest void or retake is refused once the posttest is authorized', async () => {
       await studentAttempt('stu100001', { count: 20, complete: true });
+      await recordTreatment('stu100001');
       await ops.authorizeStage(db(), { uids: ['stu100001'], stage: 'postTest', confirmSession4: true, apply: true });
       await assert.rejects(
         ops.voidAttempt(db(), { uid: 'stu100001', stage: 'preTest', reason: 'x', allowCompleted: true, apply: true }),
@@ -389,6 +404,7 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
       const [row] = await ops.stageStatus(db(), { uid: 'stu100001' });
       assert.deepEqual(row.stages.preTest, { authorized: 1, attempts: [{ n: 1, status: 'in_progress', answered: 3 }] });
       assert.deepEqual(row.stages.postTest, { authorized: 0, attempts: [] });
+      assert.deepEqual(row.treatment, []);
     });
   });
 

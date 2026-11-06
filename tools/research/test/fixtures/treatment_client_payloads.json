@@ -1,0 +1,93 @@
+{
+  "description": "Exact Firestore writes of the research treatment (DATA_MODEL.md §6e): the Researcher Panel opening an official session (regular or make-up), the student's research learning session, and the student's completion record. Asserted against the app's builders by test/research_treatment_payloads_test.dart and replayed against firestore.rules by tools/research/test/rules/treatmentRules.test.js. {{name}} is a placeholder (a whole-string placeholder keeps the value's type; map keys are always strings); the marker string stands for FieldValue.serverTimestamp(); {\"$timestampMillisFromNow\": ms} is device-clock now + ms.",
+  "serverTimestampMarker": "__serverTimestamp__",
+  "batches": {
+    "openSession": [
+      {
+        "op": "set",
+        "path": "targetWordSets/{{setId}}",
+        "data": {
+          "teacherId": "{{operator}}",
+          "wordIds": "{{words}}",
+          "cefrLevel": "{{band}}",
+          "startAt": "__serverTimestamp__",
+          "endAt": { "$timestampMillisFromNow": "{{endMs}}" },
+          "targetStudentIds": "{{students}}",
+          "createdAt": "__serverTimestamp__",
+          "research": {
+            "planVersion": "{{planVersion}}",
+            "instrumentVersion": "{{instrumentVersion}}",
+            "band": "{{band}}",
+            "session": "{{session}}",
+            "kind": "{{kind}}",
+            "opening": "{{opening}}"
+          }
+        }
+      },
+      {
+        "op": "set",
+        "path": "researchAuditLog/tset_{{setId}}",
+        "data": {
+          "action": "{{action}}",
+          "setId": "{{setId}}",
+          "band": "{{band}}",
+          "session": "{{session}}",
+          "kind": "{{kind}}",
+          "targetUid": "{{targetUid}}",
+          "studentCount": "{{studentCount}}",
+          "supervisionConfirmed": true,
+          "operatorUid": "{{operator}}",
+          "at": "__serverTimestamp__"
+        }
+      }
+    ],
+    "researchSession": [
+      {
+        "op": "add",
+        "path": "learningSessions",
+        "data": {
+          "studentId": "{{uid}}",
+          "wordIds": "{{words}}",
+          "sourceType": "targetGuru",
+          "currentPhase": "membaca",
+          "storyTitle": "{{title}}",
+          "storyContent": "{{story}}",
+          "storyTranslation": "{{translation}}",
+          "clozeTestResult": {},
+          "cowriteTranscript": [],
+          "cowriteWordsUsedCorrectly": [],
+          "startedAt": "__serverTimestamp__",
+          "completedAt": null,
+          "targetWordSetId": "{{setId}}",
+          "researchSession": "{{session}}"
+        }
+      }
+    ],
+    "recordCreate": [
+      {
+        "op": "set",
+        "path": "researchTreatment/{{uid}}",
+        "data": {
+          "studentId": "{{uid}}",
+          "planVersion": "{{planVersion}}",
+          "sessions": {
+            "{{session}}": { "sessionId": "{{sessionId}}", "setId": "{{setId}}", "kind": "{{kind}}", "recordedAt": "__serverTimestamp__" }
+          },
+          "lastRecorded": "{{session}}",
+          "updatedAt": "__serverTimestamp__"
+        }
+      }
+    ],
+    "recordUpdate": [
+      {
+        "op": "update",
+        "path": "researchTreatment/{{uid}}",
+        "data": {
+          "sessions.{{session}}": { "sessionId": "{{sessionId}}", "setId": "{{setId}}", "kind": "{{kind}}", "recordedAt": "__serverTimestamp__" },
+          "lastRecorded": "{{session}}",
+          "updatedAt": "__serverTimestamp__"
+        }
+      }
+    ]
+  }
+}

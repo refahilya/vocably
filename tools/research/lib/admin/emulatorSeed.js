@@ -18,6 +18,8 @@
  *   (`siswa.placement@example.test`, researchId `EMU-PT`);
  * - a roster entry (name + research ID) for every participant;
  * - an active study with the placement, pretest and posttest windows open,
+ *   the committed research treatment plan (`plans/treatment_plan_t1.json`,
+ *   seeded with the same `seedTreatment` as production),
  *   the Placement Test bank with a SYNTHETIC key (letter by item number —
  *   never the real key) and learning placement open;
  * - their `users/{uid}` profiles (students: placement already prompted so
@@ -33,6 +35,7 @@ const path = require('path');
 const ops = require('./operations');
 const pops = require('./placementOperations');
 const oops = require('./operatorOperations');
+const tops = require('./treatmentOperations');
 const { PLACEMENT_BANK_ASSET_RELATIVE_PATH } = require('../placement/constants');
 
 const DOMAIN = 'example.test';
@@ -109,6 +112,14 @@ async function seedEmulator({ target, db, auth, bank, bankJson, password, accoun
     apply: true,
   });
   await pops.setLearningPlacement(db, { open: true, apply: true });
+  // Research treatment: the committed plan, as in production (only for the
+  // committed bank it was built from; tests seeding a synthetic bank skip it).
+  const { readVocabByBand } = require('../../bin/build_treatment_plan');
+  const treatmentPlan = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'plans', 'treatment_plan_t1.json'), 'utf8'));
+  const seededBankSha256 = crypto.createHash('sha256').update(bankJson).digest('hex');
+  if (treatmentPlan.bankSha256 === seededBankSha256) {
+    await tops.seedTreatment(db, { plan: treatmentPlan, bank, bankSha256: seededBankSha256, vocabByBand: readVocabByBand(), apply: true });
+  }
   for (const a of accounts.filter((x) => x.operator)) {
     await oops.grantOperator(db, auth, { email: a.email, apply: true });
   }

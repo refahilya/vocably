@@ -1,0 +1,410 @@
+{
+  "schemaVersion": 1,
+  "planVersion": "t1",
+  "instrumentId": "vocably-pretest-posttest",
+  "instrumentVersion": "v1",
+  "bankSha256": "09a5c998204786b315bfd93fd0dedb23c87ab858fe5f565edd572d413af68c23",
+  "sessionsPerBand": 4,
+  "wordsPerSession": 5,
+  "randomization": {
+    "method": "fisher-yates; j = HMAC-SHA256(seed, \"<band>:<i>\") mod (i + 1), i from 19 down to 1; groups of 5 in shuffled order",
+    "seed": "5337009c5e493a658d8183497aff7a864abbc6fad30ab2a335c86e323a7bf19e",
+    "sessionOrder": {
+      "A2": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "B1": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "B2": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "C1": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "createdAt": "2026-11-03T02:15:54.150Z"
+  },
+  "bands": {
+    "A2": {
+      "sessions": {
+        "1": [
+          {
+            "itemId": "A2-08",
+            "word": "crowded"
+          },
+          {
+            "itemId": "A2-19",
+            "word": "colleague"
+          },
+          {
+            "itemId": "A2-09",
+            "word": "disease"
+          },
+          {
+            "itemId": "A2-02",
+            "word": "audience"
+          },
+          {
+            "itemId": "A2-12",
+            "word": "curly"
+          }
+        ],
+        "2": [
+          {
+            "itemId": "A2-11",
+            "word": "employee"
+          },
+          {
+            "itemId": "A2-01",
+            "word": "climate"
+          },
+          {
+            "itemId": "A2-06",
+            "word": "advertisement"
+          },
+          {
+            "itemId": "A2-10",
+            "word": "government"
+          },
+          {
+            "itemId": "A2-04",
+            "word": "comfortable"
+          }
+        ],
+        "3": [
+          {
+            "itemId": "A2-13",
+            "word": "continent"
+          },
+          {
+            "itemId": "A2-17",
+            "word": "valley"
+          },
+          {
+            "itemId": "A2-16",
+            "word": "awful"
+          },
+          {
+            "itemId": "A2-18",
+            "word": "author"
+          },
+          {
+            "itemId": "A2-03",
+            "word": "task"
+          }
+        ],
+        "4": [
+          {
+            "itemId": "A2-07",
+            "word": "engineer"
+          },
+          {
+            "itemId": "A2-14",
+            "word": "lawyer"
+          },
+          {
+            "itemId": "A2-05",
+            "word": "disaster"
+          },
+          {
+            "itemId": "A2-20",
+            "word": "ancient"
+          },
+          {
+            "itemId": "A2-15",
+            "word": "salary"
+          }
+        ]
+      }
+    },
+    "B1": {
+      "sessions": {
+        "1": [
+          {
+            "itemId": "B1-08",
+            "word": "border"
+          },
+          {
+            "itemId": "B1-16",
+            "word": "flood"
+          },
+          {
+            "itemId": "B1-04",
+            "word": "departure"
+          },
+          {
+            "itemId": "B1-06",
+            "word": "responsibility"
+          },
+          {
+            "itemId": "B1-14",
+            "word": "convince"
+          }
+        ],
+        "2": [
+          {
+            "itemId": "B1-13",
+            "word": "cruel"
+          },
+          {
+            "itemId": "B1-11",
+            "word": "breathe"
+          },
+          {
+            "itemId": "B1-15",
+            "word": "throat"
+          },
+          {
+            "itemId": "B1-12",
+            "word": "mud"
+          },
+          {
+            "itemId": "B1-19",
+            "word": "muscle"
+          }
+        ],
+        "3": [
+          {
+            "itemId": "B1-09",
+            "word": "brave"
+          },
+          {
+            "itemId": "B1-18",
+            "word": "branch"
+          },
+          {
+            "itemId": "B1-10",
+            "word": "employment"
+          },
+          {
+            "itemId": "B1-02",
+            "word": "policy"
+          },
+          {
+            "itemId": "B1-17",
+            "word": "pale"
+          }
+        ],
+        "4": [
+          {
+            "itemId": "B1-07",
+            "word": "treatment"
+          },
+          {
+            "itemId": "B1-01",
+            "word": "confident"
+          },
+          {
+            "itemId": "B1-03",
+            "word": "symptom"
+          },
+          {
+            "itemId": "B1-05",
+            "word": "cheerful"
+          },
+          {
+            "itemId": "B1-20",
+            "word": "earthquake"
+          }
+        ]
+      }
+    },
+    "B2": {
+      "sessions": {
+        "1": [
+          {
+            "itemId": "B2-17",
+            "word": "purchase"
+          },
+          {
+            "itemId": "B2-06",
+            "word": "starve"
+          },
+          {
+            "itemId": "B2-09",
+            "word": "debt"
+          },
+          {
+            "itemId": "B2-07",
+            "word": "cite"
+          },
+          {
+            "itemId": "B2-11",
+            "word": "enquiry"
+          }
+        ],
+        "2": [
+          {
+            "itemId": "B2-15",
+            "word": "praise"
+          },
+          {
+            "itemId": "B2-12",
+            "word": "courage"
+          },
+          {
+            "itemId": "B2-04",
+            "word": "wise"
+          },
+          {
+            "itemId": "B2-10",
+            "word": "rural"
+          },
+          {
+            "itemId": "B2-18",
+            "word": "wound"
+          }
+        ],
+        "3": [
+          {
+            "itemId": "B2-05",
+            "word": "inherit"
+          },
+          {
+            "itemId": "B2-14",
+            "word": "collapse"
+          },
+          {
+            "itemId": "B2-03",
+            "word": "acknowledge"
+          },
+          {
+            "itemId": "B2-16",
+            "word": "ashamed"
+          },
+          {
+            "itemId": "B2-08",
+            "word": "anxious"
+          }
+        ],
+        "4": [
+          {
+            "itemId": "B2-20",
+            "word": "sincere"
+          },
+          {
+            "itemId": "B2-01",
+            "word": "wage"
+          },
+          {
+            "itemId": "B2-19",
+            "word": "insist"
+          },
+          {
+            "itemId": "B2-13",
+            "word": "revenue"
+          },
+          {
+            "itemId": "B2-02",
+            "word": "severe"
+          }
+        ]
+      }
+    },
+    "C1": {
+      "sessions": {
+        "1": [
+          {
+            "itemId": "C1-20",
+            "word": "deteriorate"
+          },
+          {
+            "itemId": "C1-07",
+            "word": "legitimate"
+          },
+          {
+            "itemId": "C1-13",
+            "word": "injection"
+          },
+          {
+            "itemId": "C1-12",
+            "word": "expenditure"
+          },
+          {
+            "itemId": "C1-04",
+            "word": "merchant"
+          }
+        ],
+        "2": [
+          {
+            "itemId": "C1-19",
+            "word": "fragile"
+          },
+          {
+            "itemId": "C1-16",
+            "word": "burden"
+          },
+          {
+            "itemId": "C1-01",
+            "word": "outbreak"
+          },
+          {
+            "itemId": "C1-02",
+            "word": "coastal"
+          },
+          {
+            "itemId": "C1-08",
+            "word": "warehouse"
+          }
+        ],
+        "3": [
+          {
+            "itemId": "C1-11",
+            "word": "intact"
+          },
+          {
+            "itemId": "C1-06",
+            "word": "pond"
+          },
+          {
+            "itemId": "C1-17",
+            "word": "bleed"
+          },
+          {
+            "itemId": "C1-14",
+            "word": "nest"
+          },
+          {
+            "itemId": "C1-15",
+            "word": "adjacent"
+          }
+        ],
+        "4": [
+          {
+            "itemId": "C1-18",
+            "word": "harvest"
+          },
+          {
+            "itemId": "C1-10",
+            "word": "dam"
+          },
+          {
+            "itemId": "C1-05",
+            "word": "prescribe"
+          },
+          {
+            "itemId": "C1-09",
+            "word": "kidney"
+          },
+          {
+            "itemId": "C1-03",
+            "word": "viable"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -129,6 +129,13 @@ describe('Researcher Panel rules (emulator)', { skip: !RUN && 'not inside the Fi
     return a.id;
   }
 
+  /** The treatment completion record with sessions 1..[count] (`DATA_MODEL.md` §6e). */
+  async function seedTreatment(uid, count) {
+    const sessions = {};
+    for (let n = 1; n <= count; n++) sessions[String(n)] = { sessionId: `ls${n}`, setId: `rt_t1_A2_s${n}_o1`, kind: 'regular', recordedAt: fsdk.Timestamp.now() };
+    await trusted((t) => fsdk.setDoc(fsdk.doc(t, 'researchTreatment', uid), { studentId: uid, planVersion: 't1', sessions, lastRecorded: count, updatedAt: fsdk.Timestamp.now() }));
+  }
+
   const getData = async (col, id) => {
     let data;
     await trusted(async (t) => {
@@ -312,11 +319,15 @@ describe('Researcher Panel rules (emulator)', { skip: !RUN && 'not inside the Fi
       await rut.assertSucceeds(panelBatch(OP, 'authorizePreTest', { uid: 'stuA00001', operator: OP }));
     });
 
-    it('posttest needs the completed pretest and the session-4 attestation', async () => {
+    it('posttest needs the completed pretest, four recorded treatment sessions and the session-4 attestation', async () => {
       await seedParticipant('stuA00001', { pre: 1 });
       await seedAttempt('stuA00001', { status: 'in_progress', answered: 10 });
+      await seedTreatment('stuA00001', 4);
       await rut.assertFails(panelBatch(OP, 'authorizePostTest', { uid: 'stuA00001', operator: OP }));
       await seedAttempt('stuA00001', { status: 'completed', answered: 20 });
+      await seedTreatment('stuA00001', 3);
+      await rut.assertFails(panelBatch(OP, 'authorizePostTest', { uid: 'stuA00001', operator: OP }), 'three sessions recorded');
+      await seedTreatment('stuA00001', 4);
       await rut.assertFails(
         panelBatch(OP, 'authorizePostTest', { uid: 'stuA00001', operator: OP }, (w) => (w.path.startsWith('researchAuditLog') ? { ...w, data: { ...w.data, session4Confirmed: false } } : w))
       );

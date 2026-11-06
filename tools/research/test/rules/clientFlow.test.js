@@ -149,6 +149,11 @@ describe('app payloads and full flow (emulators, real Auth emulator sign-in)', {
     // Posttest: refused until the researcher opens it.
     const post = fixture.postTest;
     await rut.assertFails(create(db, post));
+    // The posttest needs the four official treatment sessions recorded (DATA_MODEL.md §6e).
+    await admin.db.collection(ops.TREATMENT).doc(fixture.uid).set({
+      studentId: fixture.uid, planVersion: 't1', lastRecorded: 4, updatedAt: new Date(),
+      sessions: Object.fromEntries([1, 2, 3, 4].map((n) => [String(n), { sessionId: `ls${n}`, setId: `rt_t1_A2_s${n}_o1`, kind: 'regular', recordedAt: new Date() }])),
+    });
     await ops.authorizeStage(admin.db, { uids: [fixture.uid], stage: 'postTest', confirmSession4: true, apply: true });
     await rut.assertSucceeds(create(db, post));
     for (const a of post.answers.slice(0, 3)) await rut.assertSucceeds(update(db, post.attemptId, a.update));

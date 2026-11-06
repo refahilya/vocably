@@ -17,6 +17,12 @@
  *   retake     --uid <uid> --stage <s> --reason "<text>"
  *   status     [--uid <uid>]               read-only overview
  *
+ * Research treatment (DATA_MODEL.md §6e; sessions are opened in the Researcher Panel):
+ *   seed-treatment   --plan <plans/treatment_plan_t1.json> [--makeup-days 2]
+ *                                           create-only plan documents + the study's treatment config
+ *   treatment-record --uid <uid> --session <learningSessions id> --reason "<text>"
+ *                                           repair a missing completion record from complete evidence
+ *
  * Researcher Panel operator (one account; the panel itself is in the app):
  *   operator   (--grant | --revoke) --email <researcher account e-mail>
  *
@@ -46,6 +52,8 @@ const { parseParticipantsCsv } = require('../lib/admin/participantsCsv');
 const ops = require('../lib/admin/operations');
 const pops = require('../lib/admin/placementOperations');
 const oops = require('../lib/admin/operatorOperations');
+const tops = require('../lib/admin/treatmentOperations');
+const { readVocabByBand } = require('./build_treatment_plan');
 const { PLACEMENT_BANK_ASSET_RELATIVE_PATH } = require('../lib/placement/constants');
 
 const SPEC = {
@@ -75,9 +83,12 @@ const SPEC = {
   email: 'string',
   grant: 'boolean',
   revoke: 'boolean',
+  plan: 'string',
+  makeupDays: 'string',
+  session: 'string',
 };
 
-const SINGLE_UID = ['void', 'retake', 'review', 'placement-void', 'placement-retake', 'placement-restore', 'assign-band'];
+const SINGLE_UID = ['void', 'retake', 'review', 'placement-void', 'placement-retake', 'placement-restore', 'assign-band', 'treatment-record'];
 
 /** The committed app-safe placement bank, with LF line endings for a stable hash. */
 function readPlacementBank() {
@@ -148,6 +159,23 @@ async function run(argv) {
       case 'retake':
         result = await ops.authorizeRetake(db, { uid, stage: args.stage, reason: args.reason, apply });
         break;
+      case 'seed-treatment': {
+        if (!args.plan) throw new Error('seed-treatment needs --plan <file>');
+        const { bank, bankSha256 } = readBank();
+        const plan = JSON.parse(fs.readFileSync(args.plan, 'utf8'));
+        result = await tops.seedTreatment(db, {
+          plan,
+          bank,
+          bankSha256,
+          vocabByBand: readVocabByBand(),
+          makeupDeadlineDays: args.makeupDays === undefined ? tops.DEFAULT_MAKEUP_DAYS : Number(args.makeupDays),
+          apply,
+        });
+        break;
+      }
+      case 'treatment-record':
+        result = await tops.recordTreatmentSession(db, { uid, sessionId: args.session, reason: args.reason, apply });
+        break;
       case 'seed-placement': {
         if (!args.key) throw new Error('seed-placement needs --key <file.private.json>');
         const { bank, bankSha256 } = readPlacementBank();
@@ -188,7 +216,7 @@ async function run(argv) {
           const placement = row.placement ? ` ${ops.formatPlacementStatus(row.placement)}` : '';
           const review = row.reviewStatus === 'pending' ? ' (review pending)' : '';
           console.log(
-            `${row.researchId}\t${row.uid}\t${row.band ?? '-'}\t${row.status}${review}\t${row.cohort}${placement}\tpre=${fmt(row.stages.preTest)}\tpost=${fmt(row.stages.postTest)}`
+            `${row.researchId}\t${row.uid}\t${row.band ?? '-'}\t${row.status}${review}\t${row.cohort}${placement}\tpre=${fmt(row.stages.preTest)}\ttreatment=${row.treatment.length}/4${row.treatment.length ? ` [${row.treatment.join(',')}]` : ''}\tpost=${fmt(row.stages.postTest)}`
           );
         }
         console.log(`${rows.length} participant(s)`);

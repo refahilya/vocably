@@ -184,10 +184,16 @@ service cloud.firestore {
     // with exact required fields, non-empty wordIds, valid timestamps,
     // targetStudentIds containing at least kAllStudents, and createdAt == request.time.
     // Update and delete are explicitly denied per Milestone 8 decision.
+    // Research treatment (`DATA_MODEL.md` §6e): the researcher operator may
+    // also create an official session set (`research` map, deterministic ID
+    // `rt_…`/`rtm_…`, `validResearchSetCreate` below). Ordinary guru sets can
+    // never carry `research` nor take those IDs.
     match /targetWordSets/{setId} {
       allow read: if request.auth != null;
 
-      allow create: if isGuru()
+      allow create: if (isResearchOperator() && validResearchSetCreate(setId))
+        || (isGuru()
+        && !setId.matches('^rtm?_.*')
         && request.resource.data.teacherId == request.auth.uid
         && request.resource.data.wordIds is list
         && request.resource.data.wordIds.size() > 0
@@ -200,7 +206,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'teacherId', 'wordIds', 'cefrLevel', 'startAt', 'endAt',
              'targetStudentIds', 'createdAt'
-           ]);
+           ]));
 
       allow update, delete: if false;
     }
@@ -332,11 +338,22 @@ service cloud.firestore {
         && request.resource.data.cowriteWordsUsedCorrectly == []
         && request.resource.data.startedAt == request.time
         && request.resource.data.completedAt == null
-        && request.resource.data.keys().hasOnly([
+        && (request.resource.data.keys().hasOnly([
              'studentId', 'wordIds', 'sourceType', 'currentPhase', 'storyTitle',
              'storyContent', 'storyTranslation', 'clozeTestResult',
              'cowriteTranscript', 'cowriteWordsUsedCorrectly', 'startedAt', 'completedAt'
-           ]);
+           ])
+          // Official research treatment session (`DATA_MODEL.md` §6e): both
+          // identifiers present and every eligibility, window and order
+          // condition re-checked here. The identifiers are immutable after
+          // create (no update shape below touches them).
+          || (request.resource.data.keys().hasOnly([
+                'studentId', 'wordIds', 'sourceType', 'currentPhase', 'storyTitle',
+                'storyContent', 'storyTranslation', 'clozeTestResult',
+                'cowriteTranscript', 'cowriteWordsUsedCorrectly', 'startedAt', 'completedAt',
+                'targetWordSetId', 'researchSession'
+              ])
+            && validResearchSessionCreate()));
 
       // Five, and only five, update shapes exist — one per write this
       // app's services actually perform. `studentId`/`wordIds`/
@@ -924,7 +941,9 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/researchInstrument/$(before.instrumentVersion + '_' + before.band))
         && (s == 'preTest'
           || (a0.preTest is int && a0.preTest >= 1
-            && get(resultPath(uid + '_preTest_' + string(a0.preTest))).data.status == 'completed'))
+            && get(resultPath(uid + '_preTest_' + string(a0.preTest))).data.status == 'completed'
+            // All four official treatment sessions recorded (`DATA_MODEL.md` §6e).
+            && get(treatmentPath(uid)).data.sessions.keys().hasAll(['1', '2', '3', '4'])))
         && existsAfter(auditPath('authorize_' + s + '_' + uid + '_1'));
     }
 
@@ -989,8 +1008,13 @@ service cloud.firestore {
     }
 
     // Audit entry: the operator, the server time, and the change it
-    // describes — which must be part of this same batch.
+    // describes — which must be part of this same batch. Treatment session
+    // sets have their own entry shape (`tset_{setId}`, below).
     function validAuditEntry(id) {
+      return id.matches('tset_.*') ? validTreatmentAuditEntry(id) : validStageAuditEntry(id);
+    }
+
+    function validStageAuditEntry(id) {
       let d = request.resource.data;
       let fields = ['action', 'stage', 'targetUid', 'attemptNumber', 'seq', 'operatorUid', 'at',
                     'session4Confirmed', 'placementPolicyAcknowledged', 'reason'];
@@ -1027,6 +1051,213 @@ service cloud.firestore {
               && d.session4Confirmed == false && d.placementPolicyAcknowledged == false
               && id == 'void_' + d.targetUid + '_' + d.stage + '_' + string(d.attemptNumber)
               && getAfter(resultPath(d.targetUid + '_' + d.stage + '_' + string(d.attemptNumber))).data.status == 'voided'));
+    }
+
+    // ---------------------------------------------------------------------
+    // Research treatment (`DATA_MODEL.md` §6e). The treatment plan — per
+    // band, its 20 pretest/posttest words in 4 sessions of 5, randomized
+    // once — lives in `researchTreatmentPlan/{planVersion}_{band}` (trusted
+    // tooling only; create-only, so it cannot change during the study). The
+    // active plan version and the make-up deadline are in
+    // `researchStudy/current.treatment` (tooling only).
+    //
+    // - The operator opens an official session in class as a
+    //   `targetWordSets` document with a `research` map: the plan's exact
+    //   words for that session, the students marked present
+    //   (`targetStudentIds`), a time-boxed window starting now, and its
+    //   `tset_{setId}` audit entry with the supervision attestation. IDs are
+    //   deterministic: regular `rt_{plan}_{band}_s{n}_o{k}` (opening k; the
+    //   first opening of session n needs session n − 1 opened; a re-opening
+    //   only within 12 hours of the first), make-up `rtm_{uid}` — so each
+    //   student can ever get ONE make-up, before the deadline.
+    // - A student starts an official session only by creating a learning
+    //   session carrying that set's ID and number, while the window is open,
+    //   as a target, with the set's exact words, while eligible (band, active
+    //   participant, completed pretest, posttest not yet authorized), for a
+    //   session not yet recorded, and in order: every earlier session
+    //   recorded, except the one covered by the make-up (or, while the
+    //   make-up is unused, at most one missed session).
+    // - Completion is recorded by the student in `researchTreatment/{uid}`,
+    //   one session per write, accepted only when the learning session it
+    //   names is that official session, completed (`selesai`), with a cloze
+    //   result for every word and a non-empty co-write transcript. The
+    //   operator reads these records; the posttest needs all four.
+    // ---------------------------------------------------------------------
+
+    function setPath(id) {
+      return /databases/$(database)/documents/targetWordSets/$(id);
+    }
+
+    function treatmentPath(uid) {
+      return /databases/$(database)/documents/researchTreatment/$(uid);
+    }
+
+    function treatmentPlan(planVersion, band) {
+      return get(/databases/$(database)/documents/researchTreatmentPlan/$(planVersion + '_' + band)).data;
+    }
+
+    function regularSetId(r, session, opening) {
+      return 'rt_' + r.planVersion + '_' + r.band + '_s' + string(session) + '_o' + string(opening);
+    }
+
+    // Sessions already recorded for [uid] ('1'..'4').
+    function treatmentDone(uid) {
+      return exists(treatmentPath(uid)) ? get(treatmentPath(uid)).data.sessions.keys() : [];
+    }
+
+    // Session numbers before [n] (n in 1..4). Spelled out: an empty list
+    // slice (`[0:0]`) is an evaluation error in the rules language.
+    function priorSessions(n) {
+      return n == 1 ? [] : n == 2 ? ['1'] : n == 3 ? ['1', '2'] : ['1', '2', '3'];
+    }
+
+    // Regular opening k of session n: in order, and a re-opening (late
+    // arrival, technical problem) only within 12 hours of the first.
+    function validRegularOpening(setId, r) {
+      return r.opening is int && r.opening >= 1 && r.opening <= 20
+        && setId == regularSetId(r, r.session, r.opening)
+        && (r.opening == 1
+          ? (r.session == 1 || exists(setPath(regularSetId(r, r.session - 1, 1))))
+          : (exists(setPath(regularSetId(r, r.session, r.opening - 1)))
+            && request.time < get(setPath(regularSetId(r, r.session, 1))).data.startAt + duration.value(12, 'h')));
+    }
+
+    // The one make-up of one student, for an opened session they have not
+    // completed, closing before the deadline (days after the first regular
+    // opening of that session closed).
+    function validMakeupSet(setId, d, r, study) {
+      let uid = d.targetStudentIds[0];
+      let first = get(setPath(regularSetId(r, r.session, 1))).data;
+      return r.opening == 0
+        && d.targetStudentIds.size() == 1
+        && setId == 'rtm_' + uid
+        && get(participantPath(uid)).data.get('band', null) == r.band
+        && d.endAt <= first.endAt + duration.value(study.treatment.get('makeupDeadlineDays', 2), 'd')
+        && !(string(r.session) in treatmentDone(uid));
+    }
+
+    function validResearchSetCreate(setId) {
+      let d = request.resource.data;
+      let r = d.research;
+      let study = researchStudy();
+      let fields = ['teacherId', 'wordIds', 'cefrLevel', 'startAt', 'endAt', 'targetStudentIds', 'createdAt', 'research'];
+      let rFields = ['planVersion', 'instrumentVersion', 'band', 'session', 'kind', 'opening'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && r is map && r.keys().hasOnly(rFields) && r.keys().hasAll(rFields)
+        && d.teacherId == request.auth.uid
+        && d.createdAt == request.time
+        && d.startAt == request.time
+        && d.endAt is timestamp && d.endAt > request.time && d.endAt <= request.time + duration.value(4, 'h')
+        && d.targetStudentIds is list && d.targetStudentIds.size() >= 1 && d.targetStudentIds.size() <= 100
+        && !('__all__' in d.targetStudentIds)
+        && r.band in ['A2', 'B1', 'B2', 'C1'] && d.cefrLevel == r.band
+        && r.session is int && r.session >= 1 && r.session <= 4
+        && study.status == 'active'
+        && study.get('treatment', {}).get('planVersion', null) == r.planVersion
+        && treatmentPlan(r.planVersion, r.band).sessions[string(r.session)] == d.wordIds
+        && treatmentPlan(r.planVersion, r.band).instrumentVersion == r.instrumentVersion
+        && ((r.kind == 'regular' && validRegularOpening(setId, r))
+          || (r.kind == 'makeup' && validMakeupSet(setId, d, r, study)))
+        && existsAfter(auditPath('tset_' + setId));
+    }
+
+    // `tset_{setId}`: who opened which session for how many students, with
+    // the supervision attestation; bound to the set created in this batch.
+    function validTreatmentAuditEntry(id) {
+      let d = request.resource.data;
+      let fields = ['action', 'setId', 'band', 'session', 'kind', 'targetUid', 'studentCount',
+                    'supervisionConfirmed', 'operatorUid', 'at'];
+      let set = getAfter(setPath(d.setId)).data;
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.operatorUid == request.auth.uid
+        && d.at == request.time
+        && id == 'tset_' + d.setId
+        && set.createdAt == request.time
+        && d.supervisionConfirmed == true
+        && set.research.band == d.band && set.research.session == d.session && set.research.kind == d.kind
+        && set.targetStudentIds.size() == d.studentCount
+        && ((d.action == 'open_treatment' && d.kind == 'regular' && d.targetUid == null)
+          || (d.action == 'open_makeup' && d.kind == 'makeup' && d.targetUid == set.targetStudentIds[0]));
+    }
+
+    function validResearchSessionCreate() {
+      let d = request.resource.data;
+      let uid = request.auth.uid;
+      let set = get(setPath(d.targetWordSetId)).data;
+      let r = set.research;
+      let p = researchParticipant();
+      let done = treatmentDone(uid);
+      let makeup = exists(setPath('rtm_' + uid)) ? [string(get(setPath('rtm_' + uid)).data.research.session)] : [];
+      return d.targetWordSetId is string
+        && d.researchSession == r.session
+        && d.sourceType == 'targetGuru'
+        && uid in set.targetStudentIds
+        && set.startAt <= request.time && request.time < set.endAt
+        && d.wordIds == set.wordIds
+        && researchParticipantActive(p) && p.band == r.band
+        && p.instrumentVersion == r.instrumentVersion
+        && p.authorizedAttempts.get('postTest', 0) == 0
+        && researchPreTestCompleted(p)
+        && !(string(r.session) in done)
+        && (r.kind == 'makeup'
+          || priorSessions(r.session).removeAll(done).removeAll(makeup).size() <= (makeup.size() == 0 ? 1 : 0));
+    }
+
+    // One completion entry: the named learning session is the student's
+    // official session [key], completed with full evidence.
+    function validTreatmentEntry(uid, key, e) {
+      let s = get(/databases/$(database)/documents/learningSessions/$(e.sessionId)).data;
+      let set = get(setPath(e.setId)).data;
+      let fields = ['sessionId', 'setId', 'kind', 'recordedAt'];
+      return e is map && e.keys().hasOnly(fields) && e.keys().hasAll(fields)
+        && e.recordedAt == request.time
+        && s.studentId == uid
+        && s.targetWordSetId == e.setId
+        && string(s.researchSession) == key
+        && set.research.session == s.researchSession
+        && set.research.kind == e.kind
+        && s.currentPhase == 'selesai' && s.completedAt is timestamp
+        && s.clozeTestResult.size() == s.wordIds.size()
+        && s.cowriteTranscript.size() > 0;
+    }
+
+    function validTreatmentCreate(uid) {
+      let d = request.resource.data;
+      let fields = ['studentId', 'planVersion', 'sessions', 'lastRecorded', 'updatedAt'];
+      let key = string(d.lastRecorded);
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.studentId == uid
+        && d.updatedAt == request.time
+        && d.lastRecorded is int && d.lastRecorded >= 1 && d.lastRecorded <= 4
+        && d.sessions is map && d.sessions.keys() == [key]
+        && validTreatmentEntry(uid, key, d.sessions[key])
+        && d.planVersion == get(setPath(d.sessions[key].setId)).data.research.planVersion;
+    }
+
+    function validTreatmentUpdate(uid) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let key = string(after.lastRecorded);
+      let change = after.sessions.diff(before.sessions);
+      return after.diff(before).affectedKeys().hasOnly(['sessions', 'lastRecorded', 'updatedAt'])
+        && after.updatedAt == request.time
+        && after.lastRecorded is int && after.lastRecorded >= 1 && after.lastRecorded <= 4
+        && change.addedKeys() == [key].toSet()
+        && change.changedKeys().size() == 0 && change.removedKeys().size() == 0
+        && validTreatmentEntry(uid, key, after.sessions[key]);
+    }
+
+    match /researchTreatmentPlan/{docId} {
+      allow read: if isResearchOperator();
+      allow write: if false;
+    }
+
+    match /researchTreatment/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isResearchOperator());
+      allow list: if isResearchOperator();
+      allow create: if request.auth != null && request.auth.uid == uid && validTreatmentCreate(uid);
+      allow update: if request.auth != null && request.auth.uid == uid && validTreatmentUpdate(uid);
+      allow delete: if false;
     }
 
     match /researchOperators/{uid} {
