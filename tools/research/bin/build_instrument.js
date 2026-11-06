@@ -8,7 +8,7 @@
  * 1. extracts the 80 items, the §3.4 part-of-speech table and the §7 key
  *    with `pdftotext`, and validates them (counts, options, duplicates,
  *    distributions, key consistency);
- * 2. writes the app-safe bank to `assets/research/instrument_v1.json`
+ * 2. writes the app-safe bank to `assets/research/instrument_<version>.json`
  *    (no answer key) — or, with `--check`, only compares against it;
  * 3. writes the private answer key ONLY when `--key-out` is given, and
  *    the human-readable comparison report ONLY when `--report-out` is

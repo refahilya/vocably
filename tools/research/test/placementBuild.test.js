@@ -19,7 +19,7 @@ const { PLACEMENT_BANDS, PLACEMENT_BANK_ASSET_RELATIVE_PATH } = require('../lib/
 const REPO_ROOT = path.join(__dirname, '..', '..', '..');
 const assetJson = fs.readFileSync(path.join(REPO_ROOT, ...PLACEMENT_BANK_ASSET_RELATIVE_PATH.split('/')), 'utf8').replace(/\r\n/g, '\n');
 const asset = JSON.parse(assetJson);
-const pretestBank = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'assets', 'research', 'instrument_v1.json'), 'utf8'));
+const pretestBank = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, ...require('../lib/constants').BANK_ASSET_RELATIVE_PATH.split('/')), 'utf8'));
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 function syntheticSource() {

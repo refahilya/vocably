@@ -21,6 +21,7 @@ const path = require('path');
 
 const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST || '';
 const projectId = process.env.GCLOUD_PROJECT || '';
+const { INSTRUMENT_VERSION: V } = require('../../lib/constants');
 const RUN = /^(127\.0\.0\.1|localhost):\d+$/.test(emulatorHost) && projectId.startsWith('demo-');
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..', '..');
@@ -116,7 +117,7 @@ describe('Researcher Panel rules (emulator)', { skip: !RUN && 'not inside the Fi
       fsdk.setDoc(fsdk.doc(t, 'researchParticipants', uid), {
         researchId: `R-${uid}`, band: status === 'awaiting_placement' ? null : band, bandSource: status === 'awaiting_placement' ? null : bandSource,
         status, exclusionReason: null, placementAttemptId: status === 'awaiting_placement' ? null : `${uid}_research_1`,
-        reviewStatus: null, instrumentVersion: 'v1',
+        reviewStatus: null, instrumentVersion: V,
         authorizedAttempts: { placement: 1, preTest: pre, postTest: post }, cohort: 'study',
         createdAt: fsdk.Timestamp.now(), updatedAt: fsdk.Timestamp.now(), ...extra,
       })
@@ -190,7 +191,7 @@ describe('Researcher Panel rules (emulator)', { skip: !RUN && 'not inside the Fi
       await rut.assertFails(fsdk.getDocs(fsdk.collection(o, 'researchAssessmentResults')));
       await rut.assertFails(fsdk.getDocs(fsdk.collection(o, 'placementAttempts')));
       await rut.assertFails(fsdk.getDoc(fsdk.doc(o, 'placementKey', 'PT-V1.1')));
-      await rut.assertFails(fsdk.getDoc(fsdk.doc(o, 'researchInstrument', 'v1_A2')));
+      await rut.assertFails(fsdk.getDoc(fsdk.doc(o, 'researchInstrument', `${V}_A2`)));
       await rut.assertFails(fsdk.getDocs(fsdk.collection(o, 'researchReviews')));
       await rut.assertFails(fsdk.getDoc(fsdk.doc(o, 'users', 'stuA00001')));
     });
@@ -302,7 +303,7 @@ describe('Researcher Panel rules (emulator)', { skip: !RUN && 'not inside the Fi
         await rut.assertFails(panelBatch(OP, 'authorizePreTest', { uid, operator: OP }));
       }
       await seedParticipant('stuBank001', { band: 'C1' });
-      await trusted((t) => fsdk.deleteDoc(fsdk.doc(t, 'researchInstrument', 'v1_C1')));
+      await trusted((t) => fsdk.deleteDoc(fsdk.doc(t, 'researchInstrument', `${V}_C1`)));
       await rut.assertFails(panelBatch(OP, 'authorizePreTest', { uid: 'stuBank001', operator: OP }));
     });
 
@@ -516,7 +517,7 @@ describe('Researcher Panel rules (emulator)', { skip: !RUN && 'not inside the Fi
       await rut.assertFails(fsdk.deleteDoc(fsdk.doc(o, 'researchParticipants', 'stuA00001')));
       await rut.assertFails(fsdk.setDoc(fsdk.doc(o, 'researchReviews', 'x'), { uid: 'stuA00001' }));
       await rut.assertFails(fsdk.setDoc(fsdk.doc(o, 'placementKey', 'PT-V1.1'), { key: {} }));
-      await rut.assertFails(fsdk.setDoc(fsdk.doc(o, 'researchInstrument', 'v1_A2'), {}));
+      await rut.assertFails(fsdk.setDoc(fsdk.doc(o, 'researchInstrument', `${V}_A2`), {}));
       await rut.assertFails(fsdk.setDoc(fsdk.doc(o, 'placementConfig', 'current'), { learningOpen: true }));
       await rut.assertFails(fsdk.updateDoc(fsdk.doc(o, 'users', OP), { role: 'siswa' }));
       await rut.assertFails(fsdk.updateDoc(fsdk.doc(o, 'users', 'stuA00001'), { name: 'x' }));

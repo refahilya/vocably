@@ -8,7 +8,7 @@
  *        [--apply] [--log <file.private.jsonl>] [command options]
  *
  * Pretest/posttest:
- *   seed-instrument                         write researchInstrument/{v1}_{band} from the app-safe bank
+ *   seed-instrument                         write researchInstrument/{version}_{band} from the active app-safe bank
  *   enrol      --csv <file>                 enrol students without a band (email|uid,researchId,cohort):
  *                                           awaiting the research Placement Test, + roster entry
  *   authorize  --stage preTest|postTest (--uid <uid>... | --cohort <c>) [--confirm-session4-completed]

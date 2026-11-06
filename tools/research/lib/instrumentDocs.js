@@ -4,7 +4,7 @@
  * Builds the `researchInstrument/{version}_{band}` documents that the
  * Firestore security rules read (via get()) to validate option IDs and
  * option texts. They hold only the PUBLIC data already shipped in
- * `assets/research/instrument_v1.json` — never the answer key.
+ * `assets/research/instrument_<version>.json` — never the answer key.
  *
  * Used today by the emulator rules tests as trusted fixtures. A later,
  * separately approved researcher script will write the same documents to

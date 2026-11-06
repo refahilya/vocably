@@ -80,11 +80,30 @@ describe('treatment plan', () => {
     assert.equal(typeof a2.sessions['1'][0], 'string');
   });
 
-  it('the committed plan t1 matches the committed bank and the app vocabulary bundles', () => {
+  const readPlan = (version) =>
+    JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'plans', `treatment_plan_${version}.json`), 'utf8'));
+
+  it('the committed plan t2 matches the active (v2) bank and the app vocabulary bundles', () => {
     const { readBank } = require('../lib/admin/cli');
     const { readVocabByBand } = require('../bin/build_treatment_plan');
     const { bank, bankSha256 } = readBank();
-    const plan = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'plans', 'treatment_plan_t1.json'), 'utf8'));
+    const plan = readPlan('t2');
+    assert.equal(plan.instrumentVersion, bank.instrumentVersion);
     assert.deepEqual(validateTreatmentPlan(plan, { bank, bankSha256, vocabByBand: readVocabByBand() }), []);
+  });
+
+  it('the archived plan t1 still matches the v1 bank it was built from', () => {
+    const { readVocabByBand } = require('../bin/build_treatment_plan');
+    const raw = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'assets', 'research', 'instrument_v1.json'), 'utf8');
+    const bankSha256 = require('crypto').createHash('sha256').update(raw).digest('hex');
+    assert.deepEqual(validateTreatmentPlan(readPlan('t1'), { bank: JSON.parse(raw), bankSha256, vocabByBand: readVocabByBand() }), []);
+  });
+
+  it('t2 keeps the t1 allocation: same seed, same session order, same words per session', () => {
+    const t1 = readPlan('t1');
+    const t2 = readPlan('t2');
+    assert.equal(t2.randomization.seed, t1.randomization.seed);
+    assert.deepEqual(t2.randomization.sessionOrder, t1.randomization.sessionOrder);
+    assert.deepEqual(t2.bands, t1.bands);
   });
 });

@@ -13,6 +13,7 @@ const path = require('path');
 
 const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST || '';
 const projectId = process.env.GCLOUD_PROJECT || '';
+const { INSTRUMENT_VERSION: V } = require('../../lib/constants');
 const RUN = /^(127\.0\.0\.1|localhost):\d+$/.test(emulatorHost) && projectId.startsWith('demo-');
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..', '..');
@@ -57,7 +58,7 @@ describe('placement admin operations (emulator)', { skip: !RUN && 'not inside th
     await db().collection('users').doc(uid).set({ uid, email: `${uid}@example.test`, name: uid, role: 'siswa' });
     await db().collection('researchParticipants').doc(uid).set({
       researchId: `R-${uid}`, band: null, bandSource: null, status: 'awaiting_placement', exclusionReason: null,
-      placementAttemptId: null, reviewStatus: null, instrumentVersion: 'v1',
+      placementAttemptId: null, reviewStatus: null, instrumentVersion: V,
       authorizedAttempts: { placement: 1, preTest: 0, postTest: 0 }, cohort: 'test',
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), ...extra,
     });

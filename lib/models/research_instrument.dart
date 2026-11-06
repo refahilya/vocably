@@ -116,7 +116,7 @@ class ResearchItem {
   }
 }
 
-/// The parsed, validated app-safe bank (`assets/research/instrument_v1.json`,
+/// The parsed, validated app-safe bank (`assets/research/instrument_<version>.json`,
 /// `DATA_MODEL.md` §6c). Parsing is strict: unknown fields, missing fields,
 /// duplicate IDs or a band without exactly [kResearchItemsPerBand] items all
 /// throw [ResearchInstrumentException]. Unknown fields are rejected on

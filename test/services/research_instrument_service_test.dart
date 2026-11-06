@@ -42,6 +42,22 @@ void main() {
     expect(instrument.items, hasLength(80));
   });
 
+  test(
+    'loads the bundled v2 bank: same items and words as v1, new option IDs',
+    () async {
+      final v1 = await ResearchInstrumentService().load('v1');
+      final v2 = await ResearchInstrumentService().load('v2');
+      expect(v2.instrumentVersion, 'v2');
+      expect(v2.items.map((i) => i.id), v1.items.map((i) => i.id));
+      expect(v2.items.map((i) => i.word), v1.items.map((i) => i.word));
+      final v1Ids = {for (final i in v1.items) ...i.options.map((o) => o.id)};
+      expect(
+        v2.items.expand((i) => i.options).where((o) => v1Ids.contains(o.id)),
+        isEmpty,
+      );
+    },
+  );
+
   test('loads from an injected bundle', () async {
     final real = await rootBundle.loadString(bankPath);
     final service = ResearchInstrumentService(
@@ -57,7 +73,7 @@ void main() {
         assetBundle: _FakeAssetBundle({}),
       );
       await expectLater(
-        service.load('v2'),
+        service.load('v99'),
         throwsInstrumentError('unsupported instrument version'),
       );
     },

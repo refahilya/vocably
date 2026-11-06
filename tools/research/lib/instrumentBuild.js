@@ -2,7 +2,7 @@
 
 /**
  * Validates parsed instrument data and builds two separate artifacts:
- * - the app-safe bank (`assets/research/instrument_v1.json`): items and
+ * - the app-safe bank (`assets/research/instrument_<version>.json`): items and
  *   options only, with opaque option IDs and NO answer key; and
  * - the private answer key: item ID → correct opaque option ID.
  *

@@ -13,7 +13,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const bankPath = 'assets/research/instrument_v1.json';
+  const bankPaths = {
+    'v1': 'assets/research/instrument_v1.json',
+    'v2': 'assets/research/instrument_v2.json',
+  };
   final forbiddenField = RegExp(
     r'correct|answer|key|letter|score|isright|solution',
     caseSensitive: false,
@@ -37,23 +40,44 @@ void main() {
     return const [];
   }
 
-  test('the instrument bank is bundled and contains 80 items, 20 per band', () async {
-    final bank = jsonDecode(await rootBundle.loadString(bankPath)) as Map<String, dynamic>;
-    final items = (bank['items'] as List).cast<Map<String, dynamic>>();
+  for (final MapEntry(key: version, value: bankPath) in bankPaths.entries) {
+    test(
+      'the $version instrument bank is bundled and contains 80 items, 20 per band',
+      () async {
+        final bank =
+            jsonDecode(await rootBundle.loadString(bankPath))
+                as Map<String, dynamic>;
+        final items = (bank['items'] as List).cast<Map<String, dynamic>>();
 
-    expect(bank['instrumentVersion'], 'v1');
-    expect(items, hasLength(80));
-    for (final band in ['A2', 'B1', 'B2', 'C1']) {
-      expect(items.where((item) => item['band'] == band), hasLength(20), reason: band);
-    }
-    for (final item in items) {
-      expect(item['options'] as List, hasLength(4), reason: item['id'] as String);
-    }
-    expect(bank['dontKnowOption'], {'id': 'dont_know', 'text': 'Saya tidak tahu kata ini'});
-  });
+        expect(bank['instrumentVersion'], version);
+        expect(items, hasLength(80));
+        for (final band in ['A2', 'B1', 'B2', 'C1']) {
+          expect(
+            items.where((item) => item['band'] == band),
+            hasLength(20),
+            reason: band,
+          );
+        }
+        for (final item in items) {
+          expect(
+            item['options'] as List,
+            hasLength(4),
+            reason: item['id'] as String,
+          );
+        }
+        expect(bank['dontKnowOption'], {
+          'id': 'dont_know',
+          'text': 'Saya tidak tahu kata ini',
+        });
+      },
+    );
 
-  test('the bundled bank carries no answer-key or correctness fields', () async {
-    final bank = jsonDecode(await rootBundle.loadString(bankPath));
-    expect(forbiddenFields(bank, r'$'), isEmpty);
-  });
+    test(
+      'the bundled $version bank carries no answer-key or correctness fields',
+      () async {
+        final bank = jsonDecode(await rootBundle.loadString(bankPath));
+        expect(forbiddenFields(bank, r'$'), isEmpty);
+      },
+    );
+  }
 }

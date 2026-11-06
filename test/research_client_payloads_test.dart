@@ -50,13 +50,13 @@ void main() {
   Future<Map<String, Object?>> buildFixture() async {
     final instrument = ResearchInstrument.fromJson(
       jsonDecode(
-        await rootBundle.loadString('assets/research/instrument_v1.json'),
+        await rootBundle.loadString('assets/research/instrument_v2.json'),
       ),
-      expectedVersion: 'v1',
+      expectedVersion: 'v2',
     );
     final assignment = const ResearchParticipantAssignment(
       band: 'B1',
-      instrumentVersion: 'v1',
+      instrumentVersion: 'v2',
     );
 
     Map<String, Object?> attempt(ResearchStage stage, int seed) {

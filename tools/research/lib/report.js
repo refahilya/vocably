@@ -7,7 +7,7 @@
  * `safeOutput.js` — never into the repository, never to the terminal.
  */
 
-const { BANDS, LETTERS, POS_CODES, DONT_KNOW_TEXT } = require('./constants');
+const { BANDS, LETTERS, POS_CODES, DONT_KNOW_TEXT, BANK_ASSET_RELATIVE_PATH } = require('./constants');
 
 function cell(text) {
   return String(text).replace(/\|/g, '\\|');
@@ -24,7 +24,7 @@ function buildComparisonReport({ items, keyLetters, keyTextStatus, composition, 
   lines.push('> Do not commit, upload or share it. Delete it once you have finished reviewing.');
   lines.push('');
   lines.push(`- Source PDF: \`${source.fileName}\` (SHA-256 \`${source.sha256}\`, ${source.pageCount} pages)`);
-  lines.push(`- Generated app-safe bank: \`assets/research/instrument_v1.json\` (SHA-256 \`${bankSha256}\`)`);
+  lines.push(`- Generated app-safe bank: \`${BANK_ASSET_RELATIVE_PATH}\` (SHA-256 \`${bankSha256}\`)`);
   lines.push(`- Instrument status: expert validation and the non-respondent pilot are **pending**.`);
   lines.push('');
   lines.push('## How to review');

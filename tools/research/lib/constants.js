@@ -12,7 +12,13 @@
  */
 
 const INSTRUMENT_ID = 'vocably-pretest-posttest';
-const INSTRUMENT_VERSION = 'v1';
+/**
+ * The ACTIVE instrument version: what `build_instrument.js` builds, what the
+ * admin tooling seeds and enrols with. v1 (bank `instrument_v1.json`) stays
+ * committed and bundled for reference; v2 = v1 with eight distractor texts
+ * revised by the expert validator (keys, items and words unchanged).
+ */
+const INSTRUMENT_VERSION = 'v2';
 const BANK_SCHEMA_VERSION = 1;
 
 const BANDS = ['A2', 'B1', 'B2', 'C1'];
@@ -37,7 +43,7 @@ const PRIVATE_KEY_SUFFIX = '.private.json';
 const PRIVATE_REPORT_SUFFIX = '.private.md';
 
 /** Repo-relative path of the generated, app-safe bank. */
-const BANK_ASSET_RELATIVE_PATH = 'assets/research/instrument_v1.json';
+const BANK_ASSET_RELATIVE_PATH = `assets/research/instrument_${INSTRUMENT_VERSION}.json`;
 
 module.exports = {
   INSTRUMENT_ID,

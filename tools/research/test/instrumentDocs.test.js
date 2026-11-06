@@ -22,7 +22,7 @@ const docs = buildInstrumentDocs(bank, bankJson);
 test('one document per band, named {version}_{band}', () => {
   assert.deepEqual(
     docs.map((d) => d.id),
-    ['A2', 'B1', 'B2', 'C1'].map((band) => instrumentDocId('v1', band))
+    ['A2', 'B1', 'B2', 'C1'].map((band) => instrumentDocId(bank.instrumentVersion, band))
   );
 });
 

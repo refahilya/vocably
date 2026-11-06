@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Checks the committed app-safe bank (`assets/research/instrument_v1.json`)
+ * Checks the committed app-safe bank (`assets/research/instrument_<version>.json`)
  * itself — the file the Flutter app will bundle.
  */
 
@@ -12,7 +12,7 @@ const path = require('path');
 
 const { findForbiddenFields } = require('../lib/instrumentBuild');
 const { loadBundles, checkVocabulary } = require('../lib/vocabLookup');
-const { BANDS, BANK_ASSET_RELATIVE_PATH } = require('../lib/constants');
+const { BANDS, BANK_ASSET_RELATIVE_PATH, INSTRUMENT_VERSION } = require('../lib/constants');
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..');
 const BANK_PATH = path.join(REPO_ROOT, ...BANK_ASSET_RELATIVE_PATH.split('/'));
@@ -29,7 +29,7 @@ const DOCUMENTED_COMPOSITION = {
 test('bank metadata', () => {
   assert.equal(bank.schemaVersion, 1);
   assert.equal(bank.instrumentId, 'vocably-pretest-posttest');
-  assert.equal(bank.instrumentVersion, 'v1');
+  assert.equal(bank.instrumentVersion, INSTRUMENT_VERSION);
   assert.deepEqual(bank.bands, BANDS);
   assert.equal(bank.itemsPerBand, 20);
   assert.match(bank.source.sha256, /^[0-9a-f]{64}$/);

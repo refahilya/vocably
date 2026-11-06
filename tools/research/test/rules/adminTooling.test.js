@@ -15,6 +15,7 @@ const path = require('path');
 
 const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST || '';
 const projectId = process.env.GCLOUD_PROJECT || '';
+const { INSTRUMENT_VERSION: V } = require('../../lib/constants');
 const RUN = /^(127\.0\.0\.1|localhost):\d+$/.test(emulatorHost) && projectId.startsWith('demo-');
 
 describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the emulators (npm run test:rules)' }, () => {
@@ -70,7 +71,7 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
   async function enrol(uid, band = 'A2', researchId = `R-${uid}`, cohort = 'study') {
     await user(uid);
     await db().collection(ops.PARTICIPANTS).doc(uid).create({
-      researchId, band, bandSource: 'researcher_assigned', instrumentVersion: 'v1', authorizedAttempts: { preTest: 0, postTest: 0 }, cohort,
+      researchId, band, bandSource: 'researcher_assigned', instrumentVersion: V, authorizedAttempts: { preTest: 0, postTest: 0 }, cohort,
     });
   }
 
@@ -89,7 +90,7 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
     const ref = fsdk.doc(client(uid), ops.ATTEMPTS, `${uid}_${stage}_${n}`);
     await rut.assertSucceeds(
       fsdk.setDoc(ref, {
-        studentId: uid, stage, attemptNumber: n, band, instrumentVersion: 'v1', itemOrder, optionOrder,
+        studentId: uid, stage, attemptNumber: n, band, instrumentVersion: V, itemOrder, optionOrder,
         responses: {}, lastAnsweredItemId: null, status: 'in_progress',
         startedAt: fsdk.serverTimestamp(), updatedAt: fsdk.serverTimestamp(), completedAt: null,
       })
@@ -122,21 +123,21 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
       assert.equal((await db().collection(ops.INSTRUMENT).get()).size, 0);
       await seedBank();
       const docs = await db().collection(ops.INSTRUMENT).get();
-      assert.deepEqual(docs.docs.map((d) => d.id).sort(), ['v1_A2', 'v1_B1', 'v1_B2', 'v1_C1']);
+      assert.deepEqual(docs.docs.map((d) => d.id).sort(), [`${V}_A2`, `${V}_B1`, `${V}_B2`, `${V}_C1`]);
       assert.equal(docs.docs[0].get('sourceBankSha256'), fixtures.bankSha256);
       assert.deepEqual((await seedBank()).actions.map((a) => a.type), ['unchanged', 'unchanged', 'unchanged', 'unchanged']);
     });
 
     it('never overwrites a bank document with different content', async () => {
       await seedBank();
-      await db().collection(ops.INSTRUMENT).doc('v1_B1').update({ sourceBankSha256: 'other' });
-      await assert.rejects(seedBank(), /v1_B1 already exists with different content/);
+      await db().collection(ops.INSTRUMENT).doc(`${V}_B1`).update({ sourceBankSha256: 'other' });
+      await assert.rejects(seedBank(), new RegExp(`${V}_B1 already exists with different content`));
     });
 
     it('students can neither read nor write the bank documents', async () => {
       await seedBank();
-      await rut.assertFails(fsdk.getDoc(fsdk.doc(client('stu1'), ops.INSTRUMENT, 'v1_A2')));
-      await rut.assertFails(fsdk.setDoc(fsdk.doc(client('stu1'), ops.INSTRUMENT, 'v1_A2'), {}));
+      await rut.assertFails(fsdk.getDoc(fsdk.doc(client('stu1'), ops.INSTRUMENT, `${V}_A2`)));
+      await rut.assertFails(fsdk.setDoc(fsdk.doc(client('stu1'), ops.INSTRUMENT, `${V}_A2`), {}));
     });
   });
 
@@ -153,7 +154,7 @@ describe('researcher admin tooling (emulator)', { skip: !RUN && 'not inside the 
         { ...p, createdAt: typeof p.createdAt, updatedAt: typeof p.updatedAt },
         {
           researchId: 'R-01', band: null, bandSource: null, status: 'awaiting_placement', exclusionReason: null,
-          placementAttemptId: null, reviewStatus: null, instrumentVersion: 'v1',
+          placementAttemptId: null, reviewStatus: null, instrumentVersion: V,
           authorizedAttempts: { placement: 1, preTest: 0, postTest: 0 }, cohort: 'study', createdAt: 'object', updatedAt: 'object',
         }
       );

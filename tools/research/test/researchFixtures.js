@@ -68,7 +68,7 @@ function attempt({ uid, stage = 'preTest', n = 1, band = 'A2', status = 'complet
       stage,
       attemptNumber: n,
       band,
-      instrumentVersion: 'v1',
+      instrumentVersion: bank.instrumentVersion,
       itemOrder,
       optionOrder,
       responses,
@@ -85,7 +85,7 @@ function attempt({ uid, stage = 'preTest', n = 1, band = 'A2', status = 'complet
 function participant({ uid, researchId = `R-${uid}`, band = 'A2', pre = 1, post = 1, cohort = 'study' }) {
   return {
     uid,
-    data: { researchId, band, bandSource: 'researcher_assigned', instrumentVersion: 'v1', authorizedAttempts: { preTest: pre, postTest: post }, cohort },
+    data: { researchId, band, bandSource: 'researcher_assigned', instrumentVersion: bank.instrumentVersion, authorizedAttempts: { preTest: pre, postTest: post }, cohort },
   };
 }
 

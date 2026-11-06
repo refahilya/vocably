@@ -21,7 +21,7 @@ test('validateKey rejects version, bank-hash, item, band and text mismatches wit
   entries[0].correctOptionText = 'changed';
   entries[1].band = 'C1';
   entries[2].correctOptionId = 'dont_know';
-  const broken = { ...key, instrumentVersion: 'v2', bankSha256: '0'.repeat(64), entries: entries.slice(0, 79) };
+  const broken = { ...key, instrumentVersion: 'v99', bankSha256: '0'.repeat(64), entries: entries.slice(0, 79) };
   const problems = validateKey(broken, bank, bankSha256);
   assert.ok(problems.some((p) => /instrumentVersion/.test(p)));
   assert.ok(problems.some((p) => /bankSha256/.test(p)));
@@ -145,7 +145,7 @@ test('structurally invalid records are excluded, never repaired', () => {
     badDontKnow: (d) => { d.responses[d.itemOrder[19]] = { optionId: 'dont_know', optionText: 'tidak tahu', displayPosition: 5 }; },
     missingAnswer: (d) => { delete d.responses[d.itemOrder[19]]; },
     bandMismatch: (d) => { d.band = 'B1'; },
-    versionMismatch: (d) => { d.instrumentVersion = 'v2'; },
+    versionMismatch: (d) => { d.instrumentVersion = 'v99'; },
     shortItemOrder: (d) => { d.itemOrder = d.itemOrder.slice(1); },
     badOptionOrder: (d) => { d.optionOrder[d.itemOrder[0]] = [a2[0].options[0].id]; },
   };
@@ -179,8 +179,8 @@ test('duplicate research IDs, orphan attempts and mismatched IDs become operatio
 
 test('a participant on another instrument version is left out with a problem, not mis-scored', () => {
   const p = participant({ uid: 'u16', researchId: 'S16' });
-  p.data.instrumentVersion = 'v2';
-  const r = run([p], [attempt({ uid: 'u16', extra: { instrumentVersion: 'v2' } })]);
+  p.data.instrumentVersion = 'v99';
+  const r = run([p], [attempt({ uid: 'u16', extra: { instrumentVersion: 'v99' } })]);
   assert.equal(r.summary.participants, 0);
   assert.deepEqual(r.problems.map((x) => x.category), ['instrument_version_mismatch']);
   assert.equal(r.attemptRows.length, 0);

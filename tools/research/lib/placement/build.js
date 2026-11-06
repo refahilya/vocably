@@ -80,7 +80,7 @@ function itemProblems(item, where, { reserve = false } = {}) {
 
 /**
  * Every problem with [source] (the parsed item file) and its pool
- * separation from [pretestBank] (`assets/research/instrument_v1.json`).
+ * separation from [pretestBank] (`assets/research/instrument_<version>.json`).
  */
 function validatePlacementSource(source, pretestBank) {
   const problems = [];

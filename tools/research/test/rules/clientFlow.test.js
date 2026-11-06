@@ -65,7 +65,7 @@ describe('app payloads and full flow (emulators, real Auth emulator sign-in)', {
     await pops.setStageWindow(admin.db, { stage: 'postTest', open: true, apply: true });
     // A banded participant (legacy researcher-assigned shape, still accepted by the rules).
     await admin.db.collection(ops.PARTICIPANTS).doc(fixture.uid).create({
-      researchId: 'E2E-01', band: fixture.band, bandSource: 'researcher_assigned', instrumentVersion: 'v1', authorizedAttempts: { preTest: 0, postTest: 0 }, cohort: 'test',
+      researchId: 'E2E-01', band: fixture.band, bandSource: 'researcher_assigned', instrumentVersion: fixture.instrumentVersion, authorizedAttempts: { preTest: 0, postTest: 0 }, cohort: 'test',
     });
     await ops.authorizeStage(admin.db, { uids: [fixture.uid], stage: 'preTest', apply: true });
   });
