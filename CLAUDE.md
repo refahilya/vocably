@@ -140,7 +140,7 @@ assets/
 
 tools/              # skrip sisi dev, tidak ikut ter-bundle ke app
   vocab_import/     # pipeline CSV Oxford → Firestore + bundle aset (§7 Milestone 4)
-  research/         # instrumen → bank + kunci privat (pretest & placement); uji emulator; admin peneliti; ekspor & skoring (bagian 10)
+  research/         # instrumen → bank + kunci privat (pretest & placement); rencana treatment (plans/); uji emulator; admin peneliti; ekspor & skoring (bagian 10)
 
 # REPO TERPISAH (bukan bagian dari project Flutter di atas):
 vocably-ai-worker/   # Cloudflare Worker (TypeScript) — proxy AI, lihat DATA_MODEL.md §10
@@ -578,10 +578,23 @@ disatukan atau ditukar-tukar pemahamannya:
     pemilik proyek dan kredensialnya sendiri**; default-nya dry-run terhadap
     emulator. Jangan pernah mencetak kunci jawaban, kredensial, atau data
     peserta.
-  - **Jangan klaim penyelesaian sesi treatment ke-4 terverifikasi otomatis** —
-    aplikasi belum melacak sesi treatment; pembukaan posttest adalah atestasi
-    peneliti (`--confirm-session4-completed` di CLI, atau centang wajib di
-    Panel Riset yang tercatat di `researchAuditLog`).
+  - **Treatment riset** (`DATA_MODEL.md` §6e): 20 kata Pre/Post-Test band
+    dibagi 4 × 5 **sekali per band** (`tools/research/bin/build_treatment_plan.js`,
+    *seed* tercatat) dan dikunci (`researchTreatmentPlan`, create-only) —
+    **jangan pernah mengacak ulang, menimpa, atau mengubah rencana yang sudah
+    di-seed**; alokasi baru = versi rencana baru. Sesi resmi = set
+    `targetWordSets` dengan `research` (ditulis operator Panel) + sesi
+    belajar dengan `targetWordSetId`/`researchSession`; **jangan pernah
+    membedakan sesi resmi dari daftar kata**. Belajar biasa tetap terbuka
+    (termasuk sebelum Pre-Test); kata instrumen tidak disembunyikan.
+    Penyelesaian tercatat di `researchTreatment/{uid}`; Post-Test butuh 4/4
+    **dan** atestasi peneliti (`--confirm-session4-completed` / centang
+    Panel), karena kehadiran dan pengawasan di kelas **tidak bisa dideteksi**
+    app — jangan klaim lokasi atau pengawasan terverifikasi otomatis. Satu
+    susulan per siswa (ID `rtm_{uid}`), batas hari di
+    `researchStudy/current.treatment`. Ekspor keterlaksanaan
+    (`bin/export_treatment.js`) hanya berisi hitungan — jangan pernah
+    mengekspor teks co-write siswa.
   - **Keputusan riset yang belum final** (mis. review ahli B2-06, retensi data,
     prosedur retake, akses ekspor) tercatat di `HANDOFF.md` — jangan
     diputuskan sendiri.
@@ -600,6 +613,9 @@ disatukan atau ditukar-tukar pemahamannya:
   jawaban) — progres dibaca dari cermin `researchProgress`; jangan tambahkan
   baca attempt, skor, atau kunci ke panel. Kebijakan yang belum final
   (void integritas, band manual, `conditional`, tinjauan) tetap tooling saja.
+  Panel juga membuka sesi treatment (per band, siswa hadir) dan susulan;
+  ia membaca `researchTreatment` (hanya nomor sesi tercatat), **tidak pernah**
+  `learningSessions` (transkrip siswa).
 
 Placement Test dan Pre/Post Test: dibangun bertahap per milestone yang
 disetujui — jangan melompat ke milestone berikutnya (mis. deploy) tanpa

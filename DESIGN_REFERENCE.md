@@ -312,6 +312,15 @@ mulai ~750 px), dan satu section Pre-Test/Post-Test di bawahnya:
     meski kecil.
 - **Section "Tes penelitian"** — di bawah kedua panel, dua baris Pre-Test dan
   Post-Test. Lihat §5.5.
+- **Kartu "Sesi Riset ke-*n*"** (treatment riset, `DATA_MODEL.md` §6e) — di
+  atas kedua panel, hanya saat peneliti membuka sesi resmi dengan siswa ini
+  ditandai hadir. Kertas putih dengan **garis stabilo 2 px** (inilah yang
+  sedang dikerjakan kelas), ikon sekolah navy, judul "Sesi Riset ke-*n*",
+  subtitle "5 kata, dibuka sampai pukul HH.mm", panah. Setelah tercatat:
+  garis abu, subtitle "Sudah selesai", badge sukses "Selesai". Tap → daftar
+  kata yang sama dengan Target Kata (judul app bar "Sesi Riset ke-*n*"); sesi
+  yang sudah selesai menampilkan pesan, tanpa CTA. Hilang sendiri ketika
+  jendela sesi tutup.
 
 **Riwayat Pembelajaran bukan card di layar ini** — dia destinasi navigasi
 tersendiri (§6), dengan desain di §3.3.
@@ -556,9 +565,20 @@ pertama tahap tes, lalu satu baris per peserta. Implementasi:
   label kuning "Sedang dibuka". Tombol **Buka** = solid navy; **Tutup** dan
   **Izinkan *n* peserta** = outline (keduanya berefek, jadi selalu lewat
   dialog konfirmasi).
+- **Sesi treatment** — `AppSheet` di bawah "Tahap tes", satu baris per band
+  yang punya peserta (pola sama dengan baris tahap): judul "Band X", caption
+  sesi berikutnya + jumlah peserta siap, ringkasan per sesi ("Sesi 1: 4/6
+  selesai · Sesi 2 dibuka sampai 09.30 · …"). Band yang sesinya sedang
+  terbuka memakai **stabilo** (garis kiri 4 px + label "Sesi *n* dibuka").
+  **Buka sesi *n*** = solid navy (nonaktif selama ada sesi terbuka di band
+  itu); **Buka ulang sesi *n*** = outline. Notice netral bila rencana belum
+  di-seed.
 - **Daftar peserta** — kolom cari + chip filter (Semua / Bisa ditindak /
   Sedang mengerjakan). ≥ 900 px: tabel (kepala kolom `surfaceAlt`; kolom
-  Peserta, Placement Test, Pre-Test, Post-Test). < 900 px: satu blok per
+  Peserta, Placement Test, Pre-Test, Treatment, Post-Test). Sel Treatment:
+  "*x*/4 selesai (sesi …)", "Sesi *n* dibuka · *x*/4 selesai" (info), "4/4 sesi
+  selesai" (sukses), caption "Susulan dipakai: sesi *m*", dan aksi teks
+  **Susulan sesi *m***. < 900 px: satu blok per
   peserta, label tahap 104 px di kiri, status di kanan. Status sel memakai
   warna nada (`AppTone`): netral = abu redup, info (mengerjakan) = biru +
   bilah progres tipis navy, sukses (band, selesai) = hijau, peringatan
@@ -568,6 +588,10 @@ pertama tahap tes, lalu satu baris per peserta. Implementasi:
   pernyataan yang **wajib dicentang** sebelum tombol konfirmasi aktif (band
   dari Placement/K2, sesi ke-4 selesai, ini gangguan teknis). Dialog buka
   tahap memakai radio: "Sampai saya tutup" / tutup otomatis 60/90/120 menit.
+  Dialog **buka sesi treatment** (maks 480 px): kalimat pengantar, "Kata sesi
+  ini: …" (tebal), daftar centang siswa hadir (semua tercentang), radio
+  60/90/120 menit (susulan: hanya durasi yang masih sebelum batas waktu),
+  dan centang wajib pengawasan.
 - **Riwayat tindakan** — `AppSheet` berisi baris waktu (`caption`, 84 px) +
   kalimat tindakan; empty state berupa notice netral.
 - Tidak ada skor, jawaban, atau warna benar/salah di mana pun. Diuji di

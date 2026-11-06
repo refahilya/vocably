@@ -203,6 +203,16 @@ Di bawah dua card di layar "Belajar", ada **section/menu tersendiri untuk
 Pre-Test dan Post-Test** (lihat 3.7) — terpisah secara jelas dan visual dari
 dua card di atas.
 
+**Kartu "Sesi Riset ke-*n*"** (treatment riset, 3.7): di atas kedua card,
+hanya untuk peserta yang ditandai **hadir** oleh peneliti saat sesi resmi
+dibuka di kelas, dan hanya selama jendela sesi terbuka ("5 kata, dibuka
+sampai pukul …"). Muncul sendiri tanpa memuat ulang (listener). Ketuk →
+daftar 5 kata sesi → "Belajar Kata Ini dengan Cerita" menjalankan alur 3 fase
+biasa, dengan penanda sesi resmi. Sesi yang sudah tercatat tampil "Sudah
+selesai" dan tidak bisa dimulai lagi. Kata sesi riset **tidak pernah**
+masuk "Target Kata Hari Ini"; belajar biasa (keranjang, target guru, Pelajari
+Kembali) tetap terbuka kapan saja, termasuk sebelum Pre-Test.
+
 ### 3.3 Menu Level → Browse Kosakata
 
 **Sumber data (klarifikasi v6):** browse **tidak membaca dari Firestore**.
@@ -358,9 +368,10 @@ riwayat — hanya subset yang dicentang, bukan seluruh daftar).
 > `assets/research/instrument_v1.json` (tanpa kunci, di-generate lewat
 > `tools/research/`); rules: `DATA_MODEL.md` §6b; tooling peneliti dan
 > ekspor: `tools/research/README.md`. **Status implementasi, deploy, dan
-> validasi: `HANDOFF.md`.** Aplikasi tidak melacak sesi treatment, jadi
-> pembukaan posttest adalah pernyataan (atestasi) peneliti, bukan bukti
-> otomatis bahwa sesi ke-4 selesai. Semua peserta didaftarkan **tanpa
+> validasi: `HANDOFF.md`.** Sesi treatment resmi dicatat aplikasi
+> (`DATA_MODEL.md` §6e): Post-Test hanya bisa diizinkan setelah keempat sesi
+> tercatat, **ditambah** atestasi peneliti (kehadiran & pengawasan tidak
+> terlihat oleh aplikasi). Semua peserta didaftarkan **tanpa
 > band** (`research_admin.js enrol`, dengan e-mail atau UID) lalu mendapat
 > band dari Placement Test riset (3.1). Tugas harian (buka/tutup tahap,
 > otorisasi, pantau, gangguan teknis) bisa dari **Panel Riset** (4.3).
@@ -381,6 +392,16 @@ dan tercatat tidak lengkap. Peserta tanpa band, dikeluarkan, berstatus
 - **Pretest dan posttest memakai 20 butir yang sama** untuk tiap siswa.
 - **Treatment:** 4 sesi belajar, masing-masing 5 dari 20 kata target band
   itu, lewat alur 3 fase biasa (Storyfier Reading → Cloze → Co-Write).
+  *(Implementasi — `DATA_MODEL.md` §6e: 20 kata Pre/Post-Test band dibagi
+  4 × 5 **sekali per band** dari *seed* tercatat, lalu dikunci
+  (`researchTreatmentPlan`); semua siswa satu band mendapat kata dan urutan
+  sesi yang sama. Peneliti membuka sesi *n* per band di kelas untuk siswa
+  yang hadir (jendela 60/90/120 menit; mulai hanya di dalam jendela). Urutan
+  dijaga rules; satu-satunya pengecualian: **satu susulan per siswa**,
+  paling lambat 2 hari (bisa diubah) setelah sesi itu. **Sesi selesai** =
+  fase `selesai` dengan Cloze untuk setiap kata dan transkrip Co-Write tidak
+  kosong; mastery tidak disyaratkan. Siswa susulan boleh mengerjakan
+  Post-Test segera setelah susulannya, walau berbeda hari.)*
 - **Posttest dilakukan segera setelah sesi treatment ke-4**, dengan jeda
   yang sama untuk semua siswa.
 - Rencana sampel: **35–40 siswa**.
@@ -508,14 +529,29 @@ Isi panel (destinasi **Riset**):
 - **Izinkan *n* peserta** — otorisasi massal Pre-Test/Post-Test untuk semua
   peserta yang siap. Pre-Test mewajibkan centang pernyataan bahwa band
   berasal dari Placement Test (K2, belum divalidasi ahli); Post-Test
-  tambahan mewajibkan centang **"Sesi treatment ke-4 sudah selesai"**
-  (aplikasi tidak melacak sesi treatment, jadi ini atestasi peneliti).
-  Post-Test hanya bisa diizinkan setelah Pre-Test peserta itu selesai.
+  tambahan mewajibkan centang **"Sesi treatment ke-4 sudah selesai … sesuai
+  daftar hadir dan catatan saya"** (atestasi peneliti). Post-Test hanya bisa
+  diizinkan setelah Pre-Test peserta itu selesai **dan keempat sesi
+  treatment resmi tercatat** (sel "Menunggu 4 sesi treatment").
+- **Sesi treatment** — satu baris per band: sesi berikutnya dan jumlah
+  peserta yang siap (band sama, Pre-Test selesai, Post-Test belum diizinkan),
+  tiap sesi "belum dibuka / dibuka sampai … / *x*/*n* selesai". **Buka sesi
+  *n*** (urut; satu sesi terbuka per band): dialog menampilkan 5 kata rencana,
+  daftar siswa yang **hadir** (tercentang semua; hilangkan centang yang tidak
+  hadir), durasi 60/90/120 menit, dan centang wajib "Siswa yang dicentang
+  hadir di kelas dan diawasi selama sesi ini". **Buka ulang sesi *n*** hanya
+  dalam 12 jam sejak pembukaan pertama (siswa terlambat/gangguan teknis).
+  Sesi yang sedang terbuka ditandai stabilo.
 - **Daftar peserta** — nama (roster) + ID riset, lalu satu sel per tahap:
   belum mulai / mengerjakan *x/n* (bilah progres) / terkirim / band /
   selesai / dibatalkan / menunggu band / menunggu Pre-Test / tidak ikut
   (C1) / perlu peneliti. Cari nama atau ID; filter "Bisa ditindak" dan
   "Sedang mengerjakan". Data diperbarui langsung (listener).
+- Kolom **Treatment** per peserta: *x*/4 selesai (nomor sesinya), sesi yang
+  sedang dibuka untuknya, "Susulan dipakai: sesi *m*", dan aksi **Susulan sesi
+  *m*** untuk sesi yang sudah lewat tetapi belum ia selesaikan, selama
+  susulan belum dipakai dan masih sebelum batas waktu (dialog dengan centang
+  pengawasan).
 - Aksi per sel: **Izinkan**; **Ulang (gangguan teknis)** — membatalkan
   percobaan yang sedang berjalan dan mengizinkan percobaan berikutnya dari
   awal (jawaban lama tetap disimpan, tidak dipakai; wajib centang "ini

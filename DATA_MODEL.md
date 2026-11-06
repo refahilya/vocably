@@ -521,6 +521,8 @@ Pembelajaran tab "per sesi" (SPEC §3.6).
 | `cowriteWordsUsedCorrectly` | array\<string\> | wordId yang berhasil dipakai **mandiri** tanpa kesalahan (= dipakai bermakna dengan makna yang dapat diterima; kesalahan tata bahasa di kalimat tidak menggugurkan; mandiri = tanpa saran menulis **dan** dalam kalimat berbahasa Inggris, bukan Indonesia/campuran; kata yang dipakai bot tidak pernah masuk) — diisi client dari field terstruktur respons `/cowrite-turn` (§10.2), bukan hasil parsing teks feedback |
 | `startedAt` | Timestamp | diisi saat dokumen pertama kali dibuat (generate pertama di Fase 1) |
 | `completedAt` | Timestamp \| null | `null` kalau sesi belum selesai |
+| `targetWordSetId` | string \| **absen** | **Hanya sesi treatment riset resmi** (§6e): ID set sesi (`rt_…`/`rtm_…`). Ditulis saat create, tidak bisa diubah; tidak pernah ada di sesi biasa |
+| `researchSession` | int (1–4) \| **absen** | **Hanya sesi treatment riset resmi** (§6e): nomor sesi set itu. Sama: create saja, immutable |
 
 > **Penanda kata target di `storyContent` (baru di v6).**
 >
@@ -659,6 +661,7 @@ untuk target per-siswa nanti.
 | `endAt` | Timestamp | berakhir. **Tidak pernah `null`** — kalau tidak ada batas akhir, isi dengan sentinel tanggal jauh di masa depan (`kNoEndDate`, mis. `2099-12-31`) |
 | `targetStudentIds` | array\<string\> | **Tidak pernah `null` dan tidak pernah kosong** — kalau berlaku untuk semua siswa, isi `["__all__"]` (`kAllStudents`); diisi array `uid` kalau nanti butuh target per-siswa/kelompok |
 | `createdAt` | Timestamp | |
+| `research` | map \| **absen** | **Hanya set sesi treatment riset resmi** yang ditulis operator Panel Riset (§6e): `{planVersion, instrumentVersion, band, session, kind, opening}`, ID deterministik `rt_…`/`rtm_…`. Set guru biasa tidak pernah memilikinya dan tidak boleh memakai ID itu. Set riset **tidak** digabung ke "Target Kata Hari Ini" dan tidak tampil di daftar Target Kata guru |
 
 > **Kenapa sentinel, bukan `null` (baru di v6).** Query aslinya —
 > `startAt <= now <= endAt` **dan** (`targetStudentIds == null` **atau**
@@ -837,7 +840,7 @@ B/S/T/K, skor.
 | `reviewStatus` | null \| `pending` \| `confirmed` \| `not_confirmed` | tinjauan manusia; `pending` memblokir aksi riset. Alasan **hanya** di `researchReviews` |
 | `bandHistory` | array | hanya tooling: entri `revoked` / `restored` / `manual` (band, sumber, attempt, waktu) |
 | `instrumentVersion` | string | `"v1"` (pretest/posttest) |
-| `authorizedAttempts` | map `{placement?: int, preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. `enrol` menulis `{placement: 1, preTest: 0, postTest: 0}`: placement riset diizinkan sejak enrolmen (waktunya diatur jendela tahap), pretest/posttest **tidak**. Posttest diizinkan peneliti setelah sesi treatment ke-4 (CLI atau panel, dengan atestasi); retake = peneliti menaikkan angka ini |
+| `authorizedAttempts` | map `{placement?: int, preTest: int, postTest: int}` | Otorisasi eksplisit per tahap: **0 = belum diizinkan**, *n* = percobaan ke-*n* boleh dibuat. `enrol` menulis `{placement: 1, preTest: 0, postTest: 0}`: placement riset diizinkan sejak enrolmen (waktunya diatur jendela tahap), pretest/posttest **tidak**. Posttest diizinkan peneliti (CLI atau panel) hanya setelah **keempat sesi treatment resmi tercatat** di `researchTreatment/{uid}` (§6e), plus atestasi sesi ke-4; retake = peneliti menaikkan angka ini |
 | `cohort` | string | `study` / `pilot` / `test` |
 | `createdAt`, `updatedAt` | Timestamp | |
 
@@ -1076,6 +1079,129 @@ attempt yang sudah `completed`, semua aksi placement riset selain membuka/
 menutup jendela (void, retake, restore, band manual), ekspor & skoring, dan
 placement belajar (`learning-placement`).
 
+## 6e. Treatment riset — `researchTreatmentPlan`, set sesi resmi, `researchTreatment`
+
+Treatment = **4 sesi × 5 kata** per band, memakai **20 kata Pre/Post-Test**
+band itu (keputusan peneliti). Belajar biasa tetap terbuka untuk semua siswa
+(termasuk sebelum Pre-Test, tanpa kata yang disembunyikan); sesi resmi
+dibedakan secara **eksplisit** lewat field, tidak pernah ditebak dari daftar
+kata. Lokasi (di kelas) tidak bisa dideteksi app: pengawasan dicatat lewat
+jendela waktu yang dibuka peneliti di kelas, daftar siswa yang ditandai
+hadir, atestasi pengawasan di log audit, dan daftar hadir manual.
+
+### Rencana: `researchTreatmentPlan/{planVersion}_{band}` — tooling saja
+
+Dibuat **sekali** oleh `tools/research/bin/build_treatment_plan.js` dari
+bank instrumen yang di-commit: 20 butir band diacak **sekali per band**
+(Fisher–Yates, j = HMAC-SHA256(seed, "band:i") mod (i+1); *seed* dicatat),
+dipotong menjadi grup G1..G4 berisi 5; urutan sesi per band boleh ditentukan
+peneliti (`--order`, default = urutan acak). File rencana
+(`tools/research/plans/treatment_plan_{v}.json`) tidak pernah ditimpa;
+`seed-treatment` menyalinnya ke Firestore **create-only** (isi berbeda →
+ditolak), jadi alokasi tidak bisa berubah selama studi. Alokasi baru = versi
+rencana baru.
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `planVersion` | string (`t1`…) | |
+| `instrumentVersion` | string | versi bank sumber (`v1`) |
+| `band` | `A2`\|`B1`\|`B2`\|`C1` | |
+| `sessions` | map `'1'..'4'` → array 5 kata | kata = `normalizeWord(word)` bank, urutan rencana |
+| `itemIds` | map `'1'..'4'` → array 5 ID butir | |
+| `bankSha256`, `planSha256` | string | jejak verifikasi |
+
+Rules: hanya operator yang boleh membaca; tidak ada tulisan client.
+Konfigurasi aktif ada di `researchStudy/current.treatment = { planVersion,
+makeupDeadlineDays }` (tooling saja; operator tidak bisa mengubahnya). Versi
+rencana hanya bisa diganti selama belum ada set sesi riset untuk versi lama;
+batas susulan (default **2 hari**, 1–14) bisa diubah kapan saja lewat
+`seed-treatment --makeup-days`.
+
+### Set sesi resmi: `targetWordSets/{setId}` dengan `research` — operator
+
+Opsi B (target per siswa): satu dokumen `targetWordSets` per pembukaan sesi,
+ditulis Panel Riset bersama entri audit `tset_{setId}` dalam satu batch.
+
+| Field | Isi |
+|---|---|
+| `wordIds` | **persis** `plan.sessions[n]` (rules membandingkan list) |
+| `cefrLevel` | = band |
+| `targetStudentIds` | siswa yang ditandai **hadir** (1–100; tidak pernah `__all__`); susulan: tepat 1 |
+| `startAt` | = waktu server saat dibuka |
+| `endAt` | > sekarang, ≤ sekarang + 4 jam (panel: 60/90/120 menit) |
+| `research` | `{ planVersion, instrumentVersion, band, session (1–4), kind: 'regular'\|'makeup', opening }` |
+
+ID deterministik (diturunkan dan dicek rules):
+- **Reguler:** `rt_{plan}_{band}_s{n}_o{k}` — pembukaan ke-*k* sesi *n*.
+  Pembukaan pertama sesi *n* mensyaratkan sesi *n*−1 sudah pernah dibuka
+  (urutan per band sama untuk semua siswa); pembukaan ulang (*k* > 1, mis.
+  siswa terlambat/gangguan teknis) hanya dalam **12 jam** sejak pembukaan
+  pertama.
+- **Susulan:** `rtm_{uid}` — **satu kali seumur studi per siswa** (dokumen
+  create-only), untuk sesi yang sudah pernah dibuka di band siswa itu dan
+  belum ia selesaikan; `endAt` ≤ `endAt` pembukaan pertama sesi itu +
+  `makeupDeadlineDays` hari.
+
+Rules juga mensyaratkan: operator aktif, studi `active`, `planVersion` =
+versi aktif, `instrumentVersion` = rencana. Guru biasa tidak bisa memakai
+field `research` maupun ID `rt…`. Set tidak bisa diubah/dihapus (seperti set
+biasa). Entri audit `tset_{setId}`: `{ action: open_treatment|open_makeup,
+setId, band, session, kind, targetUid (susulan), studentCount,
+supervisionConfirmed: true, operatorUid, at }`, terikat ke set di batch yang
+sama.
+
+Di app siswa, set riset **tidak pernah digabung** ke "Target Kata Hari Ini":
+siswa yang ditandai hadir melihat kartu sendiri "Sesi Riset ke-*n*" selama
+jendela terbuka. Daftar Target Kata guru juga melewatinya.
+
+### Sesi belajar resmi: `learningSessions` + `targetWordSetId`, `researchSession`
+
+Sesi dari kartu riset membawa dua field tambahan saat **create** (cerita
+pertama): `targetWordSetId` (ID set) dan `researchSession` (1–4);
+`sourceType` tetap `targetGuru`. Keduanya tidak pernah ada di sesi biasa dan
+tidak bisa ditambahkan/diubah setelahnya (tidak ada bentuk update yang
+menyentuhnya). Create ditolak kecuali:
+- siswa ada di `targetStudentIds`, `startAt ≤ now < endAt` (**mulai** hanya di
+  dalam jendela; menyelesaikan setelah jendela tutup tetap boleh, dan
+  ditandai di ekspor);
+- `wordIds` = kata set, `researchSession` = nomor set;
+- peserta aktif dengan band = band set, `instrumentVersion` cocok, Pre-Test
+  `completed`, Post-Test belum diizinkan;
+- sesi *n* belum tercatat; **urutan**: semua sesi sebelum *n* sudah tercatat,
+  kecuali sesi susulan (bila `rtm_{uid}` ada) — atau, selama susulan belum
+  dipakai, paling banyak satu sesi terlewat (yang nanti disusul). Set susulan
+  sendiri boleh dikerjakan di luar urutan.
+
+### Catatan penyelesaian: `researchTreatment/{uid}` — ditulis siswa pemilik
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `studentId` | uid | |
+| `planVersion` | string | dari set sesi pertama yang tercatat |
+| `sessions` | map `'1'..'4'` → `{ sessionId, setId, kind, recordedAt }` | `recordedBy: 'tooling'` bila ditulis `treatment-record` |
+| `lastRecorded` | int | nomor sesi yang ditambahkan di tulisan terakhir |
+| `updatedAt` | Timestamp | |
+
+Setiap tulisan menambah **tepat satu** sesi (tidak ada perubahan/penghapusan
+entri lama), dan rules menerimanya hanya bila `learningSessions/{sessionId}`
+adalah sesi resmi siswa itu dengan nomor dan set yang sama, `currentPhase:
+selesai`, `completedAt` ada, `clozeTestResult` mencakup setiap kata, dan
+`cowriteTranscript` tidak kosong (= definisi **sesi selesai**; mastery tidak
+disyaratkan). App menulisnya tepat setelah sesi selesai; bila gagal (offline)
+dashboard menuliskannya kemudian dari sesi yang sudah selesai. Bila tetap
+hilang, `research_admin.js treatment-record` memperbaikinya dari bukti yang
+sama. Siswa membaca catatannya sendiri; operator boleh membaca/list.
+
+**Gerbang Post-Test:** otorisasi Post-Test (Panel maupun CLI `authorize`)
+mensyaratkan keempat sesi tercatat (`sessions` punya `'1'..'4'`), selain
+Pre-Test selesai dan atestasi sesi ke-4 peneliti.
+
+Payload dikunci oleh fixture `tools/research/test/fixtures/treatment_client_payloads.json`
+(Dart: `test/research_treatment_payloads_test.dart`; emulator:
+`tools/research/test/rules/treatmentRules.test.js`). Ekspor keterlaksanaan:
+`tools/research/bin/export_treatment.js` (hanya hitungan, tanpa teks
+co-write; lihat `tools/research/README.md`).
+
 ## 7. Ringkasan Relasi
 
 ```
@@ -1084,6 +1210,8 @@ users (siswa) ──1:N── learningSessions
 users (siswa) ──1:N── placementAttempts (research | learning) ──→ users.resultLevel
 placementAttempts (research, dinilai) ──→ researchParticipants.band
 users (siswa) ──1:1── researchParticipants ──1:N── researchAssessmentResults
+researchTreatmentPlan (per band) ──1:N── targetWordSets (research) ──1:N── learningSessions (targetWordSetId)
+users (siswa) ──1:1── researchTreatment (sesi resmi tercatat) ──N:1── learningSessions
 researchInstrument, placementInstrument, placementKey, researchStudy ← dibaca rules lewat get()
 users (guru)  ──1:N── targetWordSets ──N:N── vocabWords (via wordIds)
 users (guru)  ──1:N── vocabWords (via addedByTeacherId, kalau source="guru")
