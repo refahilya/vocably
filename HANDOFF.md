@@ -15,11 +15,10 @@ dikonfirmasi peneliti.
 ## 1. Git
 
 - **`vocably`** [terverifikasi 2026-11-07]: `main` = `origin/main` di
-  `cd9f80b` (treatment riset, §5zj, tiga commit; di-push pemilik). Kode yang
-  ter-deploy (rules dan Hosting, §2) = isi commit itu.
-  **Instrumen v2 (§5zk) belum di-commit** — seluruhnya di working tree untuk
-  ditinjau dan di-commit pemilik. Data v2 **sudah di-seed ke produksi dari
-  working tree ini** (§2); Hosting **belum** di-deploy ulang.
+  `a2020ef`: treatment riset (§5zj; `f6e6215`..`cd9f80b`) dan instrumen v2
+  (§5zk; `74ae6c8` kode + `a2020ef` dokumen), di-commit & di-push pemilik.
+  Hosting ter-deploy dari `a2020ef` (§2). Commit dokumentasi yang mencatat
+  deploy ini menyusul (pemilik).
 - **`vocably-ai-worker`** [catatan 2026-10-28, tidak dicek ulang]: `main` di
   `5bcb5e4`, sama dengan `origin/main`. Satu-satunya perubahan lokal: origin
   `http://localhost:5000` di `wrangler.jsonc` — **khusus lokal; jangan
@@ -34,7 +33,7 @@ dikonfirmasi peneliti.
 | Komponen | Status | Bukti |
 |---|---|---|
 | Firestore rules | **Ter-deploy 2026-11-03 06:34 UTC** (13.34 WIB) oleh agen atas izin eksplisit pemilik: rules working tree = Panel Riset + treatment riset (§5zj). `--dry-run` dulu (kompilasi OK), lalu rilis | Keluaran `firebase deploy --only firestore:rules` ("released rules") [terverifikasi] |
-| Flutter web (Firebase Hosting) | **Ter-deploy 2026-11-03 06:36 UTC** (`Last-Modified: Tue, 03 Nov 2026 06:36:07 GMT`): build rilis working tree (§5zj), `WORKER_BASE_URL` produksi. `main.dart.js` live = build lokal (SHA-256 sama); kelima header keamanan ada di `web.app` & `firebaseapp.com`; app tampil di Chrome 390 px, Firebase SDK 12.17.0, 0 error konsol / pelanggaran CSP | `firebase deploy --only hosting`; `curl -I`; Playwright [terverifikasi] |
+| Flutter web (Firebase Hosting) | **Ter-deploy 2026-11-06 23:38 UTC** (07.38 WIB 2026-11-07; `Last-Modified: Fri, 06 Nov 2026 23:38:38 GMT`) oleh agen atas izin pemilik: build rilis dari `a2020ef` (working tree bersih, sama dengan `origin/main`), `WORKER_BASE_URL` produksi. Bundle memuat `instrument_v1.json` + `instrument_v2.json`, tanpa host emulator/`localhost`; `main.dart.js` live = build lokal (SHA-256 sama); `instrument_v2.json` live = file ter-commit; kelima header keamanan ada di `web.app` & `firebaseapp.com`. **Tidak** diuji ulang di browser (deploy sebelumnya, 2026-11-03: Chrome 390 px, 0 pelanggaran CSP) | `firebase deploy --only hosting`; `curl -I`; unduh aset live [terverifikasi] |
 | Cloudflare Worker | Versi `0bec79ee-…` (deploy 2026-10-15) dengan override `--var ALLOWED_ORIGINS`. **CORS dicek ulang 2026-11-03:** preflight dari `https://vocably-idn-en.web.app` → `204` + `Access-Control-Allow-Origin` origin itu + `Vary: Origin`; origin asing → tanpa ACAO | `curl -X OPTIONS` [terverifikasi]; versi [catatan] |
 | Index | `firestore.indexes.json` ter-deploy 2026-11-02; tidak berubah (query treatment memakai index yang sudah ada / index otomatis satu field) | [catatan] |
 | Data riset produksi | `researchInstrument` **8** (`v1_*` + `v2_*`; v2 di-seed agen 2026-11-07 atas izin pemilik: dry-run → apply → re-run `unchanged`), `placementInstrument` 1, `researchStudy/current` **active** (belum ada jendela tahap yang pernah dibuka), **operator aktif 1** (grant dilaporkan pemilik: `unchanged`/`active: true`), **rencana treatment aktif `t2`** (`researchTreatmentPlan` 8 dokumen `t1_*` + `t2_*`; `researchStudy/current.treatment = {planVersion: t2, makeupDeadlineDays: 2}` sejak 2026-11-07, sebelumnya `t1`; 0 set sesi riset pernah dibuka. Riwayat `t1`: `researchTreatmentPlan` 4 dokumen + `researchStudy/current.treatment = {planVersion: t1, makeupDeadlineDays: 2}`, di-seed agen 2026-11-03 dengan dry-run → apply → re-run `unchanged`, log `C:\vocably-private\audit\admin.private.jsonl`). **0** peserta, roster, attempt, catatan treatment, entri audit | Inspeksi baca-saja Admin SDK sebelum & sesudah deploy [terverifikasi] |
@@ -148,11 +147,9 @@ peneliti 1280 px + siswa 390 px:
 
 ## 5. Blocker sebelum mengundang responden
 
-1. **Instrumen v2: commit + deploy Hosting** (§8 langkah 1–2). Bank `v2_*` dan
-   rencana `t2` sudah di produksi; app yang ter-deploy belum memuat bank v2,
-   jadi peserta v2 belum bisa mengerjakan tes. **Jangan `enrol` siapa pun sebelum Hosting di-deploy:**
-   peserta mencatat versi instrumen saat di-enrol, dan rules menolak sesi
-   treatment bila versi peserta ≠ versi rencana aktif.
+1. ~~Instrumen v2 ke produksi~~ — **selesai 2026-11-07** (bank `v2_*`, rencana
+   `t2`, Hosting). `enrol` sekarang mencatat `instrumentVersion: v2`, sama
+   dengan rencana aktif `t2`.
 2. **Validasi ahli instrumen** (guru bahasa Inggris; Pre/Post-Test, aturan K2
    dan "+1 band"): revisi 8 pengecoh dari validator sudah masuk sebagai v2;
    **status validasi formal (lembar validasi, mis. Aiken's V) belum
@@ -255,24 +252,10 @@ izin wali sudah ditangani; kebijakan retensi/akses ditunda.
 
 ## 8. Langkah berikutnya
 
-1. **Tinjau & commit instrumen v2** (pemilik): bank `assets/research/instrument_v2.json`,
-   rencana `tools/research/plans/treatment_plan_t2.json`, konstanta tooling &
-   app, tes, dokumen. Kunci v2 privat ada di
-   `C:\Users\refah\vocably-private\instrument_v2_key.private.json` (jangan di-commit).
-2. **Produksi v2.** Seed **sudah** dijalankan agen 2026-11-07 (perintah di
-   bawah, dry-run → apply dengan log → re-run `unchanged`). Tersisa: **build +
-   `firebase deploy --only hosting`** dari kode yang sudah di-commit (izin pemilik):
-
-   ```powershell
-   npm run admin -- seed-instrument @P                                    # dry run: 4 × create v2_*, v1_* tidak disentuh → lalu @L
-   node bin/build_treatment_plan.js --check plans/treatment_plan_t2.json
-   npm run admin -- seed-treatment --plan plans/treatment_plan_t2.json @P # dry run → lalu @L (ganti t1 → t2; boleh karena belum ada sesi t1)
-   npm run admin -- status @P
-   # lalu: flutter build web --release --dart-define=WORKER_BASE_URL=… ; firebase deploy --only hosting
-   ```
-
-   Rules **tidak** perlu di-deploy ulang (membaca `researchInstrument/{versi}_{band}`
-   sesuai versi peserta).
+1. **Commit** catatan deploy Hosting ini (`HANDOFF.md`, `PROJECT_STATE.md`) lalu push (pemilik).
+2. Instrumen v2 di produksi: **selesai** (seed + Hosting, §2, `PROJECT_STATE.md` §5zk).
+   Kunci v2 privat: `C:\Users\refah\vocably-private\instrument_v2_key.private.json`
+   (dipakai `npm run export -- export --key …`; jangan di-commit).
 3. **Konfirmasi status validasi formal** instrumen & K2 dari validator.
 4. **Gladi teknis** di sekolah dengan cohort `pilot`/`test` (blocker 3), lalu
    bersihkan data uji (blocker 4).

@@ -1750,7 +1750,7 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 **Not done:** a real participant flow in production (no participant accounts; fake production accounts are not allowed); story/co-write with the production Worker under the CSP; a real Android phone; many students at once on the school network.
 
-### 5zk. Pretest/Posttest Instrument v2: Eight Revised Distractors (2026-11-07 — built and verified locally; v2 bank and plan t2 seeded to production by the agent with the owner's authorization; NOT committed; Hosting not redeployed)
+### 5zk. Pretest/Posttest Instrument v2: Eight Revised Distractors (2026-11-07 — verified locally; bank v2 and plan t2 seeded and Hosting deployed by the agent with the owner's authorization; committed and pushed by the owner)
 
 **Input.** The expert validator revised eight distractor texts across three bands. The researcher applied them to the source document and exported a new PDF, `Rancangan_Instrumen_Pretest_Vocably_v2.pdf` (SHA-256 `176a3a03cbb9c4cb…`, kept in the private folder). Changes: A2-15 b) Harga → Bonus, A2-17 d) Selancar → Tebing, B1-02 d) Profesi → Politik, B1-04 b) Bagasi → Kedatangan, B1-10 a) Kemakmuran → Pekerja, B1-18 b) Tebing → Batang, B1-18 d) Teluk → Umbi, B2-20 d) Pelupa → Serius. The researcher confirmed no key changed, and that B1-10 a) "Pekerja" (close to the key "Pekerjaan") and B1-02 d) "Politik" are the validator's own revisions. The previous PDF (v1, SHA-256 `b2cb2ad065bcd0b4…`) was overwritten and is deliberately **not** recovered (owner's decision): v1 was never used for participant data, and it stays documented through the committed bank, the private v1 key and the recorded hash.
 
@@ -1764,7 +1764,7 @@ Authorized by the project owner after their local manual E2E of CW-02, which the
 
 **Production (agent, owner's explicit authorization, 2026-11-07, from the uncommitted working tree).** A read-only `status` showed 0 participants. Both seeds ran as dry runs first: `seed-instrument` → 4 × create `v2_*`; `seed-treatment --plan plans/treatment_plan_t2.json` → 4 × create `t2_*` plus `researchStudy/current.treatment` `t1` → `t2`, make-up still 2 days. Both were then applied with `--log C:\vocably-private\audit\admin.private.jsonl`; a re-run showed all `unchanged`. A read-only check afterwards found `researchInstrument` v1 + v2 (8), `researchTreatmentPlan` t1 + t2 (8), study active with treatment `t2`, and 0 participants, attempts, treatment records and research session sets.
 
-**Not done (needs the owner):** commit; Hosting deploy of the app that bundles bank v2 (`HANDOFF.md` §8). No participant may be enrolled before it. Formal validation status (validation sheet) is not reported, so the instrument is still not described as valid or reliable.
+**Commit and Hosting (2026-11-07).** The owner committed and pushed `74ae6c8` (code) and `a2020ef` (docs). The agent then built the release from `a2020ef` (clean tree, equal to `origin/main`) and, with the owner's authorization, ran `firebase deploy --only hosting` (`Last-Modified: Fri, 06 Nov 2026 23:38:38 GMT`). The bundle carries both banks and no emulator host. Live `main.dart.js` has the same SHA-256 as the local build, live `instrument_v2.json` equals the committed file, and the five security headers are present on both domains. No browser re-test was done for this deploy. Formal validation status (validation sheet) is not reported, so the instrument is still not described as valid or reliable.
 
 ## 6. Firebase / Firestore State
 
