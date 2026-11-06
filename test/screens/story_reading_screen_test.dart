@@ -12,6 +12,7 @@ import 'package:vocably/screens/student/learning_flow/story_reading_screen.dart'
 import 'package:vocably/services/ai_worker_service.dart';
 import 'package:vocably/services/learning_session_service.dart';
 import 'package:vocably/services/vocab_bundle_service.dart';
+import 'package:vocably/models/research_treatment.dart';
 
 class _FakeAiWorkerService extends AiWorkerService {
   GenerateStoryResult Function(String prompt)? handler;
@@ -40,6 +41,7 @@ class _FakeLearningSessionService extends LearningSessionService {
     required String storyTitle,
     required String storyContent,
     required String? storyTranslation,
+    ResearchSessionRef? research,
   }) async => 'session-1';
 
   @override

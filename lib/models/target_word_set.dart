@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../utils/target_word_constants.dart';
+import 'research_treatment.dart';
 
 /// A `targetWordSets/{docId}` document (`DATA_MODEL.md` §5) — a batch of
 /// words a guru targeted for students over some time range.
@@ -21,6 +22,7 @@ class TargetWordSet {
     required this.endAt,
     required this.targetStudentIds,
     required this.createdAt,
+    this.research,
   });
 
   /// Firestore `docId` — not itself a schema field, kept for convenience
@@ -47,6 +49,14 @@ class TargetWordSet {
 
   final DateTime createdAt;
 
+  /// Set only on an official research treatment session set
+  /// (`DATA_MODEL.md` §6e), written by the researcher operator. Such sets
+  /// are never merged into "Target Kata Hari Ini": the student sees them as
+  /// their own research session, and ordinary target-word lists skip them.
+  final TreatmentSetInfo? research;
+
+  bool get isResearch => research != null;
+
   factory TargetWordSet.fromFirestore(String id, Map<String, dynamic> data) {
     return TargetWordSet(
       id: id,
@@ -59,6 +69,7 @@ class TargetWordSet {
         for (final s in data['targetStudentIds'] as List) s as String,
       ],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      research: TreatmentSetInfo.fromMap(data['research']),
     );
   }
 

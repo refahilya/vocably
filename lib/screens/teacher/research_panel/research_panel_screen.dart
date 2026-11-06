@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 
 import '../../../models/app_user.dart';
 import '../../../models/research_panel.dart';
+import '../../../models/research_participant.dart';
+import '../../../models/research_treatment.dart';
 import '../../../providers/research_panel_providers.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/app_feedback.dart';
@@ -14,7 +16,8 @@ import 'research_panel_dialogs.dart';
 /// §5.9): the single researcher operator opens and closes test stages,
 /// authorizes participants, follows their progress and handles technical
 /// interruptions — without the command line. It reads like a class
-/// register: the stages first, then one row per participant.
+/// register: the stages first, then the treatment sessions per band
+/// (`DATA_MODEL.md` §6e), then one row per participant.
 ///
 /// Only shown to the active operator (`researchOperators/{uid}`); every
 /// action is re-checked by the security rules. It never shows answers,
@@ -81,7 +84,7 @@ class _PanelBodyState extends ConsumerState<_PanelBody> {
       }
       return switch (_filter) {
         _RowFilter.all => true,
-        _RowFilter.action => row.cells.values.any((c) => c.hasAction),
+        _RowFilter.action => row.cells.values.any((c) => c.hasAction) || row.treatment.makeupOffer != null,
         _RowFilter.working => row.cells.values.any(
           (c) => c.kind == PanelCellKind.inProgress || c.kind == PanelCellKind.placementInProgress,
         ),
@@ -134,6 +137,14 @@ class _PanelBodyState extends ConsumerState<_PanelBody> {
             onAuthorizeAll: (stage) => _authorizeAll(context, data, stage),
           ),
           const SizedBox(height: AppSpacing.lg),
+          AppSectionHeader(title: 'Sesi treatment', subtitle: _treatmentLine(data)),
+          const SizedBox(height: AppSpacing.sm),
+          _TreatmentSheet(
+            data: data,
+            action: action,
+            onOpen: (band, session, opening) => _openTreatment(context, data, band, session, opening),
+          ),
+          const SizedBox(height: AppSpacing.lg),
           AppSectionHeader(
             title: 'Peserta',
             subtitle: data.rows.isEmpty ? null : '${rows.length} dari ${data.rows.length} ditampilkan',
@@ -161,6 +172,7 @@ class _PanelBodyState extends ConsumerState<_PanelBody> {
                 wide: wide,
                 busyKey: action.busyKey,
                 onAction: (row, stage) => _cellAction(context, row, stage),
+                onMakeup: (row) => _openMakeup(context, data, row),
               ),
           ],
           const SizedBox(height: AppSpacing.lg),
@@ -179,6 +191,63 @@ class _PanelBodyState extends ConsumerState<_PanelBody> {
         ? 'Studi aktif'
         : 'Studi tidak aktif';
     return '$status, ${data.rows.length} peserta';
+  }
+
+  String _treatmentLine(ResearchPanelData data) {
+    final plan = data.study.treatmentPlanVersion;
+    if (plan == null) return 'Rencana treatment belum disiapkan';
+    return 'Rencana $plan, 4 sesi × 5 kata per band. Susulan satu kali per siswa, paling lambat '
+        '${data.study.makeupDeadlineDays} hari setelah sesinya.';
+  }
+
+  String _who(PanelRow row) => row.name.isEmpty ? row.participant.researchId : '${row.name} (${row.participant.researchId})';
+
+  Future<void> _openTreatment(BuildContext context, ResearchPanelData data, String band, int session, int opening) async {
+    final plan = data.treatmentBands[band]?.plan;
+    if (plan == null) return;
+    final candidates = data.treatmentCandidates(band, session);
+    if (candidates.isEmpty) return;
+    final choice = await showOpenTreatmentDialog(
+      context,
+      title: opening == 1 ? 'Buka sesi $session band $band?' : 'Buka ulang sesi $session band $band?',
+      intro: opening == 1
+          ? 'Hanya siswa yang dicentang yang bisa memulai sesi ini, selama sesi dibuka. Siswa yang tidak hadir '
+                'bisa mengikuti susulan satu kali.'
+          : 'Pembukaan ulang untuk siswa yang terlambat atau terkendala teknis hari ini. Dicatat sebagai pembukaan '
+                'ke-$opening.',
+      words: plan.sessions[session] ?? const [],
+      candidates: [for (final r in candidates) (r.uid, _who(r))],
+      confirmLabel: opening == 1 ? 'Buka sesi $session' : 'Buka ulang sesi $session',
+      statement: 'Siswa yang dicentang hadir di kelas dan diawasi selama sesi ini.',
+    );
+    if (choice == null) return;
+    await _controller.openTreatment(
+      plan: plan,
+      session: session,
+      opening: opening,
+      studentIds: choice.studentIds,
+      duration: choice.duration,
+    );
+  }
+
+  Future<void> _openMakeup(BuildContext context, ResearchPanelData data, PanelRow row) async {
+    final band = row.participant.band;
+    final plan = band == null ? null : data.treatmentBands[band]?.plan;
+    final session = row.treatment.makeupOffer;
+    if (plan == null || session == null) return;
+    final choice = await showOpenTreatmentDialog(
+      context,
+      title: 'Buka susulan sesi $session untuk ${_who(row)}?',
+      intro: 'Setiap siswa hanya mendapat satu kali susulan. Setelah dibuka, susulan siswa ini sudah terpakai, '
+          'walaupun tidak diselesaikan.',
+      words: plan.sessions[session] ?? const [],
+      candidates: [(row.uid, _who(row))],
+      confirmLabel: 'Buka susulan',
+      statement: 'Siswa ini mengerjakan susulan di bawah pengawasan saya.',
+      latestClose: row.treatment.makeupDeadline,
+    );
+    if (choice == null) return;
+    await _controller.openMakeup(plan: plan, row: row, session: session, duration: choice.duration);
   }
 
   Future<void> _openStage(BuildContext context, PanelStage stage) async {
@@ -480,12 +549,19 @@ class _RegisterTools extends StatelessWidget {
 /// The participant register: a table on wide screens, one block per
 /// participant on phones.
 class _Register extends StatelessWidget {
-  const _Register({required this.rows, required this.wide, required this.busyKey, required this.onAction});
+  const _Register({
+    required this.rows,
+    required this.wide,
+    required this.busyKey,
+    required this.onAction,
+    required this.onMakeup,
+  });
 
   final List<PanelRow> rows;
   final bool wide;
   final String? busyKey;
   final void Function(PanelRow, PanelStage) onAction;
+  final void Function(PanelRow) onMakeup;
 
   @override
   Widget build(BuildContext context) {
@@ -498,8 +574,8 @@ class _Register extends StatelessWidget {
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0 || wide) const Divider(height: 1, color: AppColors.line),
             wide
-                ? _WideRow(row: rows[i], busyKey: busyKey, onAction: onAction)
-                : _NarrowRow(row: rows[i], busyKey: busyKey, onAction: onAction),
+                ? _WideRow(row: rows[i], busyKey: busyKey, onAction: onAction, onMakeup: onMakeup)
+                : _NarrowRow(row: rows[i], busyKey: busyKey, onAction: onAction, onMakeup: onMakeup),
           ],
         ],
       ),
@@ -521,8 +597,11 @@ class _RegisterHeader extends StatelessWidget {
       child: Row(
         children: [
           const Expanded(flex: _nameFlex, child: Text('Peserta', style: AppTextStyles.caption)),
-          for (final stage in PanelStage.values)
+          for (final stage in PanelStage.values) ...[
+            if (stage == PanelStage.postTest)
+              const Expanded(flex: _cellFlex, child: Text('Treatment', style: AppTextStyles.caption)),
             Expanded(flex: _cellFlex, child: Text(stage.label, style: AppTextStyles.caption)),
+          ],
         ],
       ),
     );
@@ -550,11 +629,12 @@ class _Identity extends StatelessWidget {
 }
 
 class _WideRow extends StatelessWidget {
-  const _WideRow({required this.row, required this.busyKey, required this.onAction});
+  const _WideRow({required this.row, required this.busyKey, required this.onAction, required this.onMakeup});
 
   final PanelRow row;
   final String? busyKey;
   final void Function(PanelRow, PanelStage) onAction;
+  final void Function(PanelRow) onMakeup;
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +644,15 @@ class _WideRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(flex: _nameFlex, child: _Identity(row: row)),
-          for (final stage in PanelStage.values)
+          for (final stage in PanelStage.values) ...[
+            if (stage == PanelStage.postTest)
+              Expanded(
+                flex: _cellFlex,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
+                  child: _TreatmentCellView(row: row, busyKey: busyKey, onMakeup: () => onMakeup(row)),
+                ),
+              ),
             Expanded(
               flex: _cellFlex,
               child: Padding(
@@ -578,6 +666,7 @@ class _WideRow extends StatelessWidget {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -585,11 +674,12 @@ class _WideRow extends StatelessWidget {
 }
 
 class _NarrowRow extends StatelessWidget {
-  const _NarrowRow({required this.row, required this.busyKey, required this.onAction});
+  const _NarrowRow({required this.row, required this.busyKey, required this.onAction, required this.onMakeup});
 
   final PanelRow row;
   final String? busyKey;
   final void Function(PanelRow, PanelStage) onAction;
+  final void Function(PanelRow) onMakeup;
 
   @override
   Widget build(BuildContext context) {
@@ -600,7 +690,18 @@ class _NarrowRow extends StatelessWidget {
         children: [
           _Identity(row: row),
           const SizedBox(height: AppSpacing.sm),
-          for (final stage in PanelStage.values)
+          for (final stage in PanelStage.values) ...[
+            if (stage == PanelStage.postTest)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(width: 104, child: Text('Treatment', style: AppTextStyles.caption)),
+                    Expanded(child: _TreatmentCellView(row: row, busyKey: busyKey, onMakeup: () => onMakeup(row))),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.xs),
               child: Row(
@@ -619,6 +720,7 @@ class _NarrowRow extends StatelessWidget {
                 ],
               ),
             ),
+          ],
         ],
       ),
     );
@@ -653,6 +755,7 @@ class _CellView extends StatelessWidget {
     PanelCellKind.notEligible => ('Tidak ikut tahap ini', AppTone.neutral),
     PanelCellKind.notAuthorized => ('Belum diizinkan', AppTone.neutral),
     PanelCellKind.waitingForPreTest => ('Menunggu Pre-Test selesai', AppTone.neutral),
+    PanelCellKind.waitingForTreatment => ('Menunggu 4 sesi treatment', AppTone.neutral),
     PanelCellKind.notStarted => (
       cell.attemptNumber > 1 ? 'Percobaan ke-${cell.attemptNumber}, belum mulai' : 'Diizinkan, belum mulai',
       AppTone.neutral,
@@ -739,6 +842,8 @@ class _AuditList extends StatelessWidget {
           : 'Mengizinkan $stage untuk $who',
       'void' => 'Membatalkan $stage percobaan ke-${e.attemptNumber} milik $who (gangguan teknis)',
       'retake' => 'Mengizinkan $who mengulang $stage (percobaan ke-${e.attemptNumber})',
+      'open_treatment' => 'Membuka sesi treatment ${e.session} band ${e.band} untuk ${e.studentCount} siswa (hadir dan diawasi)',
+      'open_makeup' => 'Membuka susulan sesi ${e.session} untuk $who (diawasi)',
       _ => 'Tindakan lain',
     };
   }
@@ -777,6 +882,205 @@ class _AuditList extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// The official treatment sessions per band (`DATA_MODEL.md` §6e): which
+/// session is next, which is open now, and how many participants finished
+/// each. A session that is open now carries the highlighter.
+class _TreatmentSheet extends StatelessWidget {
+  const _TreatmentSheet({required this.data, required this.action, required this.onOpen});
+
+  final ResearchPanelData data;
+  final PanelActionState action;
+
+  /// (band, session, opening).
+  final void Function(String, int, int) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    if (data.study.treatmentPlanVersion == null) {
+      return const AppNotice(
+        tone: AppTone.neutral,
+        icon: Icons.event_note_outlined,
+        text: 'Rencana treatment belum disiapkan. Jalankan seed-treatment lewat alat riset '
+            '(README tools/research), lalu sesi bisa dibuka di sini.',
+      );
+    }
+    final bands = data.treatmentBands.values.where((b) => data.rows.any((r) => r.participant.band == b.band)).toList();
+    if (bands.isEmpty) {
+      return const AppNotice(
+        tone: AppTone.neutral,
+        icon: Icons.group_outlined,
+        text: 'Belum ada peserta dengan band. Sesi treatment dibuka per band setelah Placement Test.',
+      );
+    }
+    return AppSheet(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < bands.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppColors.line),
+            _TreatmentBandRow(band: bands[i], data: data, action: action, onOpen: onOpen),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TreatmentBandRow extends StatelessWidget {
+  const _TreatmentBandRow({required this.band, required this.data, required this.action, required this.onOpen});
+
+  final PanelTreatmentBand band;
+  final ResearchPanelData data;
+  final PanelActionState action;
+  final void Function(String, int, int) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final rows = data.rows.where((r) => r.participant.band == band.band).toList();
+    final open = band.openNow(now);
+    final next = band.nextSession;
+    final reopen = band.reopenable(now);
+    final busy = action.busyKey == 'treat:${band.band}';
+    final planReady = band.plan != null;
+
+    String sessionText(int n) {
+      final first = band.regular(n);
+      if (first == null) return 'Sesi $n belum dibuka';
+      final done = rows.where((r) => r.treatment.done.contains(n)).length;
+      final openSet = open.where((s) => s.info.session == n).firstOrNull;
+      if (openSet != null) return 'Sesi $n dibuka sampai ${_time(openSet.endAt)}, $done/${rows.length} selesai';
+      return 'Sesi $n: $done/${rows.length} selesai';
+    }
+
+    final candidatesNext = next == null ? 0 : data.treatmentCandidates(band.band, next).length;
+    final candidatesReopen = reopen == null ? 0 : data.treatmentCandidates(band.band, reopen).length;
+    final canAct = data.study.active && planReady && !action.busy;
+    final controls = Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (reopen != null && candidatesReopen > 0)
+          OutlinedButton(
+            onPressed: canAct ? () => onOpen(band.band, reopen, band.openings(reopen) + 1) : null,
+            child: Text('Buka ulang sesi $reopen'),
+          ),
+        if (next != null)
+          FilledButton(
+            onPressed: canAct && candidatesNext > 0 && open.isEmpty ? () => onOpen(band.band, next, 1) : null,
+            child: busy ? const AppButtonSpinner(color: Colors.white, size: 18) : Text('Buka sesi $next'),
+          ),
+      ],
+    );
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Flexible(child: Text('Band ${band.band}', style: AppTextStyles.wordRow)),
+            if (open.isNotEmpty) ...[
+              const SizedBox(width: AppSpacing.sm),
+              _Highlight(text: 'Sesi ${open.first.info.session} dibuka'),
+            ],
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          !planReady
+              ? 'Rencana band ini belum tersedia'
+              : next == null
+              ? 'Keempat sesi sudah dibuka'
+              : candidatesNext == 0
+              ? 'Sesi berikutnya: $next (belum ada peserta yang siap — Pre-Test belum selesai)'
+              : 'Sesi berikutnya: $next, $candidatesNext peserta siap',
+          style: AppTextStyles.caption,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text([for (var n = 1; n <= kTreatmentSessions; n++) sessionText(n)].join(' · '), style: AppTextStyles.bodyMuted),
+      ],
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: open.isNotEmpty ? AppColors.marker : Colors.transparent, width: 4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md - 4, AppSpacing.smd, AppSpacing.md, AppSpacing.smd),
+        child: LayoutBuilder(
+          builder: (context, constraints) => constraints.maxWidth >= 560
+              ? Row(
+                  children: [
+                    Expanded(child: text),
+                    const SizedBox(width: AppSpacing.md),
+                    controls,
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [text, const SizedBox(height: AppSpacing.smd), controls],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One participant's treatment: sessions recorded, the make-up, and the
+/// make-up action when a missed session can still be made up.
+class _TreatmentCellView extends StatelessWidget {
+  const _TreatmentCellView({required this.row, required this.busyKey, required this.onMakeup});
+
+  final PanelRow row;
+  final String? busyKey;
+  final VoidCallback onMakeup;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = row.treatment;
+    final done = (t.done.toList()..sort());
+    final (text, tone) = t.complete
+        ? ('4/4 sesi selesai', AppTone.success)
+        : !t.eligible && done.isEmpty
+        ? (
+            row.participant.status == ResearchParticipantStatus.awaitingPlacement
+                ? 'Menunggu band'
+                : row.participant.canTakeResearchStages
+                ? 'Menunggu Pre-Test selesai'
+                : 'Tidak ikut tahap ini',
+            AppTone.neutral,
+          )
+        : t.openNow.isNotEmpty
+        ? ('Sesi ${t.openNow.first} dibuka · ${done.length}/4 selesai', AppTone.info)
+        : (done.isEmpty ? '0/4 selesai' : '${done.length}/4 selesai (sesi ${done.join(', ')})', AppTone.neutral);
+    final offer = t.makeupOffer;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          text,
+          style: AppTextStyles.body.copyWith(
+            color: tone == AppTone.neutral ? AppColors.inkMuted : tone.foreground,
+            fontWeight: tone == AppTone.neutral ? null : FontWeight.w600,
+          ),
+        ),
+        if (t.makeupUsed) Text('Susulan dipakai: sesi ${t.makeupSession}', style: AppTextStyles.caption),
+        if (offer != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                minimumSize: const Size(0, 36),
+              ),
+              onPressed: busyKey != null ? null : onMakeup,
+              child: busyKey == 'makeup:${row.uid}' ? const AppButtonSpinner(size: 16) : Text('Susulan sesi $offer'),
+            ),
+          ),
+      ],
     );
   }
 }

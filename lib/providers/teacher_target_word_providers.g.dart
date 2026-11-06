@@ -9,13 +9,17 @@ part of 'teacher_target_word_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// All target word sets created by [teacherId], sorted in memory by
-/// `createdAt` descending (`DATA_MODEL.md` §5).
+/// `createdAt` descending (`DATA_MODEL.md` §5). Official research session
+/// sets (`DATA_MODEL.md` §6e) are managed in the Researcher Panel and left
+/// out here.
 
 @ProviderFor(teacherTargetWordSets)
 final teacherTargetWordSetsProvider = TeacherTargetWordSetsFamily._();
 
 /// All target word sets created by [teacherId], sorted in memory by
-/// `createdAt` descending (`DATA_MODEL.md` §5).
+/// `createdAt` descending (`DATA_MODEL.md` §5). Official research session
+/// sets (`DATA_MODEL.md` §6e) are managed in the Researcher Panel and left
+/// out here.
 
 final class TeacherTargetWordSetsProvider
     extends
@@ -28,7 +32,9 @@ final class TeacherTargetWordSetsProvider
         $FutureModifier<List<TargetWordSet>>,
         $FutureProvider<List<TargetWordSet>> {
   /// All target word sets created by [teacherId], sorted in memory by
-  /// `createdAt` descending (`DATA_MODEL.md` §5).
+  /// `createdAt` descending (`DATA_MODEL.md` §5). Official research session
+  /// sets (`DATA_MODEL.md` §6e) are managed in the Researcher Panel and left
+  /// out here.
   TeacherTargetWordSetsProvider._({
     required TeacherTargetWordSetsFamily super.from,
     required String super.argument,
@@ -74,10 +80,12 @@ final class TeacherTargetWordSetsProvider
 }
 
 String _$teacherTargetWordSetsHash() =>
-    r'569f45f4a49682eb3523d45517279995da90c911';
+    r'2d572b6018757cb38a21665ed1e287bb6cf530ec';
 
 /// All target word sets created by [teacherId], sorted in memory by
-/// `createdAt` descending (`DATA_MODEL.md` §5).
+/// `createdAt` descending (`DATA_MODEL.md` §5). Official research session
+/// sets (`DATA_MODEL.md` §6e) are managed in the Researcher Panel and left
+/// out here.
 
 final class TeacherTargetWordSetsFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<TargetWordSet>>, String> {
@@ -91,7 +99,9 @@ final class TeacherTargetWordSetsFamily extends $Family
       );
 
   /// All target word sets created by [teacherId], sorted in memory by
-  /// `createdAt` descending (`DATA_MODEL.md` §5).
+  /// `createdAt` descending (`DATA_MODEL.md` §5). Official research session
+  /// sets (`DATA_MODEL.md` §6e) are managed in the Researcher Panel and left
+  /// out here.
 
   TeacherTargetWordSetsProvider call(String teacherId) =>
       TeacherTargetWordSetsProvider._(argument: teacherId, from: this);

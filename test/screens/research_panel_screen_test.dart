@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vocably/models/app_user.dart';
 import 'package:vocably/models/research_panel.dart';
 import 'package:vocably/models/research_participant.dart';
+import 'package:vocably/models/research_treatment.dart';
 import 'package:vocably/providers/research_panel_providers.dart';
 import 'package:vocably/screens/teacher/research_panel/research_panel_screen.dart';
 import 'package:vocably/services/research_assessment_service.dart';
@@ -17,6 +18,9 @@ final _teacher = AppUser(uid: 'teacher-2', email: 'guru@example.test', name: 'Gu
 
 FakeResearchPanelService _classroom({Set<PanelStage> open = const {}}) => FakeResearchPanelService(
   study: activeStudy(open: open),
+  plans: [panelPlan('A2'), panelPlan('B1'), panelPlan('B2')],
+  // R-05 finished all four official sessions; R-04 has not finished the pretest.
+  records: [panelRecord('s5', {1, 2, 3, 4})],
   participants: [
     panelParticipant('s1', researchId: 'R-01', status: ResearchParticipantStatus.awaitingPlacement),
     panelParticipant('s2', researchId: 'R-02', band: 'A2'),
@@ -81,7 +85,9 @@ void main() {
     expect(find.text('Mengerjakan 23/50'), findsOneWidget);
     expect(find.text('Mengerjakan 7/20'), findsOneWidget);
     expect(find.text('Menunggu hasil Placement'), findsNWidgets(2));
-    expect(find.text('Band A2'), findsOneWidget);
+    // Once in the register, once as the band's treatment row.
+    expect(find.text('Band A2'), findsNWidgets(2));
+    expect(find.text('4/4 sesi selesai'), findsOneWidget);
     expect(find.textContaining('1 selesai, 1 mengerjakan, 2 belum diizinkan'), findsOneWidget);
   });
 
@@ -201,5 +207,72 @@ void main() {
     await tester.scrollUntilVisible(find.text('Eka Putri'), 300, scrollable: find.byType(Scrollable).first);
     expect(find.text('Eka Putri'), findsOneWidget);
     expect(find.text('Placement Test'), findsWidgets);
+  });
+  group('treatment sessions', () {
+    FakeResearchPanelService bandB1({List<PanelTreatmentSet> sets = const [], List<TreatmentRecord> records = const []}) => FakeResearchPanelService(
+      study: activeStudy(),
+      plans: [panelPlan('B1')],
+      treatmentSets: sets,
+      records: records,
+      participants: [
+        panelParticipant('t1', researchId: 'R-11', band: 'B1', pre: 1),
+        panelParticipant('t2', researchId: 'R-12', band: 'B1', pre: 1),
+        panelParticipant('t3', researchId: 'R-13', band: 'B1', pre: 1),
+      ],
+      roster: const [
+        PanelRosterEntry(uid: 't1', name: 'Fajar', researchId: 'R-11'),
+        PanelRosterEntry(uid: 't2', name: 'Gita', researchId: 'R-12'),
+        PanelRosterEntry(uid: 't3', name: 'Hana', researchId: 'R-13'),
+      ],
+      progress: [for (final u in ['t1', 't2', 't3']) panelProgress(u, PanelStage.preTest, answered: 20, status: 'completed')],
+    );
+
+    testWidgets('opening session 1 for the students present needs the supervision statement', (tester) async {
+      final service = bandB1();
+      await _pump(tester, service);
+      expect(find.text('Sesi berikutnya: 1, 3 peserta siap'), findsOneWidget);
+      await _tapLast(tester, 'Buka sesi 1');
+      expect(find.text('Buka sesi 1 band B1?'), findsOneWidget);
+      expect(find.textContaining(planWords('B1', 1).join(', ')), findsOneWidget);
+      // Gita is absent today.
+      await tester.tap(find.text('Gita (R-12)'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(_button('Buka sesi 1').last).onPressed, isNull, reason: 'the supervision statement is required');
+      await tester.tap(find.textContaining('hadir di kelas dan diawasi'));
+      await tester.pumpAndSettle();
+      await _tapLast(tester, 'Buka sesi 1');
+      expect(service.calls, ['treat:B1:1:1:t1,t3:60']);
+      expect(find.text('Sesi 1 band B1 dibuka untuk 2 siswa.'), findsOneWidget);
+      expect(find.text('Sesi 1 dibuka'), findsOneWidget, reason: 'the open session carries the highlighter');
+      expect(find.textContaining('Membuka sesi treatment 1 band B1 untuk 2 siswa'), findsOneWidget);
+      expect(tester.widget<FilledButton>(_button('Buka sesi 2')).onPressed, isNull, reason: 'one session at a time');
+    });
+
+    testWidgets('a student who missed a closed session gets the one make-up, before the deadline', (tester) async {
+      final now = DateTime.now();
+      final service = bandB1(
+        sets: [panelSet('B1', 1, students: const ['t1', 't3'], startAt: now.subtract(const Duration(hours: 3)), endAt: now.subtract(const Duration(hours: 2)))],
+        records: [panelRecord('t1', {1}), panelRecord('t3', {1})],
+      );
+      await _pump(tester, service);
+      expect(find.text('Susulan sesi 1'), findsOneWidget, reason: 'only Gita missed it');
+      await _tapLast(tester, 'Susulan sesi 1');
+      expect(find.text('Buka susulan sesi 1 untuk Gita (R-12)?'), findsOneWidget);
+      await tester.tap(find.textContaining('di bawah pengawasan saya'));
+      await tester.pumpAndSettle();
+      await _tapLast(tester, 'Buka susulan');
+      expect(service.calls, ['treat:B1:1:makeup:t2:60']);
+      expect(find.text('Susulan dipakai: sesi 1'), findsOneWidget);
+      expect(find.text('Susulan sesi 1'), findsNothing, reason: 'one make-up per student');
+      // The first session may still be re-opened today for latecomers.
+      expect(find.text('Buka ulang sesi 1'), findsNothing, reason: 'every candidate has done or is doing session 1');
+    });
+
+    testWidgets('without a seeded plan the section explains the tooling step', (tester) async {
+      final service = FakeResearchPanelService(study: activeStudy(treatmentPlanVersion: null), participants: [panelParticipant('t1')]);
+      await _pump(tester, service);
+      expect(find.textContaining('Rencana treatment belum disiapkan'), findsWidgets);
+      expect(find.text('Buka sesi 1'), findsNothing);
+    });
   });
 }

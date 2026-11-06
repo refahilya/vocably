@@ -20,7 +20,10 @@ Future<List<TargetWordSet>> activeTargetWordSets(Ref ref, String studentId) {
 
 /// Resolves every currently-active target word (across however many
 /// active sets exist) to its full [VocabBundleEntry], for the "Target
-/// Kata Hari Ini" card.
+/// Kata Hari Ini" card. Official research session sets
+/// (`DATA_MODEL.md` §6e) are skipped: they are shown, and started, only as
+/// the student's own research session (`research_treatment_providers.dart`),
+/// so their words are never mixed into an ordinary session.
 ///
 /// Each [TargetWordSet] is scoped to one `cefrLevel` (`DATA_MODEL.md`
 /// §5's own framing — a guru picks words starting from one level), so
@@ -35,7 +38,16 @@ Future<List<TargetWordSet>> activeTargetWordSets(Ref ref, String studentId) {
 /// could target the same word.
 @riverpod
 Future<List<VocabBundleEntry>> targetWordEntries(Ref ref, String studentId) async {
-  final sets = await ref.watch(activeTargetWordSetsProvider(studentId).future);
+  final sets = [
+    for (final set in await ref.watch(activeTargetWordSetsProvider(studentId).future))
+      if (!set.isResearch) set,
+  ];
+  return resolveTargetWords(ref, sets);
+}
+
+/// [sets]' words resolved against each set's level bundle, in set order,
+/// de-duplicated by word; a word the bundle no longer has is skipped.
+Future<List<VocabBundleEntry>> resolveTargetWords(Ref ref, List<TargetWordSet> sets) async {
   if (sets.isEmpty) return const [];
 
   final resolved = <String, VocabBundleEntry>{};

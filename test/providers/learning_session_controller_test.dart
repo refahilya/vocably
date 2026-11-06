@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vocably/models/learning_session.dart';
@@ -9,11 +10,14 @@ import 'package:vocably/providers/ai_worker_providers.dart';
 import 'package:vocably/providers/history_providers.dart';
 import 'package:vocably/providers/learning_cart_providers.dart';
 import 'package:vocably/providers/learning_session_controller.dart';
+import 'package:vocably/providers/research_treatment_providers.dart';
 import 'package:vocably/services/ai_worker_service.dart';
 import 'package:vocably/services/learning_progress_service.dart';
 import 'package:vocably/services/learning_session_service.dart';
+import 'package:vocably/services/research_treatment_service.dart';
 import 'package:vocably/utils/cloze_blanks.dart';
 import 'package:vocably/utils/cowrite_feedback.dart';
+import 'package:vocably/models/research_treatment.dart';
 
 /// Records every call so tests can assert exactly what was sent to
 /// Firestore, without a real Firestore/emulator (same disclosed-gap
@@ -30,6 +34,10 @@ class _FakeLearningSessionService extends LearningSessionService {
   String nextSessionId = 'session-1';
   bool throwOnCompleteSession = false;
 
+  /// When set, [createSession] throws it (e.g. the rules refusing a
+  /// research session).
+  Object? createError;
+
   @override
   Future<String> createSession({
     required String studentId,
@@ -38,8 +46,11 @@ class _FakeLearningSessionService extends LearningSessionService {
     required String storyTitle,
     required String storyContent,
     required String? storyTranslation,
+    ResearchSessionRef? research,
   }) async {
+    if (createError != null) throw createError!;
     createCalls.add({
+      'research': research,
       'studentId': studentId,
       'wordIds': wordIds,
       'sourceType': sourceType,
@@ -146,6 +157,18 @@ class _FakeLearningProgressService extends LearningProgressService {
       'cowriteWordsUsedCorrectly': cowriteWordsUsedCorrectly,
       'sessionId': sessionId,
     });
+  }
+}
+
+/// Records research completion writes (`DATA_MODEL.md` §6e).
+class _FakeResearchTreatmentService extends ResearchTreatmentService {
+  final calls = <String>[];
+  bool throwOnRecord = false;
+
+  @override
+  Future<void> recordCompletion({required String uid, required ResearchSessionRef ref, required String sessionId}) async {
+    if (throwOnRecord) throw Exception('simulated lost connection');
+    calls.add('$uid:${ref.session}:${ref.setId}:$sessionId');
   }
 }
 
@@ -282,6 +305,7 @@ void main() {
   late _FakeLearningSessionService fakeSessionService;
   late _FakeLearningProgressService fakeProgressService;
   late _ScriptedRandom scriptedRandom;
+  late _FakeResearchTreatmentService fakeTreatment;
   late ProviderContainer container;
 
   setUp(() {
@@ -289,8 +313,10 @@ void main() {
     fakeSessionService = _FakeLearningSessionService();
     fakeProgressService = _FakeLearningProgressService();
     scriptedRandom = _ScriptedRandom();
+    fakeTreatment = _FakeResearchTreatmentService();
     container = ProviderContainer(
       overrides: [
+        researchTreatmentServiceProvider.overrideWithValue(fakeTreatment),
         aiWorkerServiceProvider.overrideWithValue(fakeAi),
         learningSessionServiceProvider.overrideWithValue(fakeSessionService),
         learningProgressServiceProvider.overrideWithValue(fakeProgressService),
@@ -2036,6 +2062,74 @@ void main() {
           expect(state().cowriteTranscript.last.text, 'I bought a souvenir there.');
         },
       );
+    });
+  });
+
+  group('research treatment session (DATA_MODEL.md §6e)', () {
+    const ref = ResearchSessionRef(setId: 'rt_t1_A2_s2_o1', session: 2, kind: TreatmentSetKind.regular, planVersion: 't1');
+
+    Future<void> runToCompletion({ResearchSessionRef? research}) async {
+      controller().startFlow(
+        studentId: 'student-1',
+        wordIds: ['run', 'souvenir'],
+        sourceType: LearningSessionSourceType.targetGuru,
+        research: research,
+      );
+      fakeAi.generateStoryHandler = (words, prompt) => GenerateStoryResult(
+        story: 'I [[run|ran]] and bought a [[souvenir|souvenir]].',
+        translation: 'T',
+      );
+      await controller().generateStory(prompt: 'judul');
+      await controller().advanceToClozeTest();
+      controller().setClozeAnswer('run', 'run');
+      controller().setClozeAnswer('souvenir', 'souvenir');
+      controller().submitCloze();
+      await controller().confirmClozeAndAdvance(buildClozeSegments(state().storyContent!));
+      fakeAi.cowriteTurnHandler = (transcript, remainingWords, requestSuggestion) => CowriteTurnResult(
+        aiTurn: 'Nice!',
+        feedback: null,
+        hasError: false,
+        wordsUsedCorrectly: [...remainingWords],
+        suggestion: null,
+        aiUsedWords: const [],
+      );
+      await controller().sendTurn('I ran and bought a souvenir.');
+      await controller().completeCowrite();
+    }
+
+    test('the first story writes the session with its set ID and number; completion is recorded', () async {
+      await runToCompletion(research: ref);
+      expect(fakeSessionService.createCalls.single['research'], same(ref));
+      expect(state().currentPhase, LearningSessionPhase.selesai);
+      expect(fakeTreatment.calls, ['student-1:2:rt_t1_A2_s2_o1:session-1']);
+    });
+
+    test('an ordinary target-word session carries no research reference and records nothing', () async {
+      await runToCompletion();
+      expect(fakeSessionService.createCalls.single['research'], isNull);
+      expect(state().currentPhase, LearningSessionPhase.selesai);
+      expect(fakeTreatment.calls, isEmpty);
+    });
+
+    test('a research session the rules refuse to start explains it (not a connection hint)', () async {
+      fakeSessionService.createError = FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied');
+      controller().startFlow(studentId: 'student-1', wordIds: ['run'], sourceType: LearningSessionSourceType.targetGuru, research: ref);
+      fakeAi.generateStoryHandler = (words, prompt) => const GenerateStoryResult(story: 'I [[run|ran]].', translation: 'T');
+      await controller().generateStory(prompt: 'judul');
+      expect(state().generateError, kResearchSessionRefusedMessage);
+      expect(state().sessionId, isNull);
+
+      // The same refusal for ordinary learning keeps the ordinary message.
+      controller().startFlow(studentId: 'student-1', wordIds: ['run'], sourceType: LearningSessionSourceType.targetGuru);
+      await controller().generateStory(prompt: 'judul');
+      expect(state().generateError, 'Gagal membuat cerita. Periksa koneksi lalu coba lagi.');
+    });
+
+    test('a lost completion write never fails the finished session (recorded later from the dashboard)', () async {
+      fakeTreatment.throwOnRecord = true;
+      await runToCompletion(research: ref);
+      expect(state().currentPhase, LearningSessionPhase.selesai);
+      expect(state().turnError, isNull);
     });
   });
 }

@@ -28,6 +28,8 @@ import 'package:vocably/providers/learning_session_controller.dart';
 import 'package:vocably/providers/placement_test_providers.dart';
 import 'package:vocably/providers/research_assessment_providers.dart';
 import 'package:vocably/providers/research_panel_providers.dart';
+import 'package:vocably/providers/research_treatment_providers.dart';
+import 'package:vocably/services/research_treatment_service.dart';
 import 'package:vocably/providers/vocab_bundle_providers.dart';
 import 'package:vocably/providers/vocab_management_providers.dart';
 import 'package:vocably/screens/auth/complete_registration_screen.dart';
@@ -63,6 +65,7 @@ import 'package:vocably/theme/theme.dart';
 import 'package:vocably/utils/role.dart';
 import 'package:vocably/widgets/app_nav_shell.dart';
 import 'package:vocably/widgets/stepper_header.dart';
+import 'package:vocably/models/research_treatment.dart';
 
 import '../support/app_fonts.dart';
 import '../support/fake_placement_service.dart';
@@ -139,11 +142,43 @@ class _Sets extends TargetWordSetService {
     createdAt: DateTime(2020, 1, 1),
   );
 
-  @override
-  Future<List<TargetWordSet>> fetchActiveForStudent(String studentId) async => [_set];
+  /// An official research session open for the student (`DATA_MODEL.md` §6e).
+  static final research = TargetWordSet(
+    id: 'rt_t1_B1_s3_o1',
+    teacherId: 'teacher-1',
+    wordIds: [_longWord, _phrase, 'run', 'souvenir'],
+    cefrLevel: 'B1',
+    startAt: DateTime.now().subtract(const Duration(minutes: 5)),
+    endAt: DateTime.now().add(const Duration(minutes: 85)),
+    targetStudentIds: const ['student-1'],
+    createdAt: DateTime.now(),
+    research: const TreatmentSetInfo(
+      planVersion: 't1',
+      instrumentVersion: 'v1',
+      band: 'B1',
+      session: 3,
+      kind: TreatmentSetKind.regular,
+      opening: 1,
+    ),
+  );
 
   @override
-  Future<List<TargetWordSet>> fetchForTeacher(String teacherId) async => [_set, _set, _set];
+  Future<List<TargetWordSet>> fetchActiveForStudent(String studentId) async => [_set, research];
+
+  @override
+  Stream<List<TargetWordSet>> watchActiveForStudent(String studentId) =>
+      Stream.fromFuture(fetchActiveForStudent(studentId));
+
+  @override
+  Future<List<TargetWordSet>> fetchForTeacher(String teacherId) async => [_set, _set, _set, research];
+}
+
+class _Treatment extends ResearchTreatmentService {
+  @override
+  Future<bool> isParticipant(String uid) async => false;
+
+  @override
+  Future<TreatmentRecord> fetchRecord(String uid) async => TreatmentRecord.empty;
 }
 
 class _Topics extends TopicsService {
@@ -188,6 +223,7 @@ class _Sessions extends LearningSessionService {
     required String storyTitle,
     required String storyContent,
     required String? storyTranslation,
+    ResearchSessionRef? research,
   }) async => 'session-1';
 
   @override
@@ -286,6 +322,7 @@ List<dynamic> _overrides({
   ),
   researchAssessmentRandomProvider.overrideWithValue(Random(3)),
   researchPanelServiceProvider.overrideWithValue(_panel()),
+  researchTreatmentServiceProvider.overrideWithValue(_Treatment()),
   if (instrument != null) researchInstrumentProvider('v1').overrideWith((ref) async => instrument),
 ];
 
@@ -313,8 +350,21 @@ FakeResearchPanelService _panel() => FakeResearchPanelService(
     panelProgress('s4', PanelStage.preTest, status: 'voided'),
     panelProgress('s5', PanelStage.preTest, answered: 20, status: 'completed'),
     panelProgress('s5', PanelStage.postTest, answered: 4),
+    panelProgress('s6', PanelStage.preTest, answered: 20, status: 'completed'),
+    panelProgress('s7', PanelStage.preTest, answered: 20, status: 'completed'),
   ],
-);
+  // Treatment: session 1 held yesterday, session 2 earlier today (closed);
+  // s6 missed session 1 (make-up offered), s7 did both.
+  plans: [panelPlan('B1')],
+  treatmentSets: [
+    panelSet('B1', 1, students: const ['s5', 's7'], startAt: DateTime.now().subtract(const Duration(hours: 27)), endAt: DateTime.now().subtract(const Duration(hours: 26))),
+    panelSet('B1', 2, students: const ['s5', 's6', 's7'], startAt: DateTime.now().subtract(const Duration(hours: 3)), endAt: DateTime.now().subtract(const Duration(hours: 2))),
+  ],
+  records: [panelRecord('s5', {1, 2, 3, 4}), panelRecord('s6', {2}), panelRecord('s7', {1, 2})],
+)..participants.addAll([
+    for (final i in [6, 7])
+      panelParticipant('s$i', researchId: 'PENELITIAN-SMK-00$i', pre: 1),
+  ]);
 
 void main() {
   late ResearchInstrument instrument;
@@ -398,6 +448,10 @@ void main() {
       ],
     ),
     'target word list': const TargetWordListScreen(studentId: 'student-1'),
+    'research session list': TargetWordListScreen(
+      studentId: 'student-1',
+      research: ResearchSessionOffer(set: _Sets.research, info: _Sets.research.research!, completed: false),
+    ),
     'vocabulary browser': const VocabBrowserScreen(),
     'word detail': WordDetailScreen(entry: _entry(_longWord)),
     'session detail': SessionDetailScreen(session: _session),
@@ -517,6 +571,26 @@ void main() {
             await tester.tap(find.text('Mulai'));
             await tester.pumpAndSettle();
             expect(find.text('Lanjut'), findsOneWidget);
+          },
+        );
+      });
+    }
+  });
+
+  group('treatment session dialog', () {
+    for (final size in _viewports) {
+      testWidgets('open session 3 @ ${size.width.toInt()}x${size.height.toInt()}', (tester) async {
+        await check(
+          tester,
+          size,
+          cases['researcher panel']!,
+          drive: (tester, _) async {
+            await tester.ensureVisible(find.text('Buka sesi 3'));
+            await tester.tap(find.text('Buka sesi 3'));
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            expect(find.text('Buka sesi 3 band B1?'), findsOneWidget);
+            expect(find.textContaining('hadir di kelas dan diawasi'), findsOneWidget);
           },
         );
       });

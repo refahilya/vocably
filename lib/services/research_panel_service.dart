@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/research_panel.dart';
+import '../models/research_treatment.dart';
 import 'firebase_service.dart';
 import 'research_assessment_service.dart';
 
@@ -67,6 +68,46 @@ class ResearchPanelService {
       .limit(limit)
       .snapshots()
       .map((q) => [for (final d in q.docs) PanelAuditEntry.fromFirestore(d.id, d.data())]);
+
+  /// The locked treatment plan, one document per band (`DATA_MODEL.md` §6e).
+  Stream<List<TreatmentPlanBand>> watchTreatmentPlans() => _db
+      .collection('researchTreatmentPlan')
+      .snapshots()
+      .map((q) => [for (final d in q.docs) ?TreatmentPlanBand.fromFirestore(d.data())]);
+
+  /// Every official treatment session set (regular and make-up).
+  Stream<List<PanelTreatmentSet>> watchTreatmentSets() => _db
+      .collection('targetWordSets')
+      .where('research.band', whereIn: const ['A2', 'B1', 'B2', 'C1'])
+      .snapshots()
+      .map((q) => [for (final d in q.docs) ?PanelTreatmentSet.fromFirestore(d.id, d.data())]);
+
+  /// Every participant's completion record (sessions recorded, no content).
+  Stream<List<TreatmentRecord>> watchTreatmentRecords() => _db
+      .collection('researchTreatment')
+      .snapshots()
+      .map((q) => [for (final d in q.docs) TreatmentRecord.fromFirestore(d.id, d.data())]);
+
+  /// Opens an official treatment session (regular or make-up) now, for
+  /// [duration], for [studentIds] (marked present by the operator).
+  Future<void> openTreatmentSession({
+    required String operatorUid,
+    required TreatmentSetInfo info,
+    required List<String> words,
+    required List<String> studentIds,
+    required Duration duration,
+  }) => _guard(
+    () => _commit(
+      ResearchTreatmentWrites.openSession(
+        info: info,
+        words: words,
+        studentIds: studentIds,
+        operatorUid: operatorUid,
+        serverTimestamp: FieldValue.serverTimestamp(),
+        endAt: DateTime.now().add(duration),
+      ),
+    ),
+  );
 
   /// The current window-change sequence number, from the server (the rules
   /// require exactly the next one).

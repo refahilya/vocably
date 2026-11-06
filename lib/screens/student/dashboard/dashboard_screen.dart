@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../models/app_user.dart';
 import '../../../models/research_attempt.dart';
 import '../../../providers/dashboard_providers.dart';
 import '../../../providers/research_assessment_providers.dart';
+import '../../../providers/research_treatment_providers.dart';
 import '../../../services/research_assessment_service.dart';
 import '../../../theme/theme.dart';
 import '../../../utils/cefr_levels.dart';
@@ -37,6 +39,7 @@ class DashboardScreen extends ConsumerWidget {
         children: [
           Text('Halo, ${profile.name}', style: AppTextStyles.pageTitle),
           const SizedBox(height: AppSpacing.md),
+          _ResearchSessionCards(studentId: profile.uid),
           LayoutBuilder(
             builder: (context, constraints) {
               final target = _TargetWordCard(studentId: profile.uid);
@@ -68,6 +71,99 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           _PreTestPostTestSection(uid: profile.uid),
         ],
+      ),
+    );
+  }
+}
+
+/// Official research treatment sessions open for this student right now
+/// (`DATA_MODEL.md` §6e, `DESIGN_REFERENCE.md` §5.1): only shown while the
+/// researcher has a session open in class with this student marked present.
+/// It carries the highlighter because it is what the class is doing now.
+/// Also records, in the background, any finished session whose completion
+/// could not be recorded when it ended.
+class _ResearchSessionCards extends ConsumerWidget {
+  const _ResearchSessionCards({required this.studentId});
+
+  final String studentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(researchTreatmentReconcileProvider(studentId));
+    final now = DateTime.now();
+    // A session whose window has closed disappears (the listener gets no
+    // event when time passes; any rebuild drops it).
+    final offers = [
+      for (final o in ref.watch(researchSessionOffersProvider(studentId)).value ?? const <ResearchSessionOffer>[])
+        if (now.isBefore(o.set.endAt)) o,
+    ];
+    if (offers.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final offer in offers) ...[
+          _ResearchSessionCard(studentId: studentId, offer: offer),
+          const SizedBox(height: AppSpacing.md),
+        ],
+      ],
+    );
+  }
+}
+
+class _ResearchSessionCard extends StatelessWidget {
+  const _ResearchSessionCard({required this.studentId, required this.offer});
+
+  final String studentId;
+  final ResearchSessionOffer offer;
+
+  @override
+  Widget build(BuildContext context) {
+    final until = DateFormat('HH.mm').format(offer.set.endAt);
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: offer.completed ? AppColors.line : AppColors.marker, width: 2),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () async {
+          final container = ProviderScope.containerOf(context, listen: false);
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => TargetWordListScreen(studentId: studentId, research: offer),
+            ),
+          );
+          container.invalidate(researchSessionOffersProvider(studentId));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              const Icon(Icons.school_outlined, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.smd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Sesi Riset ke-${offer.info.session}', style: AppTextStyles.bodyStrong),
+                    const SizedBox(height: 2),
+                    Text(
+                      offer.completed
+                          ? 'Sudah selesai'
+                          : '${offer.set.wordIds.length} kata, dibuka sampai pukul $until',
+                      style: AppTextStyles.bodyMuted,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              offer.completed
+                  ? const AppBadge(text: 'Selesai', tone: AppTone.success)
+                  : const Icon(Icons.arrow_forward, color: AppColors.primary),
+            ],
+          ),
+        ),
       ),
     );
   }

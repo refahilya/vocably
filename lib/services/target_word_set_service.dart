@@ -76,6 +76,27 @@ class TargetWordSetService {
 
     return filterStillActive(sets, now);
   }
+
+  /// Live form of [fetchActiveForStudent] (same query), for the student's
+  /// official research session card (`DATA_MODEL.md` §6e): a session the
+  /// researcher opens in class appears on a dashboard that is already open.
+  /// A listener reads only what changes, which keeps a class of students
+  /// well inside the Spark plan's read quota (polling would not).
+  Stream<List<TargetWordSet>> watchActiveForStudent(String studentId) {
+    return _targetWordSets
+        .where('targetStudentIds', arrayContainsAny: [kAllStudents, studentId])
+        .where('endAt', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
+        .orderBy('endAt')
+        .snapshots()
+        .map(
+          (snapshot) => filterStillActive([
+            for (final doc in snapshot.docs)
+              // A set this device just wrote has no server time yet.
+              if (doc.data()['startAt'] is Timestamp && doc.data()['createdAt'] is Timestamp)
+                TargetWordSet.fromFirestore(doc.id, doc.data()),
+          ], DateTime.now()),
+        );
+  }
 }
 
 /// The client-side half of `DATA_MODEL.md` §5's query — sets whose

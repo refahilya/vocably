@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:vocably/models/research_panel.dart';
 import 'package:vocably/models/research_participant.dart';
 import 'package:vocably/models/research_study.dart';
+import 'package:vocably/models/research_treatment.dart';
 import 'package:vocably/services/research_assessment_service.dart';
 import 'package:vocably/services/research_panel_service.dart';
 
@@ -17,16 +18,25 @@ class FakeResearchPanelService extends ResearchPanelService {
     List<PanelParticipant>? participants,
     List<PanelRosterEntry>? roster,
     List<PanelProgress>? progress,
+    List<TreatmentPlanBand>? plans,
+    List<PanelTreatmentSet>? treatmentSets,
+    List<TreatmentRecord>? records,
   }) : study = study ?? activeStudy(),
        participants = participants ?? [],
        roster = roster ?? [],
-       progress = progress ?? [];
+       progress = progress ?? [],
+       plans = plans ?? [],
+       treatmentSets = treatmentSets ?? [],
+       records = records ?? [];
 
   Set<String> operators;
   PanelStudy study;
   List<PanelParticipant> participants;
   List<PanelRosterEntry> roster;
   List<PanelProgress> progress;
+  List<TreatmentPlanBand> plans;
+  List<PanelTreatmentSet> treatmentSets;
+  List<TreatmentRecord> records;
   final audit = <PanelAuditEntry>[];
 
   /// Every action, e.g. `open:preTest:60`, `authorize:uid:postTest`, `retake:uid:preTest:void`.
@@ -63,6 +73,54 @@ class FakeResearchPanelService extends ResearchPanelService {
 
   @override
   Stream<List<PanelAuditEntry>> watchAudit({int limit = 12}) => _live(() => audit.reversed.take(limit).toList());
+
+  @override
+  Stream<List<TreatmentPlanBand>> watchTreatmentPlans() => _live(() => List.of(plans));
+
+  @override
+  Stream<List<PanelTreatmentSet>> watchTreatmentSets() => _live(() => List.of(treatmentSets));
+
+  @override
+  Stream<List<TreatmentRecord>> watchTreatmentRecords() => _live(() => List.of(records));
+
+  /// `treat:<band>:<session>:<opening>:<uids>:<minutes>`.
+  @override
+  Future<void> openTreatmentSession({
+    required String operatorUid,
+    required TreatmentSetInfo info,
+    required List<String> words,
+    required List<String> studentIds,
+    required Duration duration,
+  }) async {
+    _maybeFail();
+    calls.add('treat:${info.band}:${info.session}:${info.kind == TreatmentSetKind.makeup ? 'makeup' : info.opening}:${studentIds.join(',')}:${duration.inMinutes}');
+    final now = DateTime.now();
+    treatmentSets = [
+      ...treatmentSets,
+      PanelTreatmentSet(
+        id: ResearchTreatmentWrites.setIdFor(info, studentIds),
+        info: info,
+        wordIds: words,
+        studentIds: studentIds,
+        startAt: now.subtract(const Duration(seconds: 1)),
+        endAt: now.add(duration),
+      ),
+    ];
+    audit.add(
+      PanelAuditEntry(
+        id: '${audit.length}',
+        action: info.kind == TreatmentSetKind.makeup ? 'open_makeup' : 'open_treatment',
+        stage: null,
+        targetUid: info.kind == TreatmentSetKind.makeup ? studentIds.single : null,
+        attemptNumber: null,
+        at: DateTime(2026, 11, 2, 8, audit.length),
+        session: info.session,
+        band: info.band,
+        studentCount: studentIds.length,
+      ),
+    );
+    changed();
+  }
 
   void _maybeFail() {
     final kind = failNext;
@@ -153,8 +211,13 @@ class FakeResearchPanelService extends ResearchPanelService {
   }
 }
 
-/// An active study; [open] stages have a window that is open now.
-PanelStudy activeStudy({Set<PanelStage> open = const {}, ResearchStudyStatus status = ResearchStudyStatus.active}) {
+/// An active study; [open] stages have a window that is open now. The
+/// treatment plan `t1` is active unless [treatmentPlanVersion] says otherwise.
+PanelStudy activeStudy({
+  Set<PanelStage> open = const {},
+  ResearchStudyStatus status = ResearchStudyStatus.active,
+  String? treatmentPlanVersion = 't1',
+}) {
   final now = DateTime.now();
   return PanelStudy(
     exists: true,
@@ -163,8 +226,57 @@ PanelStudy activeStudy({Set<PanelStage> open = const {}, ResearchStudyStatus sta
     windows: {
       for (final s in open) s: PanelWindow(openAt: now.subtract(const Duration(hours: 1)), closeAt: kOpenEndedStageClose),
     },
+    treatmentPlanVersion: treatmentPlanVersion,
   );
 }
+
+/// Synthetic plan words for [band] session [n].
+List<String> planWords(String band, int n) => [for (final x in 'abcde'.split('')) 'w${band.toLowerCase()}s$n$x'];
+
+/// The locked plan `t1` for [band] (synthetic words).
+TreatmentPlanBand panelPlan(String band) => TreatmentPlanBand(
+  planVersion: 't1',
+  instrumentVersion: 'v1',
+  band: band,
+  sessions: {for (var n = 1; n <= 4; n++) n: planWords(band, n)},
+);
+
+/// A regular session set of [band] (or a make-up for [students].single).
+PanelTreatmentSet panelSet(
+  String band,
+  int session, {
+  int opening = 1,
+  bool makeup = false,
+  List<String> students = const [],
+  DateTime? startAt,
+  DateTime? endAt,
+}) {
+  final info = TreatmentSetInfo(
+    planVersion: 't1',
+    instrumentVersion: 'v1',
+    band: band,
+    session: session,
+    kind: makeup ? TreatmentSetKind.makeup : TreatmentSetKind.regular,
+    opening: makeup ? 0 : opening,
+  );
+  final now = DateTime.now();
+  return PanelTreatmentSet(
+    id: ResearchTreatmentWrites.setIdFor(info, students.isEmpty ? const ['x'] : students),
+    info: info,
+    wordIds: planWords(band, session),
+    studentIds: students,
+    startAt: startAt ?? now.subtract(const Duration(minutes: 30)),
+    endAt: endAt ?? now.add(const Duration(minutes: 30)),
+  );
+}
+
+/// [uid]'s completion record with [sessions] recorded.
+TreatmentRecord panelRecord(String uid, Set<int> sessions) => TreatmentRecord(
+  uid: uid,
+  sessions: {
+    for (final n in sessions) n: TreatmentRecordEntry(sessionId: 'ls$n', setId: 'rt_t1_B1_s${n}_o1', kind: TreatmentSetKind.regular),
+  },
+);
 
 /// A participant record as the operator reads it.
 PanelParticipant panelParticipant(

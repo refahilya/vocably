@@ -40,6 +40,10 @@ class _NoopTargetWordSetService extends TargetWordSetService {
       [];
 
   @override
+  Stream<List<TargetWordSet>> watchActiveForStudent(String studentId) =>
+      Stream.fromFuture(fetchActiveForStudent(studentId));
+
+  @override
   Future<List<TargetWordSet>> fetchForTeacher(String teacherId) async => [];
 }
 

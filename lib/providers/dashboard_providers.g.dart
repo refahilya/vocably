@@ -156,7 +156,10 @@ final class ActiveTargetWordSetsFamily extends $Family
 
 /// Resolves every currently-active target word (across however many
 /// active sets exist) to its full [VocabBundleEntry], for the "Target
-/// Kata Hari Ini" card.
+/// Kata Hari Ini" card. Official research session sets
+/// (`DATA_MODEL.md` §6e) are skipped: they are shown, and started, only as
+/// the student's own research session (`research_treatment_providers.dart`),
+/// so their words are never mixed into an ordinary session.
 ///
 /// Each [TargetWordSet] is scoped to one `cefrLevel` (`DATA_MODEL.md`
 /// §5's own framing — a guru picks words starting from one level), so
@@ -175,7 +178,10 @@ final targetWordEntriesProvider = TargetWordEntriesFamily._();
 
 /// Resolves every currently-active target word (across however many
 /// active sets exist) to its full [VocabBundleEntry], for the "Target
-/// Kata Hari Ini" card.
+/// Kata Hari Ini" card. Official research session sets
+/// (`DATA_MODEL.md` §6e) are skipped: they are shown, and started, only as
+/// the student's own research session (`research_treatment_providers.dart`),
+/// so their words are never mixed into an ordinary session.
 ///
 /// Each [TargetWordSet] is scoped to one `cefrLevel` (`DATA_MODEL.md`
 /// §5's own framing — a guru picks words starting from one level), so
@@ -201,7 +207,10 @@ final class TargetWordEntriesProvider
         $FutureProvider<List<VocabBundleEntry>> {
   /// Resolves every currently-active target word (across however many
   /// active sets exist) to its full [VocabBundleEntry], for the "Target
-  /// Kata Hari Ini" card.
+  /// Kata Hari Ini" card. Official research session sets
+  /// (`DATA_MODEL.md` §6e) are skipped: they are shown, and started, only as
+  /// the student's own research session (`research_treatment_providers.dart`),
+  /// so their words are never mixed into an ordinary session.
   ///
   /// Each [TargetWordSet] is scoped to one `cefrLevel` (`DATA_MODEL.md`
   /// §5's own framing — a guru picks words starting from one level), so
@@ -258,11 +267,14 @@ final class TargetWordEntriesProvider
   }
 }
 
-String _$targetWordEntriesHash() => r'20ef628ca4a3be475781c8400635399d21730a08';
+String _$targetWordEntriesHash() => r'7b243c684c8c8a3a19abd28390234ecd168db63f';
 
 /// Resolves every currently-active target word (across however many
 /// active sets exist) to its full [VocabBundleEntry], for the "Target
-/// Kata Hari Ini" card.
+/// Kata Hari Ini" card. Official research session sets
+/// (`DATA_MODEL.md` §6e) are skipped: they are shown, and started, only as
+/// the student's own research session (`research_treatment_providers.dart`),
+/// so their words are never mixed into an ordinary session.
 ///
 /// Each [TargetWordSet] is scoped to one `cefrLevel` (`DATA_MODEL.md`
 /// §5's own framing — a guru picks words starting from one level), so
@@ -289,7 +301,10 @@ final class TargetWordEntriesFamily extends $Family
 
   /// Resolves every currently-active target word (across however many
   /// active sets exist) to its full [VocabBundleEntry], for the "Target
-  /// Kata Hari Ini" card.
+  /// Kata Hari Ini" card. Official research session sets
+  /// (`DATA_MODEL.md` §6e) are skipped: they are shown, and started, only as
+  /// the student's own research session (`research_treatment_providers.dart`),
+  /// so their words are never mixed into an ordinary session.
   ///
   /// Each [TargetWordSet] is scoped to one `cefrLevel` (`DATA_MODEL.md`
   /// §5's own framing — a guru picks words starting from one level), so

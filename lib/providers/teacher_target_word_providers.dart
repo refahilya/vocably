@@ -6,7 +6,9 @@ import 'dashboard_providers.dart';
 part 'teacher_target_word_providers.g.dart';
 
 /// All target word sets created by [teacherId], sorted in memory by
-/// `createdAt` descending (`DATA_MODEL.md` §5).
+/// `createdAt` descending (`DATA_MODEL.md` §5). Official research session
+/// sets (`DATA_MODEL.md` §6e) are managed in the Researcher Panel and left
+/// out here.
 @riverpod
 Future<List<TargetWordSet>> teacherTargetWordSets(
   Ref ref,
@@ -15,7 +17,7 @@ Future<List<TargetWordSet>> teacherTargetWordSets(
   final sets = await ref
       .watch(targetWordSetServiceProvider)
       .fetchForTeacher(teacherId);
-  final sorted = [...sets];
+  final sorted = [for (final set in sets) if (!set.isResearch) set];
   sorted.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   return sorted;
 }

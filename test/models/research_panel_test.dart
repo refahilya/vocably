@@ -4,12 +4,13 @@ import 'package:vocably/models/placement_attempt.dart';
 import 'package:vocably/models/research_attempt.dart';
 import 'package:vocably/models/research_panel.dart';
 import 'package:vocably/models/research_participant.dart';
+import 'package:vocably/models/research_treatment.dart';
 
 import '../support/fake_research_panel_service.dart';
 
 void main() {
-  PanelCell cell(PanelParticipant p, PanelStage stage, [List<PanelProgress> progress = const []]) =>
-      PanelRow.derive(p, null, {for (final m in progress) m.attemptId: m}).cells[stage]!;
+  PanelCell cell(PanelParticipant p, PanelStage stage, [List<PanelProgress> progress = const [], TreatmentRecord? record]) =>
+      PanelRow.derive(p, null, {for (final m in progress) m.attemptId: m}, record: record).cells[stage]!;
 
   group('placement cell', () {
     test('band-less participant: not started, answering (count), submitted', () {
@@ -71,10 +72,12 @@ void main() {
       expect([second.kind, second.attemptNumber], [PanelCellKind.notStarted, 2]);
     });
 
-    test('posttest waits for a completed pretest; pretest retakes stop once the posttest is authorized', () {
+    test('posttest waits for a completed pretest and four recorded sessions; pretest retakes stop once the posttest is authorized', () {
       expect(cell(panelParticipant('u1', pre: 1), PanelStage.postTest).kind, PanelCellKind.waitingForPreTest);
       final preDone = [panelProgress('u1', PanelStage.preTest, answered: 20, status: 'completed')];
-      expect(cell(panelParticipant('u1', pre: 1), PanelStage.postTest, preDone).canAuthorize, isTrue);
+      final three = cell(panelParticipant('u1', pre: 1), PanelStage.postTest, preDone, panelRecord('u1', {1, 2, 3}));
+      expect([three.kind, three.canAuthorize], [PanelCellKind.waitingForTreatment, false]);
+      expect(cell(panelParticipant('u1', pre: 1), PanelStage.postTest, preDone, panelRecord('u1', {1, 2, 3, 4})).canAuthorize, isTrue);
       final both = panelParticipant('u1', pre: 1, post: 1);
       final pre = cell(both, PanelStage.preTest, [panelProgress('u1', PanelStage.preTest, answered: 3)]);
       expect(pre.canVoidAndRetake, isFalse);
@@ -165,6 +168,84 @@ void main() {
         'status': 'in_progress',
         'updatedAt': 'TS',
       });
+    });
+  });
+
+  group('treatment', () {
+    final preDone = [panelProgress('u1', PanelStage.preTest, answered: 20, status: 'completed')];
+    final now = DateTime(2026, 11, 10, 10);
+    PanelTreatment treatment(PanelParticipant p, {List<PanelTreatmentSet> sets = const [], TreatmentRecord? record, int days = 2, List<PanelProgress>? progress}) =>
+        PanelRow.derive(p, null, {for (final m in progress ?? preDone) m.attemptId: m}, record: record, sets: sets, makeupDeadlineDays: days, now: now).treatment;
+    PanelTreatmentSet closedFirst(int n, {required DateTime end}) => panelSet('B1', n, startAt: end.subtract(const Duration(hours: 1)), endAt: end);
+
+    test('eligible only with a band, a completed pretest and no posttest yet', () {
+      expect(treatment(panelParticipant('u1', pre: 1)).eligible, isTrue);
+      expect(treatment(panelParticipant('u1', pre: 1), progress: const []).eligible, isFalse);
+      expect(treatment(panelParticipant('u1', pre: 1, post: 1)).eligible, isFalse);
+      expect(treatment(panelParticipant('u1', status: ResearchParticipantStatus.awaitingPlacement)).eligible, isFalse);
+    });
+
+    test('a make-up is offered once, for an opened and closed session, before the deadline', () {
+      final p = panelParticipant('u1', pre: 1);
+      final end = now.subtract(const Duration(hours: 2));
+      final t = treatment(p, sets: [closedFirst(1, end: end)]);
+      expect(t.makeupOffer, 1);
+      expect(t.makeupDeadline, end.add(const Duration(days: 2)));
+      // Recorded already: nothing to make up.
+      expect(treatment(p, sets: [closedFirst(1, end: end)], record: panelRecord('u1', {1})).makeupOffer, isNull);
+      // Still open: the student can still attend (a re-opening, not a make-up).
+      expect(treatment(p, sets: [panelSet('B1', 1, startAt: now.subtract(const Duration(minutes: 5)), endAt: now.add(const Duration(minutes: 50)), students: const ['u1'])]).makeupOffer, isNull);
+      // Past the deadline (the shortest 60-minute window no longer fits).
+      expect(treatment(p, sets: [closedFirst(1, end: now.subtract(const Duration(days: 2)))]).makeupOffer, isNull);
+      expect(treatment(p, sets: [closedFirst(1, end: now.subtract(const Duration(days: 2)))], days: 3).makeupOffer, 1);
+      // The one make-up is used: never another.
+      final used = treatment(p, sets: [closedFirst(1, end: end), closedFirst(2, end: end), panelSet('B1', 1, makeup: true, students: const ['u1'], endAt: end)]);
+      expect([used.makeupUsed, used.makeupSession, used.makeupOffer], [true, 1, null]);
+    });
+
+    test('band: next session in order, re-opening only within 12 hours and not while open', () {
+      final band = PanelTreatmentBand(
+        band: 'B1',
+        plan: panelPlan('B1'),
+        sets: [panelSet('B1', 1, startAt: now.subtract(const Duration(hours: 3)), endAt: now.subtract(const Duration(hours: 2)))],
+      );
+      expect(band.nextSession, 2);
+      expect(band.reopenable(now), 1);
+      expect(band.reopenable(now.add(const Duration(hours: 10))), isNull);
+      expect(band.openNow(now), isEmpty);
+      final open = PanelTreatmentBand(band: 'B1', plan: panelPlan('B1'), sets: [panelSet('B1', 1, startAt: now.subtract(const Duration(minutes: 5)), endAt: now.add(const Duration(minutes: 55)))]);
+      expect(open.reopenable(now), isNull);
+      expect(open.openNow(now), hasLength(1));
+      final all = PanelTreatmentBand(band: 'B1', plan: panelPlan('B1'), sets: [for (var n = 1; n <= 4; n++) panelSet('B1', n, startAt: now.subtract(const Duration(days: 1)), endAt: now.subtract(const Duration(hours: 23)))]);
+      expect(all.nextSession, isNull);
+    });
+
+    test('combined data: only the active plan version, candidates per session', () {
+      final data = ResearchPanelData.combine(
+        study: activeStudy(),
+        participants: [panelParticipant('u1', researchId: 'R-1', pre: 1), panelParticipant('u2', researchId: 'R-2', pre: 1), panelParticipant('u3', researchId: 'R-3', band: 'A2', pre: 1)],
+        roster: const [],
+        progress: [for (final u in ['u1', 'u2', 'u3']) panelProgress(u, PanelStage.preTest, answered: 20, status: 'completed')],
+        audit: const [],
+        plans: [panelPlan('B1'), panelPlan('A2')],
+        treatmentSets: [
+          panelSet('B1', 1, students: const ['u1']),
+          PanelTreatmentSet(
+            id: 'rt_t9_B1_s2_o1',
+            info: const TreatmentSetInfo(planVersion: 't9', instrumentVersion: 'v1', band: 'B1', session: 2, kind: TreatmentSetKind.regular, opening: 1),
+            wordIds: const [],
+            studentIds: const ['u1'],
+            startAt: DateTime.now(),
+            endAt: DateTime.now(),
+          ),
+        ],
+        treatmentRecords: [panelRecord('u1', {1})],
+      );
+      expect(data.treatmentBands['B1']!.sets, hasLength(1), reason: 'other plan versions are ignored');
+      expect(data.treatmentBands['B1']!.plan!.sessions[1], planWords('B1', 1));
+      expect(data.treatmentCandidates('B1', 1).map((r) => r.uid), ['u2']);
+      expect(data.treatmentCandidates('B1', 2).map((r) => r.uid), ['u1', 'u2']);
+      expect(data.rows.first.treatment.openNow, {1});
     });
   });
 

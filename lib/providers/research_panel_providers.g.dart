@@ -146,14 +146,16 @@ final class ResearchOperatorFamily extends $Family
 }
 
 /// Live panel data: study windows, participants, roster names, progress
-/// mirrors and the latest audit entries, combined once every source has
+/// mirrors, the latest audit entries and the research treatment (plan,
+/// session sets, completion records), combined once every source has
 /// delivered its first value.
 
 @ProviderFor(researchPanelData)
 final researchPanelDataProvider = ResearchPanelDataProvider._();
 
 /// Live panel data: study windows, participants, roster names, progress
-/// mirrors and the latest audit entries, combined once every source has
+/// mirrors, the latest audit entries and the research treatment (plan,
+/// session sets, completion records), combined once every source has
 /// delivered its first value.
 
 final class ResearchPanelDataProvider
@@ -167,7 +169,8 @@ final class ResearchPanelDataProvider
         $FutureModifier<ResearchPanelData>,
         $StreamProvider<ResearchPanelData> {
   /// Live panel data: study windows, participants, roster names, progress
-  /// mirrors and the latest audit entries, combined once every source has
+  /// mirrors, the latest audit entries and the research treatment (plan,
+  /// session sets, completion records), combined once every source has
   /// delivered its first value.
   ResearchPanelDataProvider._()
     : super(
@@ -195,7 +198,7 @@ final class ResearchPanelDataProvider
   }
 }
 
-String _$researchPanelDataHash() => r'e054c8f3996772811bf0d22a4f79be6d08b998d2';
+String _$researchPanelDataHash() => r'dcaa508b81ade5096c4653aaa754d6766e18cf87';
 
 /// Runs Researcher Panel actions one at a time for the signed-in operator.
 
@@ -252,7 +255,7 @@ final class ResearchPanelControllerProvider
 }
 
 String _$researchPanelControllerHash() =>
-    r'3a29d1798eb250c8d65c25eab1579b735589e5d3';
+    r'1810c8d09eeed4be5fe7a8e4a374e71abae93bdf';
 
 /// Runs Researcher Panel actions one at a time for the signed-in operator.
 

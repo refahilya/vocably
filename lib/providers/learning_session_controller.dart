@@ -1,9 +1,11 @@
 import 'dart:math';
 
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/learning_session.dart';
+import '../models/research_treatment.dart';
 import '../services/ai_worker_service.dart';
 import '../utils/cloze_blanks.dart';
 import '../utils/cowrite_feedback.dart';
@@ -13,6 +15,7 @@ import '../utils/normalize_word.dart';
 import 'ai_worker_providers.dart';
 import 'history_providers.dart';
 import 'learning_cart_providers.dart';
+import 'research_treatment_providers.dart';
 
 part 'learning_session_controller.g.dart';
 
@@ -28,6 +31,7 @@ class LearningFlowState {
     required this.studentId,
     required this.wordIds,
     required this.sourceType,
+    this.research,
     this.sessionId,
     this.currentPhase = LearningSessionPhase.membaca,
     this.storyTitle,
@@ -65,6 +69,11 @@ class LearningFlowState {
 
   /// One of [LearningSessionSourceType].
   final String sourceType;
+
+  /// The official research treatment session this flow is
+  /// (`DATA_MODEL.md` §6e), or `null` for ordinary learning. Written once,
+  /// with the first story, as `targetWordSetId` + `researchSession`.
+  final ResearchSessionRef? research;
 
   /// `null` until the first successful generate creates the Firestore
   /// document (`DATA_MODEL.md` §4).
@@ -209,6 +218,7 @@ class LearningFlowState {
       studentId: studentId,
       wordIds: wordIds,
       sourceType: sourceType,
+      research: research,
       sessionId: sessionId ?? this.sessionId,
       currentPhase: currentPhase ?? this.currentPhase,
       storyTitle: storyTitle ?? this.storyTitle,
@@ -295,10 +305,14 @@ class LearningFlowController extends _$LearningFlowController {
   /// hand this a list with duplicates, but a duplicate target word sent
   /// to `/generate-story` would be wasteful at best (`DATA_MODEL.md`
   /// §10.2 has no defined behavior for it either).
+  ///
+  /// [research] marks the flow as an official research session (started
+  /// from that session's set); its words must be the set's words, in order.
   void startFlow({
     required String studentId,
     required List<String> wordIds,
     required String sourceType,
+    ResearchSessionRef? research,
   }) {
     final deduped = <String>[];
     final seen = <String>{};
@@ -307,7 +321,7 @@ class LearningFlowController extends _$LearningFlowController {
       if (seen.add(normalized)) deduped.add(normalized);
     }
     _flowEpoch++;
-    state = LearningFlowState(studentId: studentId, wordIds: deduped, sourceType: sourceType);
+    state = LearningFlowState(studentId: studentId, wordIds: deduped, sourceType: sourceType, research: research);
   }
 
   /// Fase 1's "Generate"/"Generate ulang" (`SPEC.md` §5.1). Calls the
@@ -366,6 +380,7 @@ class LearningFlowController extends _$LearningFlowController {
               storyTitle: prompt,
               storyContent: result.story,
               storyTranslation: result.translation,
+              research: state.research,
             );
         state = state.copyWith(sessionId: sessionId);
       } else {
@@ -395,9 +410,15 @@ class LearningFlowController extends _$LearningFlowController {
       }
     } catch (error, stackTrace) {
       debugPrint('LearningFlowController.generateStory failed: $error\n$stackTrace');
+      // A research session the rules refuse to start (window closed, not
+      // this student's turn, earlier session missing) is not a connection
+      // problem — say so instead of suggesting a retry would help.
+      final refused = state.research != null && state.sessionId == null && error is FirebaseException && error.code == 'permission-denied';
       state = state.copyWith(
         isGenerating: false,
-        generateError: 'Gagal membuat cerita. Periksa koneksi lalu coba lagi.',
+        generateError: refused
+            ? kResearchSessionRefusedMessage
+            : 'Gagal membuat cerita. Periksa koneksi lalu coba lagi.',
       );
     }
   }
@@ -858,6 +879,21 @@ class LearningFlowController extends _$LearningFlowController {
         turnError: 'Gagal menyelesaikan sesi. Coba lagi.',
         isCompletingCowrite: false,
       );
+      return;
+    }
+
+    // Official research session: record the completion (`DATA_MODEL.md`
+    // §6e). Never fails the finished session — if this write is lost, the
+    // dashboard records it later from the completed session itself.
+    final research = state.research;
+    if (research != null) {
+      try {
+        await ref
+            .read(researchTreatmentServiceProvider)
+            .recordCompletion(uid: state.studentId, ref: research, sessionId: sessionId);
+      } catch (error, stackTrace) {
+        debugPrint('LearningFlowController: research completion not recorded yet: $error\n$stackTrace');
+      }
     }
   }
 
@@ -872,5 +908,9 @@ class LearningFlowController extends _$LearningFlowController {
 /// target word only as a bare word, repeated word, short determiner/
 /// preposition fragment, or list of target words instead of a complete
 /// English sentence/clause (`shouldRejectStudentTurnLocally`).
+const String kResearchSessionRefusedMessage =
+    'Sesi riset ini tidak dapat dimulai sekarang. Waktunya mungkin sudah habis, atau ada sesi sebelumnya '
+    'yang belum selesai. Tanyakan kepada peneliti.';
+
 const String kBareOrFragmentTurnErrorMessage =
     'Tulis kalimat lengkap dalam bahasa Inggris yang menggunakan kata target, bukan hanya kata lepas.';

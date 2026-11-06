@@ -4,6 +4,7 @@ import 'placement_attempt.dart';
 import 'research_attempt.dart';
 import 'research_participant.dart';
 import 'research_study.dart';
+import 'research_treatment.dart';
 
 /// The three research stages the Researcher Panel controls
 /// (`DATA_MODEL.md` §6d). [id] is the stage key used in Firestore.
@@ -56,6 +57,8 @@ class PanelStudy {
     required this.status,
     required this.operatorSeq,
     required this.windows,
+    this.treatmentPlanVersion,
+    this.makeupDeadlineDays = kDefaultMakeupDeadlineDays,
   });
 
   /// `false` when the tooling has not created the study document yet.
@@ -65,6 +68,14 @@ class PanelStudy {
   /// Number of panel window changes so far (`DATA_MODEL.md` §6d).
   final int operatorSeq;
   final Map<PanelStage, PanelWindow> windows;
+
+  /// The active treatment plan (`researchStudy/current.treatment`, set by
+  /// `seed-treatment`); `null` until the tooling has set it.
+  final String? treatmentPlanVersion;
+
+  /// Days after a session's first opening closed during which its make-up
+  /// may still be held (`DATA_MODEL.md` §6e).
+  final int makeupDeadlineDays;
 
   bool get active => exists && status == ResearchStudyStatus.active;
 
@@ -84,11 +95,16 @@ class PanelStudy {
       }
     }
     final seq = data?['operatorSeq'];
+    final treatment = data?['treatment'];
+    final plan = treatment is Map ? treatment['planVersion'] : null;
+    final days = treatment is Map ? treatment['makeupDeadlineDays'] : null;
     return PanelStudy(
       exists: data != null,
       status: study.status,
       operatorSeq: seq is int ? seq : 0,
       windows: windows,
+      treatmentPlanVersion: plan is String ? plan : null,
+      makeupDeadlineDays: days is int ? days : kDefaultMakeupDeadlineDays,
     );
   }
 }
@@ -251,6 +267,9 @@ class PanelAuditEntry {
     required this.targetUid,
     required this.attemptNumber,
     required this.at,
+    this.session,
+    this.band,
+    this.studentCount,
   });
 
   final String id;
@@ -260,6 +279,11 @@ class PanelAuditEntry {
   final int? attemptNumber;
   final DateTime? at;
 
+  /// Treatment entries (`open_treatment`, `open_makeup`) only.
+  final int? session;
+  final String? band;
+  final int? studentCount;
+
   factory PanelAuditEntry.fromFirestore(String id, Map<String, dynamic> data) => PanelAuditEntry(
     id: id,
     action: data['action'] is String ? data['action'] as String : '',
@@ -267,6 +291,9 @@ class PanelAuditEntry {
     targetUid: data['targetUid'] is String ? data['targetUid'] as String : null,
     attemptNumber: data['attemptNumber'] is int ? data['attemptNumber'] as int : null,
     at: data['at'] is Timestamp ? (data['at'] as Timestamp).toDate() : null,
+    session: data['session'] is int ? data['session'] as int : null,
+    band: data['band'] is String ? data['band'] as String : null,
+    studentCount: data['studentCount'] is int ? data['studentCount'] as int : null,
   );
 }
 
@@ -302,6 +329,9 @@ enum PanelCellKind {
 
   /// Post-Test: the pretest is not completed yet.
   waitingForPreTest,
+
+  /// Post-Test: fewer than four official treatment sessions are recorded.
+  waitingForTreatment,
   notStarted,
   inProgress,
   completed,
@@ -344,7 +374,7 @@ class PanelCell {
 
 /// One register row: participant, roster name and the three stage cells.
 class PanelRow {
-  PanelRow({required this.participant, required this.name, required this.cells});
+  PanelRow({required this.participant, required this.name, required this.cells, this.treatment = PanelTreatment.none});
 
   final PanelParticipant participant;
 
@@ -352,13 +382,23 @@ class PanelRow {
   final String name;
   final Map<PanelStage, PanelCell> cells;
 
+  /// Official treatment sessions (`DATA_MODEL.md` §6e).
+  final PanelTreatment treatment;
+
   String get uid => participant.uid;
 
+  /// [record] = the participant's `researchTreatment` record; [sets] =
+  /// every official session set; [now] = the device clock (display only —
+  /// the rules decide with the server clock).
   static PanelRow derive(
     PanelParticipant p,
     PanelRosterEntry? roster,
-    Map<String, PanelProgress> progressById,
-  ) {
+    Map<String, PanelProgress> progressById, {
+    TreatmentRecord? record,
+    List<PanelTreatmentSet> sets = const [],
+    int makeupDeadlineDays = kDefaultMakeupDeadlineDays,
+    DateTime? now,
+  }) {
     PanelProgress? progressOf(PanelStage stage, int n) {
       if (n < 1) return null;
       final mirror = progressById[PanelProgress.attemptIdFor(p.uid, stage, n)];
@@ -393,6 +433,17 @@ class PanelRow {
       };
     }
 
+    final preDoneForTreatment =
+        progressOf(PanelStage.preTest, p.attempt(PanelStage.preTest))?.status == 'completed';
+    final treatment = PanelTreatment.derive(
+      p,
+      record: record,
+      sets: sets,
+      preTestCompleted: preDoneForTreatment,
+      makeupDeadlineDays: makeupDeadlineDays,
+      now: now ?? DateTime.now(),
+    );
+
     PanelCell research(PanelStage stage) {
       if (p.unreadable) return const PanelCell(PanelCellKind.unreadable);
       if (!p.canTakeResearchStages) {
@@ -408,6 +459,11 @@ class PanelRow {
       if (n < 1) {
         if (stage == PanelStage.postTest && !preDone) {
           return const PanelCell(PanelCellKind.waitingForPreTest);
+        }
+        // The rules authorize the posttest only with all four official
+        // sessions recorded.
+        if (stage == PanelStage.postTest && !treatment.complete) {
+          return const PanelCell(PanelCellKind.waitingForTreatment);
         }
         return const PanelCell(PanelCellKind.notAuthorized, canAuthorize: true);
       }
@@ -437,15 +493,199 @@ class PanelRow {
         PanelStage.preTest: research(PanelStage.preTest),
         PanelStage.postTest: research(PanelStage.postTest),
       },
+      treatment: treatment,
     );
   }
 }
 
+/// An official treatment session set (`targetWordSets` with `research`)
+/// as the operator reads it. Lenient: a pending server timestamp reads as
+/// "now".
+class PanelTreatmentSet {
+  const PanelTreatmentSet({
+    required this.id,
+    required this.info,
+    required this.wordIds,
+    required this.studentIds,
+    required this.startAt,
+    required this.endAt,
+  });
+
+  final String id;
+  final TreatmentSetInfo info;
+  final List<String> wordIds;
+  final List<String> studentIds;
+  final DateTime startAt;
+  final DateTime endAt;
+
+  bool isOpenAt(DateTime now) => !now.isBefore(startAt) && now.isBefore(endAt);
+
+  static PanelTreatmentSet? fromFirestore(String id, Map<String, dynamic> data) {
+    final info = TreatmentSetInfo.fromMap(data['research']);
+    final words = data['wordIds'];
+    final students = data['targetStudentIds'];
+    if (info == null || words is! List || students is! List) return null;
+    DateTime time(Object? v) => v is Timestamp ? v.toDate() : DateTime.now();
+    return PanelTreatmentSet(
+      id: id,
+      info: info,
+      wordIds: [for (final w in words) '$w'],
+      studentIds: [for (final s in students) '$s'],
+      startAt: time(data['startAt']),
+      endAt: time(data['endAt']),
+    );
+  }
+}
+
+/// One participant's official treatment sessions, as the panel shows them.
+class PanelTreatment {
+  const PanelTreatment({
+    required this.eligible,
+    required this.done,
+    required this.makeupSession,
+    required this.makeupOffer,
+    required this.makeupDeadline,
+    required this.openNow,
+  });
+
+  static const none = PanelTreatment(
+    eligible: false,
+    done: {},
+    makeupSession: null,
+    makeupOffer: null,
+    makeupDeadline: null,
+    openNow: {},
+  );
+
+  /// May attend official sessions now: active participant with a band, a
+  /// completed pretest and no posttest authorized yet.
+  final bool eligible;
+
+  /// Recorded (completed) session numbers.
+  final Set<int> done;
+
+  /// The session of this student's one make-up, once it was opened.
+  final int? makeupSession;
+
+  /// A missed session the panel can open the make-up for now, and the
+  /// latest moment that make-up may close.
+  final int? makeupOffer;
+  final DateTime? makeupDeadline;
+
+  /// Sessions open right now with this student marked present.
+  final Set<int> openNow;
+
+  bool get complete => done.length >= kTreatmentSessions;
+  bool get makeupUsed => makeupSession != null;
+
+  static PanelTreatment derive(
+    PanelParticipant p, {
+    required TreatmentRecord? record,
+    required List<PanelTreatmentSet> sets,
+    required bool preTestCompleted,
+    required int makeupDeadlineDays,
+    required DateTime now,
+  }) {
+    final done = record?.done ?? <int>{};
+    final eligible = p.canTakeResearchStages && preTestCompleted && p.attempt(PanelStage.postTest) == 0;
+    final makeup = sets.where((s) => s.id == TreatmentIds.makeupSet(p.uid)).firstOrNull;
+    final openNow = {
+      for (final s in sets)
+        if (s.isOpenAt(now) && s.studentIds.contains(p.uid)) s.info.session,
+    };
+    int? offer;
+    DateTime? deadline;
+    if (eligible && makeup == null && p.band != null) {
+      for (var n = 1; n <= kTreatmentSessions; n++) {
+        if (done.contains(n) || openNow.contains(n)) continue;
+        final first = sets.where((s) => s.info.kind == TreatmentSetKind.regular && s.info.band == p.band && s.info.session == n && s.info.opening == 1).firstOrNull;
+        if (first == null || now.isBefore(first.endAt)) continue;
+        final until = first.endAt.add(Duration(days: makeupDeadlineDays));
+        // The shortest make-up window (60 minutes) must still fit.
+        if (now.add(kTreatmentWindowChoices.first).isAfter(until)) continue;
+        offer = n;
+        deadline = until;
+        break;
+      }
+    }
+    return PanelTreatment(
+      eligible: eligible,
+      done: done,
+      makeupSession: makeup?.info.session,
+      makeupOffer: offer,
+      makeupDeadline: deadline,
+      openNow: openNow,
+    );
+  }
+}
+
+/// Window lengths the panel offers for a treatment session (the rules allow
+/// at most 4 hours).
+const List<Duration> kTreatmentWindowChoices = [Duration(minutes: 60), Duration(minutes: 90), Duration(minutes: 120)];
+
+/// One band's treatment: its locked plan and every session set opened.
+class PanelTreatmentBand {
+  PanelTreatmentBand({required this.band, required this.plan, required this.sets});
+
+  final String band;
+
+  /// `null` until the plan is seeded.
+  final TreatmentPlanBand? plan;
+
+  /// This band's sets (regular and make-up).
+  final List<PanelTreatmentSet> sets;
+
+  /// Opening [opening] of regular session [n], if it exists.
+  PanelTreatmentSet? regular(int n, [int opening = 1]) => sets
+      .where((s) => s.info.kind == TreatmentSetKind.regular && s.info.session == n && s.info.opening == opening)
+      .firstOrNull;
+
+  int openings(int n) => sets.where((s) => s.info.kind == TreatmentSetKind.regular && s.info.session == n).length;
+
+  /// The next session to open (in order), or `null` when all four are.
+  int? get nextSession {
+    for (var n = 1; n <= kTreatmentSessions; n++) {
+      if (regular(n) == null) return n;
+    }
+    return null;
+  }
+
+  /// The latest opened session, when it may still be re-opened (within
+  /// [kTreatmentReopenLimit] of its first opening) and is not open now.
+  int? reopenable(DateTime now) {
+    final next = nextSession;
+    final latest = next == null ? kTreatmentSessions : next - 1;
+    if (latest < 1) return null;
+    final first = regular(latest)!;
+    if (sets.any((s) => s.info.kind == TreatmentSetKind.regular && s.info.session == latest && s.isOpenAt(now))) return null;
+    return now.isBefore(first.startAt.add(kTreatmentReopenLimit)) ? latest : null;
+  }
+
+  /// Regular sets open right now.
+  List<PanelTreatmentSet> openNow(DateTime now) =>
+      sets.where((s) => s.info.kind == TreatmentSetKind.regular && s.isOpenAt(now)).toList();
+}
+
 /// Everything the panel shows, from the operator's live reads.
 class ResearchPanelData {
-  ResearchPanelData({required this.study, required this.rows, required this.audit});
+  ResearchPanelData({required this.study, required this.rows, required this.audit, this.treatmentBands = const {}});
 
   final PanelStudy study;
+
+  /// Per band (A2, B1, B2, C1): plan and opened session sets.
+  final Map<String, PanelTreatmentBand> treatmentBands;
+
+  /// Participants of [band] who may attend session [n] now: not recorded
+  /// for it, and not already in an open set of it.
+  List<PanelRow> treatmentCandidates(String band, int n) => rows
+      .where(
+        (r) =>
+            r.participant.band == band &&
+            r.treatment.eligible &&
+            !r.treatment.done.contains(n) &&
+            !r.treatment.openNow.contains(n),
+      )
+      .toList();
 
   /// Sorted by research ID.
   final List<PanelRow> rows;
@@ -459,13 +699,38 @@ class ResearchPanelData {
     required List<PanelRosterEntry> roster,
     required List<PanelProgress> progress,
     required List<PanelAuditEntry> audit,
+    List<TreatmentPlanBand> plans = const [],
+    List<PanelTreatmentSet> treatmentSets = const [],
+    List<TreatmentRecord> treatmentRecords = const [],
+    DateTime? now,
   }) {
+    final at = now ?? DateTime.now();
     final rosterByUid = {for (final r in roster) r.uid: r};
     final progressById = {for (final m in progress) m.attemptId: m};
+    final planVersion = study.treatmentPlanVersion;
+    final sets = [for (final s in treatmentSets) if (s.info.planVersion == planVersion) s];
+    final recordByUid = {for (final r in treatmentRecords) r.uid: r};
     final rows = [
-      for (final p in participants) PanelRow.derive(p, rosterByUid[p.uid], progressById),
+      for (final p in participants)
+        PanelRow.derive(
+          p,
+          rosterByUid[p.uid],
+          progressById,
+          record: recordByUid[p.uid],
+          sets: sets,
+          makeupDeadlineDays: study.makeupDeadlineDays,
+          now: at,
+        ),
     ]..sort((a, b) => a.participant.researchId.compareTo(b.participant.researchId));
-    return ResearchPanelData(study: study, rows: rows, audit: audit);
+    final bands = {
+      for (final band in const ['A2', 'B1', 'B2', 'C1'])
+        band: PanelTreatmentBand(
+          band: band,
+          plan: plans.where((x) => x.band == band && x.planVersion == planVersion).firstOrNull,
+          sets: [for (final s in sets) if (s.info.band == band) s],
+        ),
+    };
+    return ResearchPanelData(study: study, rows: rows, audit: audit, treatmentBands: bands);
   }
 
   /// Participants whose [stage] cell is [kind].

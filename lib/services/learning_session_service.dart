@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/learning_session.dart';
+import '../models/research_treatment.dart';
 import 'firebase_service.dart';
 
 /// Read/write access to `learningSessions` (`DATA_MODEL.md` §4). Reads
@@ -58,6 +59,7 @@ class LearningSessionService {
     required String storyTitle,
     required String storyContent,
     required String? storyTranslation,
+    ResearchSessionRef? research,
   }) async {
     final docRef = await _learningSessions.add(
       LearningSession.newSessionData(
@@ -67,6 +69,7 @@ class LearningSessionService {
         storyTitle: storyTitle,
         storyContent: storyContent,
         storyTranslation: storyTranslation,
+        research: research,
       ),
     );
     return docRef.id;

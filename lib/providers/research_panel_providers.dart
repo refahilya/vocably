@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/research_panel.dart';
+import '../models/research_treatment.dart';
 import '../services/research_assessment_service.dart';
 import '../services/research_panel_service.dart';
 
@@ -19,7 +20,8 @@ Stream<bool> researchOperator(Ref ref, String uid) =>
     ref.watch(researchPanelServiceProvider).watchOperator(uid);
 
 /// Live panel data: study windows, participants, roster names, progress
-/// mirrors and the latest audit entries, combined once every source has
+/// mirrors, the latest audit entries and the research treatment (plan,
+/// session sets, completion records), combined once every source has
 /// delivered its first value.
 @riverpod
 Stream<ResearchPanelData> researchPanelData(Ref ref) {
@@ -30,9 +32,13 @@ Stream<ResearchPanelData> researchPanelData(Ref ref) {
   List<PanelRosterEntry>? roster;
   List<PanelProgress>? progress;
   List<PanelAuditEntry>? audit;
+  List<TreatmentPlanBand>? plans;
+  List<PanelTreatmentSet>? sets;
+  List<TreatmentRecord>? records;
 
   void emit() {
     if (study == null || participants == null || roster == null || progress == null || audit == null) return;
+    if (plans == null || sets == null || records == null) return;
     controller.add(
       ResearchPanelData.combine(
         study: study!,
@@ -40,6 +46,9 @@ Stream<ResearchPanelData> researchPanelData(Ref ref) {
         roster: roster!,
         progress: progress!,
         audit: audit!,
+        plans: plans!,
+        treatmentSets: sets!,
+        treatmentRecords: records!,
       ),
     );
   }
@@ -63,6 +72,18 @@ Stream<ResearchPanelData> researchPanelData(Ref ref) {
     }, onError: controller.addError),
     service.watchAudit().listen((v) {
       audit = v;
+      emit();
+    }, onError: controller.addError),
+    service.watchTreatmentPlans().listen((v) {
+      plans = v;
+      emit();
+    }, onError: controller.addError),
+    service.watchTreatmentSets().listen((v) {
+      sets = v;
+      emit();
+    }, onError: controller.addError),
+    service.watchTreatmentRecords().listen((v) {
+      records = v;
       emit();
     }, onError: controller.addError),
   ];
@@ -157,6 +178,59 @@ class ResearchPanelController extends _$ResearchPanelController {
     'row:${row.uid}:${stage.id}',
     () => _service.retake(operatorUid: operatorUid, row: row, stage: stage, voidCurrent: voidCurrent),
     '${row.participant.researchId} dapat mengulang ${stage.label} dari awal.',
+  );
+
+  /// Opens official treatment session [session] of [band] (opening
+  /// [opening]; a re-opening when > 1) for [studentIds], with the plan's
+  /// [words].
+  Future<void> openTreatment({
+    required TreatmentPlanBand plan,
+    required int session,
+    required int opening,
+    required List<String> studentIds,
+    required Duration duration,
+  }) => _run(
+    'treat:${plan.band}',
+    () => _service.openTreatmentSession(
+      operatorUid: operatorUid,
+      info: TreatmentSetInfo(
+        planVersion: plan.planVersion,
+        instrumentVersion: plan.instrumentVersion,
+        band: plan.band,
+        session: session,
+        kind: TreatmentSetKind.regular,
+        opening: opening,
+      ),
+      words: plan.sessions[session]!,
+      studentIds: studentIds,
+      duration: duration,
+    ),
+    'Sesi $session band ${plan.band} dibuka untuk ${studentIds.length} siswa.',
+  );
+
+  /// Opens [row]'s one make-up, for session [session].
+  Future<void> openMakeup({
+    required TreatmentPlanBand plan,
+    required PanelRow row,
+    required int session,
+    required Duration duration,
+  }) => _run(
+    'makeup:${row.uid}',
+    () => _service.openTreatmentSession(
+      operatorUid: operatorUid,
+      info: TreatmentSetInfo(
+        planVersion: plan.planVersion,
+        instrumentVersion: plan.instrumentVersion,
+        band: plan.band,
+        session: session,
+        kind: TreatmentSetKind.makeup,
+        opening: 0,
+      ),
+      words: plan.sessions[session]!,
+      studentIds: [row.uid],
+      duration: duration,
+    ),
+    'Susulan sesi $session dibuka untuk ${row.participant.researchId}.',
   );
 
   /// Authorizes [rows] one batch each (the rules' per-request read limit

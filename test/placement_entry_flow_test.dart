@@ -92,6 +92,10 @@ class _RollingBackUserService extends _FirestoreLikeUserService {
 class _NoTargets extends TargetWordSetService {
   @override
   Future<List<TargetWordSet>> fetchActiveForStudent(String studentId) async => [];
+
+  @override
+  Stream<List<TargetWordSet>> watchActiveForStudent(String studentId) =>
+      Stream.fromFuture(fetchActiveForStudent(studentId));
 }
 
 class _NoVocab extends VocabBundleService {

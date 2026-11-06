@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vocably/models/app_user.dart';
+import 'package:vocably/models/learning_session.dart';
+import 'package:vocably/models/research_treatment.dart';
+import 'package:vocably/providers/learning_session_controller.dart';
+import 'package:vocably/providers/research_treatment_providers.dart';
+import 'package:vocably/services/research_treatment_service.dart';
 import 'package:vocably/models/target_word_set.dart';
 import 'package:vocably/models/vocab_bundle_entry.dart';
 import 'package:vocably/models/vocab_word.dart';
@@ -34,6 +39,22 @@ class _FakeTargetWordSetService extends TargetWordSetService {
   @override
   Future<List<TargetWordSet>> fetchActiveForStudent(String studentId) async =>
       sets;
+
+  @override
+  Stream<List<TargetWordSet>> watchActiveForStudent(String studentId) =>
+      Stream.fromFuture(fetchActiveForStudent(studentId));
+}
+
+/// The student's research treatment record; not a participant by default,
+/// so the background reconciliation does nothing.
+class _FakeTreatmentService extends ResearchTreatmentService {
+  TreatmentRecord record = TreatmentRecord.empty;
+
+  @override
+  Future<bool> isParticipant(String uid) async => false;
+
+  @override
+  Future<TreatmentRecord> fetchRecord(String uid) async => record;
 }
 
 /// Also stands in for `VocabBrowserScreen`'s own bundle loading once a
@@ -70,6 +91,7 @@ Future<void> _pumpDashboard(
   _FakeTargetWordSetService? targetWordSetService,
   _FakeVocabBundleService? vocabBundleService,
   FakeResearchAssessmentService? researchService,
+  _FakeTreatmentService? treatmentService,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -80,6 +102,7 @@ Future<void> _pumpDashboard(
           researchService ?? FakeResearchAssessmentService(),
         ),
         placementServiceProvider.overrideWithValue(FakePlacementService()),
+        researchTreatmentServiceProvider.overrideWithValue(treatmentService ?? _FakeTreatmentService()),
         targetWordSetServiceProvider.overrideWithValue(
           targetWordSetService ?? _FakeTargetWordSetService(),
         ),
@@ -611,5 +634,107 @@ void main() {
         expect(find.text('Keluar'), findsNothing);
       },
     );
+  });
+
+  group('DashboardScreen — research treatment session (DATA_MODEL.md §6e)', () {
+    VocabBundleEntry entry(String w) => VocabBundleEntry(
+      word: w,
+      meanings: const [VocabMeaning(pos: 'noun', translation: 'arti')],
+      cefrLevel: 'B1',
+      topics: const [],
+    );
+    final words = ['wa', 'wb', 'wc', 'wd', 'we'];
+
+    TargetWordSet researchSet({List<String> students = const ['student-1']}) => TargetWordSet(
+      id: 'rt_t1_B1_s2_o1',
+      teacherId: 'researcher-1',
+      wordIds: words,
+      cefrLevel: 'B1',
+      startAt: DateTime.now().subtract(const Duration(minutes: 5)),
+      endAt: DateTime.now().add(const Duration(minutes: 55)),
+      targetStudentIds: students,
+      createdAt: DateTime.now(),
+      research: const TreatmentSetInfo(
+        planVersion: 't1',
+        instrumentVersion: 'v1',
+        band: 'B1',
+        session: 2,
+        kind: TreatmentSetKind.regular,
+        opening: 1,
+      ),
+    );
+
+    TargetWordSet ordinarySet() => TargetWordSet(
+      id: 'set-1',
+      teacherId: 'teacher-1',
+      wordIds: const ['wz'],
+      cefrLevel: 'B1',
+      startAt: DateTime(2020),
+      endAt: DateTime(2099, 12, 31),
+      targetStudentIds: const ['__all__'],
+      createdAt: DateTime(2020),
+    );
+
+    _FakeVocabBundleService bundle() => _FakeVocabBundleService()..byLevel = {'B1': [for (final w in [...words, 'wz']) entry(w)]};
+
+    testWidgets('an open session for this student shows its own card; its words never join Target Kata', (tester) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        targetWordSetService: _FakeTargetWordSetService()..sets = [researchSet(), ordinarySet()],
+        vocabBundleService: bundle(),
+      );
+      expect(find.text('Sesi Riset ke-2'), findsOneWidget);
+      expect(find.textContaining('5 kata, dibuka sampai pukul'), findsOneWidget);
+      expect(find.text('1 kata dari Guru'), findsOneWidget, reason: 'the research words are not merged');
+    });
+
+    testWidgets('the card opens the session list, whose CTA starts the flow with the session reference', (tester) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        targetWordSetService: _FakeTargetWordSetService()..sets = [researchSet()],
+        vocabBundleService: bundle(),
+      );
+      await tester.tap(find.text('Sesi Riset ke-2'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(AppBar, 'Sesi Riset ke-2'), findsOneWidget);
+      final container = ProviderScope.containerOf(tester.element(find.byType(TargetWordListScreen)));
+      await tester.tap(find.text('📖 Belajar Kata Ini dengan Cerita'));
+      await tester.pump();
+      final flow = container.read(learningFlowControllerProvider);
+      expect(flow.wordIds, words);
+      expect(flow.sourceType, LearningSessionSourceType.targetGuru);
+      expect([flow.research?.setId, flow.research?.session], ['rt_t1_B1_s2_o1', 2]);
+    });
+
+    testWidgets('a recorded session says so and cannot be started again', (tester) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        targetWordSetService: _FakeTargetWordSetService()..sets = [researchSet()],
+        vocabBundleService: bundle(),
+        treatmentService: _FakeTreatmentService()
+          ..record = const TreatmentRecord(
+            uid: 'student-1',
+            sessions: {2: TreatmentRecordEntry(sessionId: 'ls', setId: 'rt_t1_B1_s2_o1', kind: TreatmentSetKind.regular)},
+          ),
+      );
+      expect(find.text('Sudah selesai'), findsOneWidget);
+      await tester.tap(find.text('Sesi Riset ke-2'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sesi riset ini sudah selesai.'), findsOneWidget);
+      expect(find.text('📖 Belajar Kata Ini dengan Cerita'), findsNothing);
+    });
+
+    testWidgets('no card for a student the researcher did not mark present', (tester) async {
+      await _pumpDashboard(
+        tester,
+        profile: _studentProfile,
+        targetWordSetService: _FakeTargetWordSetService()..sets = [researchSet(students: const ['someone-else'])],
+        vocabBundleService: bundle(),
+      );
+      expect(find.textContaining('Sesi Riset'), findsNothing);
+    });
   });
 }

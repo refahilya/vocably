@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'research_treatment.dart';
+
 /// `learningSessions.sourceType` values (`DATA_MODEL.md` §4). All three
 /// run the identical 3-phase flow — this only records where the target
 /// words came from.
@@ -103,6 +105,8 @@ class LearningSession {
     required this.cowriteWordsUsedCorrectly,
     required this.startedAt,
     required this.completedAt,
+    this.targetWordSetId,
+    this.researchSession,
   });
 
   final String id;
@@ -136,6 +140,14 @@ class LearningSession {
 
   final DateTime startedAt;
   final DateTime? completedAt;
+
+  /// Official research treatment session only (`DATA_MODEL.md` §6e): the
+  /// session set it was started from and its session number. Both `null`
+  /// for every ordinary learning session; immutable after create.
+  final String? targetWordSetId;
+  final int? researchSession;
+
+  bool get isResearchSession => researchSession != null;
 
   /// Fields with no `| null` in `DATA_MODEL.md` §4 that are also
   /// required from the moment a session document is first written (the
@@ -209,6 +221,8 @@ class LearningSession {
         ],
         startedAt: (data['startedAt'] as Timestamp).toDate(),
         completedAt: completedAtRaw is Timestamp ? completedAtRaw.toDate() : null,
+        targetWordSetId: data['targetWordSetId'] as String?,
+        researchSession: data['researchSession'] as int?,
       );
     } catch (error) {
       throw FormatException(
@@ -236,6 +250,7 @@ class LearningSession {
     required String storyTitle,
     required String storyContent,
     required String? storyTranslation,
+    ResearchSessionRef? research,
   }) {
     return {
       'studentId': studentId,
@@ -250,6 +265,10 @@ class LearningSession {
       'cowriteWordsUsedCorrectly': <String>[],
       'startedAt': FieldValue.serverTimestamp(),
       'completedAt': null,
+      if (research != null) ...{
+        'targetWordSetId': research.setId,
+        'researchSession': research.session,
+      },
     };
   }
 
